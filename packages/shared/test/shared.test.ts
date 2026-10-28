@@ -28,7 +28,7 @@ import {
   practiceListMessage,
   recruitMessages,
   answerReport,
-  warningText,
+  warningCard,
   toJstDate,
   yen,
   type Practice,
@@ -365,10 +365,23 @@ describe('Flex Message', () => {
     expect(answerReport([{ practice: at('2026-11-01', '13:00'), answer: null }])).toBeNull();
   });
 
-  it('キャンセル期限前のお知らせは「募集」の練習の画面を開く', () => {
-    const text = warningText(practice({ id: 'p1' }), 1, 3, appUrl);
-    expect(text).toContain(`${appUrl}?manage=p1`);
-    expect(text).not.toContain('?p=');
+  it('キャンセル期限前のお知らせは「募集」の練習の画面を開き、グループごとにもう一度募集できる', () => {
+    const groups = [{ id: 'C1', name: 'チームA' }, { id: 'C2', name: 'あ'.repeat(30) }];
+    const json = JSON.stringify(warningCard({ practice: practice({ id: 'p1' }), going: 1, min: 3, groups, appUrl }));
+    expect(json).toContain(`${appUrl}?manage=p1`);
+    expect(json).not.toContain('?p=');
+    expect(json).toContain('もう一度募集するか、キャンセルするか');
+    expect(json).toContain('"data":"a=remind&p=p1&g=C1"');
+    // ボタンの文字は40文字まで
+    for (const m of json.matchAll(/"label":"([^"]*)"/g)) expect([...m[1]].length).toBeLessThanOrEqual(40);
+  });
+
+  it('キャンセル期限前のお知らせ: ボタンに入りきらない・送れるグループがないときは、もう一度募集を出さない', () => {
+    const long = practice({ id: 'スタジオペンタ渋谷センター街店ダンス練習スタジオ-20261021-1900-Aスタジオ大' });
+    const json = JSON.stringify(warningCard({ practice: long, going: 1, min: 3, groups: [{ id: 'C'.padEnd(33, '0'), name: 'チームA' }], appUrl }));
+    expect(json).not.toContain('a=remind');
+    expect(json).toContain('予約情報を開く');
+    expect(json).not.toContain('もう一度募集するか');
   });
 
   it('確認カード: 「登録して募集」「登録のみ」「やめる」', () => {

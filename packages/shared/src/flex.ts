@@ -328,13 +328,57 @@ export function practiceListMessage(items: ListItem[], appUrl: string, group?: L
 
 // ---------------------------------------------------------------- テキスト通知
 
-export function warningText(p: Practice, going: number, min: number, appUrl: string): string {
-  return [
-    `${practiceSummary(p)} の参加は現在${going}人です（最低人数${min}人）。`,
-    'まもなくキャンセル料がかかります。キャンセルするか判断してください。',
-    // 削除は「募集」の練習の画面でするので、そこを開く
-    appLink(appUrl, { manage: p.id }),
-  ].join('\n');
+/** postback の data は300文字まで（練習IDにスタジオ名が入るので、長いと入りきらない） */
+const MAX_POSTBACK = 300;
+
+export interface WarningCardInput {
+  practice: Practice;
+  going: number;
+  min: number;
+  /** 「もう一度募集」を出すグループ */
+  groups: Group[];
+  appUrl: string;
+}
+
+/**
+ * キャンセル期限前のお知らせ（予約者の個別トークに送る）。
+ * グループごとの「もう一度募集」と、削除などをする「予約情報を開く」（「募集」の練習の画面）を付ける
+ */
+export function warningCard({ practice: p, going, min, groups, appUrl }: WarningCardInput): LineMessage {
+  const remind: Node[] = groups
+    .map((g) => ({ label: `${[...g.name].length > 20 ? [...g.name].slice(0, 20).join('') + '…' : g.name}にもう一度募集`, data: encodePostback({ a: 'remind', p: p.id, g: g.id }) }))
+    // 入りきらないボタンは出さない（カードごと送れなくなるので）
+    .filter((b) => b.data.length <= MAX_POSTBACK)
+    // ボタンの文字は40文字まで
+    .map(({ label, data }) => ({ type: 'button', style: 'primary', color: GREEN, height: 'sm', action: { type: 'postback', label, data, displayText: label } }));
+  const next = remind.length > 0 ? 'もう一度募集するか、キャンセルするか判断してください。' : 'キャンセルするか判断してください。';
+  return {
+    type: 'flex',
+    altText: `参加は現在${going}人です（最低人数${min}人）: ${labelDate(p.date)}`,
+    contents: {
+      type: 'bubble',
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          text('キャンセル期限前のお知らせ', { weight: 'bold', size: 'lg', color: RED }),
+          text(practiceSummary(p), { weight: 'bold', size: 'sm' }),
+          text(`参加は現在${going}人です（最低人数${min}人）。まもなくキャンセル料がかかります。${next}`, { size: 'sm' }),
+        ],
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          ...remind,
+          // 削除は「募集」の練習の画面でするので、そこを開く
+          { type: 'button', style: 'secondary', height: 'sm', action: { type: 'uri', label: '予約情報を開く', uri: appLink(appUrl, { manage: p.id }) } },
+        ],
+      },
+    },
+  };
 }
 
 /**

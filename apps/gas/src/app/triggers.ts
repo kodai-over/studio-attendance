@@ -1,10 +1,11 @@
-import { cancelWarningAt, findCancelRule, goingList, isActive, toJstDate, warningText, TEST_MEMBER_ID } from '@studio-attendance/shared';
+import { cancelWarningAt, findCancelRule, goingList, isActive, toJstDate, warningCard, TEST_MEMBER_ID, type LineMessage } from '@studio-attendance/shared';
 import type { Ctx } from './ports';
+import { remindGroups } from './practices';
 
 /**
  * 毎時実行。
  * - 日付を過ぎた練習を「終了」にする（参加リンクも無効になる）
- * - キャンセル期限前警告：警告時刻を過ぎ、参加人数が最低人数に届いていない練習を予約者に知らせる
+ * - キャンセル期限前警告：警告時刻を過ぎ、参加人数が最低人数に届いていない練習を予約者に知らせる（グループにもう一度募集できる）
  * - グループ名をLINE側の名前にそろえる
  */
 export function hourlyJob(ctx: Ctx): void {
@@ -12,7 +13,7 @@ export function hourlyJob(ctx: Ctx): void {
   const today = toJstDate(now);
   const settings = ctx.store.settings();
   const att = ctx.store.attendance();
-  const warnings: { to: string; text: string }[] = [];
+  const warnings: { to: string; message: LineMessage }[] = [];
 
   ctx.withLock(() => {
     for (const p of ctx.store.practices()) {
@@ -32,13 +33,15 @@ export function hourlyJob(ctx: Ctx): void {
       const going = goingList(att, p.id).length;
       const min = p.min ?? settings.minDefault;
       // 確認用アカウントはLINEのユーザーではないので送らない
-      if (going < min && p.booker !== TEST_MEMBER_ID) warnings.push({ to: p.booker, text: warningText(p, going, min, ctx.config.appUrl) });
+      if (going < min && p.booker !== TEST_MEMBER_ID) {
+        warnings.push({ to: p.booker, message: warningCard({ practice: p, going, min, groups: remindGroups(ctx, p), appUrl: ctx.config.appUrl }) });
+      }
     }
   });
 
   for (const w of warnings) {
     try {
-      ctx.line.push(w.to, [{ type: 'text', text: w.text }]);
+      ctx.line.push(w.to, [w.message]);
     } catch (e) {
       ctx.log('warning push failed', w.to, e);
     }
