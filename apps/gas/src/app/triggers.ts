@@ -1,11 +1,11 @@
-import { cancelDeadline, cancelWarningAt, findCancelRule, goingList, isActive, toJstDate, warningCard, TEST_MEMBER_ID, type LineMessage } from '@studio-attendance/shared';
+import { cancelWarningAt, findCancelRule, goingList, isActive, toJstDate, warningCard, TEST_MEMBER_ID, type LineMessage } from '@studio-attendance/shared';
 import type { Ctx } from './ports';
 import { remindGroups } from './practices';
 
 /**
  * 毎時実行。
  * - 日付を過ぎた練習を「終了」にする（参加リンクも無効になる）
- * - キャンセル期限前警告：期限の前日の警告時刻を過ぎ、参加人数が最低人数に届いていない練習を予約者に知らせる（グループにもう一度募集できる）
+ * - キャンセル期限前警告：警告時刻を過ぎ、参加人数が最低人数に届いていない練習を予約者に知らせる（グループにもう一度募集できる）
  * - グループ名をLINE側の名前にそろえる
  */
 export function hourlyJob(ctx: Ctx): void {
@@ -34,8 +34,7 @@ export function hourlyJob(ctx: Ctx): void {
       const min = p.min ?? settings.minDefault;
       // 確認用アカウントはLINEのユーザーではないので送らない
       if (going < min && p.booker !== TEST_MEMBER_ID) {
-        const deadline = cancelDeadline(p.date, rule);
-        warnings.push({ to: p.booker, message: warningCard({ practice: p, going, min, deadline, groups: remindGroups(ctx, p), appUrl: ctx.config.appUrl }) });
+        warnings.push({ to: p.booker, message: warningCard({ practice: p, going, min, groups: remindGroups(ctx, p), appUrl: ctx.config.appUrl }) });
       }
     }
   });

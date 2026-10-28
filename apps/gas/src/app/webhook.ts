@@ -251,7 +251,8 @@ function onPostback(ctx: Ctx, ev: LineEvent): void {
     case 'remind': {
       // 送れないときは UserError の理由がそのまま返事になる
       const name = remindRecruit(ctx, userId, data.p, data.g);
-      safeReply(ctx, ev, [textMsg(`${name}にもう一度募集を送りました。`)]);
+      // 送るのに時間がかかって返事の期限が切れても、結果は伝える
+      sendToUser(ctx, ev, userId, [textMsg(`${name}にもう一度募集を送りました。`)]);
       return;
     }
     case 'discard': {

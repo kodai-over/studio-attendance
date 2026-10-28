@@ -557,18 +557,16 @@ describe('キャンセル期限前警告と終了', () => {
     t.line.pushes = [];
     t.line.groupNames = { [G1]: 'チームA' };
 
-    // 10/21 の練習で、キャンセル期限（4日前）は 10/17。お知らせはその前日の 10:00
-    t.clock.now = new Date('2026-10-16T00:59:00Z'); // 10/16 9:59 JST
+    t.clock.now = new Date('2026-10-17T00:59:00Z'); // 10/17 9:59 JST
     hourlyJob(t.ctx);
     expect(t.line.pushes).toHaveLength(0);
 
-    t.clock.now = new Date('2026-10-16T01:00:00Z');
+    t.clock.now = new Date('2026-10-17T01:00:00Z');
     hourlyJob(t.ctx);
     expect(t.line.pushes).toHaveLength(1);
     expect(t.line.pushes[0].to).toBe(BOOKER);
     const card = JSON.stringify(t.line.pushes[0]);
     expect(card).toContain('現在1人です（最低人数3人）'); // 登録者が自動で「行く」
-    expect(card).toContain('10/17(土)からキャンセル料がかかります');
     // 募集していなくても、ふだんの送り先にもう一度募集できる
     expect(card).toContain('チームAにもう一度募集');
     expect(card).toContain(`a=remind&p=${encodeURIComponent(t.store.p[0].id)}&g=${G1}`);
@@ -609,7 +607,7 @@ describe('もう一度募集', () => {
     t.store.s.groups.push({ id: G2, name: 'チームB' });
     t.line.groupNames = { [G1]: 'チームA', [G2]: 'チームB' };
     const id = make(t, [G2]);
-    t.clock.now = new Date('2026-10-16T01:00:00Z');
+    t.clock.now = new Date('2026-10-17T01:00:00Z');
     hourlyJob(t.ctx);
     const card = JSON.stringify(t.line.pushes[0]);
     expect(card).toContain('チームBにもう一度募集');
@@ -663,6 +661,39 @@ describe('もう一度募集', () => {
     t.clock.now = new Date('2026-10-20T00:00:00Z');
     remind(t, ADMIN, id);
     expect(t.line.pushes).toHaveLength(1);
+  });
+
+  it('満員の予約情報には送らない', () => {
+    const t = setup();
+    const id = make(t, []);
+    t.store.p[0].status = '満員';
+    remind(t, BOOKER, id);
+    expect(t.line.lastReplyText()).toContain('満員なので');
+    expect(t.line.pushes).toHaveLength(0);
+  });
+
+  it('送る前に失敗しても、すぐに押し直せる', () => {
+    const t = setup();
+    const id = make(t, []);
+    const attendance = t.store.attendance.bind(t.store);
+    t.store.attendance = () => {
+      throw new Error('sheet error');
+    };
+    remind(t, BOOKER, id);
+    expect(t.kv.data.has(`remind:${id}:${G1}`)).toBe(false);
+    t.store.attendance = attendance;
+    remind(t, BOOKER, id);
+    expect(t.line.pushes).toHaveLength(1);
+  });
+
+  it('返事の期限が切れていたら、個別に送る', () => {
+    const t = setup();
+    const id = make(t, []);
+    t.line.reply = () => {
+      throw new Error('invalid reply token');
+    };
+    remind(t, BOOKER, id);
+    expect(t.line.pushes.map((p) => p.to)).toEqual([G1, BOOKER]);
   });
 });
 

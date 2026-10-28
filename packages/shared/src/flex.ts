@@ -328,15 +328,13 @@ export function practiceListMessage(items: ListItem[], appUrl: string, group?: L
 
 // ---------------------------------------------------------------- テキスト通知
 
-/** お知らせのボタンに出すグループの数（多いとカードが長くなる） */
-const MAX_REMIND_GROUPS = 4;
+/** postback の data は300文字まで（練習IDにスタジオ名が入るので、長いと入りきらない） */
+const MAX_POSTBACK = 300;
 
 export interface WarningCardInput {
   practice: Practice;
   going: number;
   min: number;
-  /** キャンセル期限の日 */
-  deadline: string;
   /** 「もう一度募集」を出すグループ */
   groups: Group[];
   appUrl: string;
@@ -346,15 +344,14 @@ export interface WarningCardInput {
  * キャンセル期限前のお知らせ（予約者の個別トークに送る）。
  * グループごとの「もう一度募集」と、削除などをする「予約情報を開く」（「募集」の練習の画面）を付ける
  */
-export function warningCard({ practice: p, going, min, deadline, groups, appUrl }: WarningCardInput): LineMessage {
-  const remind: Node[] = groups.slice(0, MAX_REMIND_GROUPS).map((g) => ({
-    type: 'button',
-    style: 'primary',
-    color: GREEN,
-    height: 'sm',
+export function warningCard({ practice: p, going, min, groups, appUrl }: WarningCardInput): LineMessage {
+  const remind: Node[] = groups
+    .map((g) => ({ label: `${[...g.name].length > 20 ? [...g.name].slice(0, 20).join('') + '…' : g.name}にもう一度募集`, data: encodePostback({ a: 'remind', p: p.id, g: g.id }) }))
+    // 入りきらないボタンは出さない（カードごと送れなくなるので）
+    .filter((b) => b.data.length <= MAX_POSTBACK)
     // ボタンの文字は40文字まで
-    action: { type: 'postback', label: `${[...g.name].length > 20 ? [...g.name].slice(0, 20).join('') + '…' : g.name}にもう一度募集`, data: encodePostback({ a: 'remind', p: p.id, g: g.id }) },
-  }));
+    .map(({ label, data }) => ({ type: 'button', style: 'primary', color: GREEN, height: 'sm', action: { type: 'postback', label, data, displayText: label } }));
+  const next = remind.length > 0 ? 'もう一度募集するか、キャンセルするか判断してください。' : 'キャンセルするか判断してください。';
   return {
     type: 'flex',
     altText: `参加は現在${going}人です（最低人数${min}人）: ${labelDate(p.date)}`,
@@ -367,7 +364,7 @@ export function warningCard({ practice: p, going, min, deadline, groups, appUrl 
         contents: [
           text('キャンセル期限前のお知らせ', { weight: 'bold', size: 'lg', color: RED }),
           text(practiceSummary(p), { weight: 'bold', size: 'sm' }),
-          text(`参加は現在${going}人です（最低人数${min}人）。${labelDate(deadline)}からキャンセル料がかかります。もう一度募集するか、キャンセルするか判断してください。`, { size: 'sm' }),
+          text(`参加は現在${going}人です（最低人数${min}人）。まもなくキャンセル料がかかります。${next}`, { size: 'sm' }),
         ],
       },
       footer: {

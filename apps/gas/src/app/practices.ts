@@ -471,6 +471,7 @@ export function remindRecruit(ctx: Ctx, userId: string, practiceId: string, grou
   if (!p) throw new UserError('この予約情報は削除されています。');
   if (!canEditPractice(ctx.store.getMember(userId), p)) throw new UserError('この予約情報の予約者か管理者だけが募集を送れます。');
   if (!isActive(p) || p.date < toJstDate(ctx.now())) throw new UserError('終了した予約情報には募集を送れません。');
+  if (p.status === '満員') throw new UserError('満員なので、募集は送れません。');
   const group = ctx.store.settings().groups.find((g) => g.id === groupId);
   if (!group) throw new UserError('このグループには今は送れません（Bot がグループにいません）。');
   const key = remindKey(p.id, group.id);
@@ -480,11 +481,18 @@ export function remindRecruit(ctx: Ctx, userId: string, practiceId: string, grou
     return true;
   });
   if (!fresh) throw new UserError(`${group.name}には少し前に募集を送りました。続けて送るときは10分ほどあけてください。`);
-  const going = goingList(ctx.store.attendance(), p.id).length;
-  const min = p.min ?? ctx.store.settings().minDefault;
-  const lead = `まだ参加者を募集しています。参加は現在${going}人です（最低人数${min}人）。`;
-  const booker = ctx.store.getMember(p.booker);
-  if (sendRecruit(ctx, [p], [group.id], booker?.name ?? '（不明）', lead).length === 0) {
+  let sent;
+  try {
+    const going = goingList(ctx.store.attendance(p.id), p.id).length;
+    const min = p.min ?? ctx.store.settings().minDefault;
+    const lead = `まだ参加者を募集しています。参加は現在${going}人です（最低人数${min}人）。`;
+    sent = sendRecruit(ctx, [p], [group.id], ctx.store.getMember(p.booker)?.name ?? '（不明）', lead).length > 0;
+  } catch (e) {
+    // 送る前に失敗したときも、すぐ押し直せるようにする
+    ctx.kv.remove(key);
+    throw e;
+  }
+  if (!sent) {
     ctx.kv.remove(key);
     throw new UserError('募集を送れませんでした。時間をおいてもう一度お試しください。');
   }

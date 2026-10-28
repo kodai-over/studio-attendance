@@ -152,12 +152,9 @@ describe('設定', () => {
     expect(findCancelRule(settings.cancelRules, 'BUZZ横浜東口')?.daysBefore).toBe(1);
     expect(findCancelRule(settings.cancelRules, 'その他')).toBeNull();
   });
-  it('警告時刻はキャンセル期限の前日', () => {
+  it('警告時刻', () => {
     expect(cancelWarningAt('2026-10-21', { studio: 'worcle', daysBefore: 4, time: '10:00' }).toISOString()).toBe(
-      '2026-10-16T01:00:00.000Z',
-    );
-    expect(cancelWarningAt('2026-10-21', { studio: 'worcle', daysBefore: 0, time: '10:00' }).toISOString()).toBe(
-      '2026-10-20T01:00:00.000Z',
+      '2026-10-17T01:00:00.000Z',
     );
   });
 });
@@ -370,13 +367,21 @@ describe('Flex Message', () => {
 
   it('キャンセル期限前のお知らせは「募集」の練習の画面を開き、グループごとにもう一度募集できる', () => {
     const groups = [{ id: 'C1', name: 'チームA' }, { id: 'C2', name: 'あ'.repeat(30) }];
-    const json = JSON.stringify(warningCard({ practice: practice({ id: 'p1' }), going: 1, min: 3, deadline: '2026-10-17', groups, appUrl }));
+    const json = JSON.stringify(warningCard({ practice: practice({ id: 'p1' }), going: 1, min: 3, groups, appUrl }));
     expect(json).toContain(`${appUrl}?manage=p1`);
     expect(json).not.toContain('?p=');
-    expect(json).toContain('10/17(土)からキャンセル料がかかります');
+    expect(json).toContain('もう一度募集するか、キャンセルするか');
     expect(json).toContain('"data":"a=remind&p=p1&g=C1"');
     // ボタンの文字は40文字まで
     for (const m of json.matchAll(/"label":"([^"]*)"/g)) expect([...m[1]].length).toBeLessThanOrEqual(40);
+  });
+
+  it('キャンセル期限前のお知らせ: ボタンに入りきらない・送れるグループがないときは、もう一度募集を出さない', () => {
+    const long = practice({ id: 'スタジオペンタ渋谷センター街店ダンス練習スタジオ-20261021-1900-Aスタジオ大' });
+    const json = JSON.stringify(warningCard({ practice: long, going: 1, min: 3, groups: [{ id: 'C'.padEnd(33, '0'), name: 'チームA' }], appUrl }));
+    expect(json).not.toContain('a=remind');
+    expect(json).toContain('予約情報を開く');
+    expect(json).not.toContain('もう一度募集するか');
   });
 
   it('確認カード: 「登録して募集」「登録のみ」「やめる」', () => {
