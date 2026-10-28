@@ -96,9 +96,14 @@ export function findCancelRule(rules: CancelRule[], studio: string): CancelRule 
   return hits[0] ?? null;
 }
 
-/** キャンセル期限前警告を出す時刻 */
+/** キャンセル期限の日（この日からキャンセル料がかかる） */
+export function cancelDeadline(date: string, rule: CancelRule): string {
+  return addDays(date, -rule.daysBefore);
+}
+
+/** キャンセル期限前警告を出す時刻。期限の前日の警告時刻（もう一度募集する時間を残す） */
 export function cancelWarningAt(date: string, rule: CancelRule): Date {
-  return jstDateTime(addDays(date, -rule.daysBefore), rule.time);
+  return jstDateTime(addDays(cancelDeadline(date, rule), -1), rule.time);
 }
 
 export function isActive(p: Pick<Practice, 'status'>): boolean {

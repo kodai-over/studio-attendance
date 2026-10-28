@@ -26,6 +26,7 @@ import {
   noteGroupMember,
   readReservations,
   recordAnswer,
+  remindRecruit,
   removeDraft,
   saveDraft,
   upcoming,
@@ -247,6 +248,12 @@ function onPostback(ctx: Ctx, ev: LineEvent): void {
       return onRsvp(ctx, ev, userId, data.p, data.v === '1' ? '行く' : data.v === '2' ? '保留' : '行かない');
     case 'confirm':
       return onConfirm(ctx, ev, userId, data.d, data.r === '1');
+    case 'remind': {
+      // 送れないときは UserError の理由がそのまま返事になる
+      const name = remindRecruit(ctx, userId, data.p, data.g);
+      safeReply(ctx, ev, [textMsg(`${name}にもう一度募集を送りました。`)]);
+      return;
+    }
     case 'discard': {
       const draft = loadDraft(ctx, data.d);
       if (draft && draft.booker === userId) removeDraft(ctx, data.d);
