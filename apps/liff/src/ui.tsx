@@ -133,7 +133,7 @@ export const Spinner = () => <div class="spinner" aria-label="読み込み中" /
 export const Syncing = () => <div class="syncing" role="progressbar" aria-label="更新中" />;
 
 export function TopBar({ title, back, children }: { title?: string; back?: boolean; children?: ComponentChildren }) {
-  if (!title && !back && !children) return null;
+  if (!title && !back && children === undefined) return null;
   return (
     <header class="topbar">
       {back && (
