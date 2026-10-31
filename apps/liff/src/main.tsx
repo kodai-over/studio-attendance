@@ -175,13 +175,13 @@ function App() {
         <div class="empty">{error}</div>
       ) : me ? (
         <AppContext.Provider value={{ me, setMe, toast, practices: practices?.list ?? null, practicesAt: practices?.at ?? 0, startupFailed, setPractices, updatePractice, deletePractice, loadHome }}>
-          <NavBar />
           {me.actAs && me.actAs !== 'self' && (
             <button class="acting-banner" onClick={() => go('/settings')}>
               {me.actAs === 'member' ? '一般として表示中' : '確認用アカウント「admin」として操作中'}（「自分」で戻せます）
             </button>
           )}
           <Router />
+          <NavBar />
         </AppContext.Provider>
       ) : (
         <Spinner />
