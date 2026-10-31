@@ -165,7 +165,7 @@ export function PracticeCard({ v, onAnswer, busy }: { v: PracticeView; onAnswer?
         <div class="ticket-foot">
           <AvatarStack names={v.going.map((a) => ({ name: a.name, guest: a.kind === 'ゲスト' }))} />
           <span class="count">
-            <Icon name="people" size={16} />
+            <Icon name="people" size={14} />
             {v.goingCount}
             {p.max ? <small>/{p.max}</small> : null}
           </span>

@@ -90,7 +90,7 @@ function RecruitTicket({ v, showBooker }: { v: PracticeView; showBooker: boolean
             ))}
           </span>
           <span class="fee">
-            <Icon name="chevron" size={18} />
+            <Icon name="chevron" size={15} />
           </span>
         </div>
       </button>
