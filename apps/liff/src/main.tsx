@@ -180,8 +180,8 @@ function App() {
               {me.actAs === 'member' ? '一般として表示中' : '確認用アカウント「admin」として操作中'}（「自分」で戻せます）
             </button>
           )}
-          <Router />
           <NavBar />
+          <Router />
         </AppContext.Provider>
       ) : (
         <Spinner />
