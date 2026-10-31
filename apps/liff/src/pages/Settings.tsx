@@ -151,17 +151,18 @@ export function AdminPage() {
       {members == null ? (
         <Spinner />
       ) : (
-        members.map((m) => (
-          <section class="card" key={m.userId}>
-            <div class="row">
-              <strong class="grow">{m.name}</strong>
-              <select style={{ width: 'auto' }} value={m.role} disabled={busy} onChange={(e) => saveMember(m.userId, { role: e.currentTarget.value as Role })}>
-                <option>一般</option>
-                <option>予約者</option>
-                <option>管理者</option>
-              </select>
-            </div>
-            {me.groups.map((g) => (
+        <div class="card-grid">
+          {members.map((m) => (
+            <section class="card" key={m.userId}>
+              <div class="row">
+                <strong class="grow">{m.name}</strong>
+                <select style={{ width: 'auto' }} value={m.role} disabled={busy} onChange={(e) => saveMember(m.userId, { role: e.currentTarget.value as Role })}>
+                  <option>一般</option>
+                  <option>予約者</option>
+                  <option>管理者</option>
+                </select>
+              </div>
+              {me.groups.map((g) => (
                 <label class="check">
                   <input
                     type="checkbox"
@@ -171,8 +172,8 @@ export function AdminPage() {
                   />
                   {g.name}に所属
                 </label>
-            ))}
-            {me.groups.map((g) => (
+              ))}
+              {me.groups.map((g) => (
                 <label class="check">
                   <input
                     type="checkbox"
@@ -184,9 +185,10 @@ export function AdminPage() {
                   />
                   {g.name}をふだんの送り先にする
                 </label>
-            ))}
-          </section>
-        ))
+              ))}
+            </section>
+          ))}
+        </div>
       )}
 
       <StudioEditor studios={studios} onChange={setStudios} />

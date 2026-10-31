@@ -15,55 +15,66 @@ export function RecruitDetailPage({ id }: { id: string }) {
   return (
     <>
       <TopBar back>{loading && <Syncing />}</TopBar>
-      <PracticePass v={v} />
 
-      {(v.practice.status === '募集中' || v.practice.status === '満員') && (
-        <RecruitForm v={v} busy={busy} onSend={async (groups) => {
-            if (me.actAs === 'test' && !confirm('確認用アカウント「admin」として、グループに募集を送ります。よろしいですか？')) return;
-            await update(() => api('recruitPractice', { id, groups }), 'グループに募集を送りました');
-          }} />
-      )}
+      <div class="detail-layout">
+        <div class="detail-primary">
+          <PracticePass v={v} />
 
-      <section>
-        <div class="sec-head">
-          <Icon name="people" size={18} />
-          ゲスト
-          {guests.length > 0 && <span class="n">{guests.length}</span>}
+          {(v.practice.status === '募集中' || v.practice.status === '満員') && (
+            <RecruitForm
+              v={v}
+              busy={busy}
+              onSend={async (groups) => {
+                if (me.actAs === 'test' && !confirm('確認用アカウント「admin」として、グループに募集を送ります。よろしいですか？')) return;
+                await update(() => api('recruitPractice', { id, groups }), 'グループに募集を送りました');
+              }}
+            />
+          )}
         </div>
-        {guests.length > 0 && (
-          <div class="people" style={{ marginBottom: 10 }}>
-            {guests.map((a) => (
-              <span class="person">
-                <Avatar name={a.name} guest />
-                <span>{a.name}</span>
-                {a.canRemove && (
-                  <button class="x" aria-label={`${a.name}さんを削除`} onClick={() => confirm(`${a.name}さんを削除しますか？`) && remove(a)}>
-                    <Icon name="x" size={14} />
-                  </button>
-                )}
-              </span>
-            ))}
-          </div>
-        )}
-        <GuestForm onAdd={(name) => update(() => api('addGuest', { id, name }), `${name}さんを追加しました`)} busy={busy} />
-      </section>
 
-      {v.joinUrl && <JoinLink url={v.joinUrl} />}
+        <div class="detail-side">
+          <section>
+            <div class="sec-head">
+              <Icon name="people" size={18} />
+              ゲスト
+              {guests.length > 0 && <span class="n">{guests.length}</span>}
+            </div>
+            {guests.length > 0 && (
+              <div class="people" style={{ marginBottom: 10 }}>
+                {guests.map((a) => (
+                  <span class="person">
+                    <Avatar name={a.name} guest />
+                    <span>{a.name}</span>
+                    {a.canRemove && (
+                      <button class="x" aria-label={`${a.name}さんを削除`} onClick={() => confirm(`${a.name}さんを削除しますか？`) && remove(a)}>
+                        <Icon name="x" size={14} />
+                      </button>
+                    )}
+                  </span>
+                ))}
+              </div>
+            )}
+            <GuestForm onAdd={(name) => update(() => api('addGuest', { id, name }), `${name}さんを追加しました`)} busy={busy} />
+          </section>
 
-      {v.canEdit && (
-        <EditForm
-          v={v}
-          busy={busy}
-          onSave={(patch) => update(() => api('updatePractice', { id, patch }), '保存しました')}
-          onDelete={async () => {
-            // サーバーの返事を待たずに「募集」に戻る（失敗したら一覧に戻して知らせる）
-            // 一覧から来たときは戻る（履歴に削除した練習の画面を残さない）。お知らせのリンクから来たときは「募集」へ
-            if (history.length > 1) history.back();
-            else go('/recruit');
-            await deletePractice(v);
-          }}
-        />
-      )}
+          {v.joinUrl && <JoinLink url={v.joinUrl} />}
+
+          {v.canEdit && (
+            <EditForm
+              v={v}
+              busy={busy}
+              onSave={(patch) => update(() => api('updatePractice', { id, patch }), '保存しました')}
+              onDelete={async () => {
+                // サーバーの返事を待たずに「募集」に戻る（失敗したら一覧に戻して知らせる）
+                // 一覧から来たときは戻る（履歴に削除した練習の画面を残さない）。お知らせのリンクから来たときは「募集」へ
+                if (history.length > 1) history.back();
+                else go('/recruit');
+                await deletePractice(v);
+              }}
+            />
+          )}
+        </div>
+      </div>
     </>
   );
 }

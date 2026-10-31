@@ -75,7 +75,11 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
           {tab === 'all' && <p class="note">スタジオの予約は「募集」の右上の＋から登録できます</p>}
         </div>
       ) : (
-        shown.map((v) => <PracticeCard key={v.practice.id} v={v} onAnswer={(a) => answer(v.practice.id, a)} />)
+        <div class="ticket-grid">
+          {shown.map((v) => (
+            <PracticeCard key={v.practice.id} v={v} onAnswer={(a) => answer(v.practice.id, a)} />
+          ))}
+        </div>
       )}
     </>
   );

@@ -15,6 +15,8 @@
   --sun: #d23b2a;
   --nav: rgb(128 128 128 / 62%);
   --nav-on: rgb(70 70 70 / 70%);
+  --pad-x: 16px;
+  --nav-w: 0px;
   --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
   --sans: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
   color-scheme: light;
@@ -76,8 +78,8 @@ a {
 .app {
   max-width: 560px;
   margin: 0 auto;
-  /* 下の浮いたナビに最後の行が隠れないよう、下に余白をとる */
-  padding: 0 16px calc(104px + env(safe-area-inset-bottom));
+  /* 下のナビに最後の行が隠れないよう、下に余白をとる */
+  padding: 0 var(--pad-x) calc(80px + env(safe-area-inset-bottom));
 }
 
 .icon {
@@ -94,7 +96,7 @@ a {
   align-items: center;
   gap: 4px;
   min-height: 52px;
-  margin: 0 -16px 8px;
+  margin: 0 calc(var(--pad-x) * -1) 8px;
   padding: 4px 8px;
   background: color-mix(in srgb, var(--bg) 90%, transparent);
   backdrop-filter: blur(10px);
@@ -127,7 +129,7 @@ a {
   position: sticky;
   top: 0;
   z-index: 5;
-  margin: 0 -16px 16px;
+  margin: 0 calc(var(--pad-x) * -1) 16px;
   padding-top: env(safe-area-inset-top);
   background: color-mix(in srgb, var(--bg) 92%, transparent);
   backdrop-filter: blur(10px);
@@ -190,46 +192,47 @@ a {
   }
 }
 
-/* ---------- 下の浮いたナビ ---------- */
+/* ---------- ナビ（狭い画面では下端に密着、広い画面では左サイドバー） ---------- */
 .navbar {
   position: fixed;
-  left: 50%;
-  bottom: calc(14px + env(safe-area-inset-bottom));
+  inset-inline: 0;
+  bottom: 0;
   z-index: 10;
-  transform: translateX(-50%);
   display: flex;
-  gap: 2px;
-  width: min(calc(100% - 32px), 420px);
-  padding: 5px;
-  border-radius: 999px;
-  background: var(--nav);
-  backdrop-filter: blur(18px) saturate(1.4);
-  -webkit-backdrop-filter: blur(18px) saturate(1.4);
-  box-shadow: 0 8px 28px rgb(0 0 0 / 18%);
+  gap: 4px;
+  padding: 6px max(12px, env(safe-area-inset-left)) calc(6px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-right));
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
 }
 .navbar button {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 2px;
-  padding: 8px 0 6px;
+  padding: 6px 4px 4px;
   border: 0;
-  border-radius: 999px;
+  border-radius: 10px;
   background: transparent;
-  color: rgb(255 255 255 / 82%);
+  color: var(--sub);
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.04em;
+  transition: background 0.15s, color 0.15s;
 }
 .navbar button[aria-current='page'] {
-  background: var(--nav-on);
-  color: #fff;
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 600;
 }
 
 /* ---------- 左にスワイプして削除する行（募集） ---------- */
 .swipe {
   position: relative;
+  height: 100%;
   margin-bottom: 10px;
   border-radius: 14px;
   overflow: hidden;
@@ -237,6 +240,7 @@ a {
 .swipe-body {
   position: relative;
   z-index: 1;
+  height: 100%;
   /* 縦のスクロールはブラウザに任せ、横の動きだけ受け取る */
   touch-action: pan-y;
   /* 中止の練習（半透明）の下から赤が透けないように */
@@ -273,18 +277,47 @@ a {
 }
 
 /* ---------- チケット（練習） ---------- */
+.ticket-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  container-type: inline-size;
+}
+.ticket-grid > .ticket,
+.ticket-grid > .swipe {
+  margin-bottom: 0;
+}
 .ticket {
+  --stub-w: 84px;
   position: relative;
   display: grid;
-  grid-template-columns: 84px 1fr;
+  grid-template-columns: var(--stub-w) 1fr;
+  grid-template-rows: 1fr auto;
+  height: 100%;
   margin-bottom: 10px;
   border-radius: 14px;
   background: var(--paper);
   /* 半券と本体のあいだの切り込み */
-  -webkit-mask: radial-gradient(circle 9px at 84px 0, transparent 8.5px, #000 9px) top / 100% 51% no-repeat,
-    radial-gradient(circle 9px at 84px 100%, transparent 8.5px, #000 9px) bottom / 100% 51% no-repeat;
-  mask: radial-gradient(circle 9px at 84px 0, transparent 8.5px, #000 9px) top / 100% 51% no-repeat,
-    radial-gradient(circle 9px at 84px 100%, transparent 8.5px, #000 9px) bottom / 100% 51% no-repeat;
+  -webkit-mask: radial-gradient(circle 9px at var(--stub-w) 0, transparent 8.5px, #000 9px) top / 100% 51% no-repeat,
+    radial-gradient(circle 9px at var(--stub-w) 100%, transparent 8.5px, #000 9px) bottom / 100% 51% no-repeat;
+  mask: radial-gradient(circle 9px at var(--stub-w) 0, transparent 8.5px, #000 9px) top / 100% 51% no-repeat,
+    radial-gradient(circle 9px at var(--stub-w) 100%, transparent 8.5px, #000 9px) bottom / 100% 51% no-repeat;
+}
+@media (min-width: 640px) {
+  @container (inline-size < 620px) {
+    .ticket {
+      --stub-w: 70px;
+    }
+    .ticket-main {
+      padding: 10px 12px 8px 13px;
+    }
+    .stub .d {
+      font-size: 23px;
+    }
+    .time {
+      font-size: 16px;
+    }
+  }
 }
 .ticket > .stub {
   grid-row: span 2;
@@ -1137,6 +1170,15 @@ details > summary {
   padding: 14px 16px 6px;
   border-radius: 16px;
   background: var(--paper);
+  container-type: inline-size;
+}
+@container (inline-size > 480px) {
+  .draft-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    align-items: start;
+  }
 }
 .draft-head {
   display: flex;
@@ -1181,8 +1223,8 @@ details > summary {
 /* ---------- 通知 ---------- */
 .toast {
   position: fixed;
-  left: 50%;
-  bottom: calc(96px + env(safe-area-inset-bottom));
+  left: calc(50% + var(--nav-w) / 2);
+  bottom: calc(74px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   max-width: calc(100% - 32px);
   padding: 11px 18px;
@@ -1360,4 +1402,107 @@ details > summary {
   color: var(--bg);
   font-size: 13px;
   text-align: center;
+}
+
+/* ---------- 広い画面（横表示・インナー画面・タブレット・PC） ---------- */
+@media (min-width: 640px) {
+  :root {
+    --pad-x: 20px;
+    --nav-w: calc(76px + env(safe-area-inset-left));
+  }
+  body:has(.navbar) {
+    padding-left: var(--nav-w);
+    padding-right: env(safe-area-inset-right);
+  }
+  .app:has(.navbar) {
+    max-width: 960px;
+    padding-bottom: calc(32px + env(safe-area-inset-bottom));
+  }
+  .navbar {
+    inset: 0 auto 0 0;
+    width: var(--nav-w);
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 6px;
+    padding: max(16px, env(safe-area-inset-top)) 8px max(16px, env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left));
+    border-top: 0;
+    border-right: 1px solid var(--line);
+  }
+  .navbar button {
+    flex: none;
+    width: 100%;
+    padding: 10px 4px 8px;
+    border-radius: 12px;
+  }
+  .ticket-grid,
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .card-grid > .card {
+    margin-bottom: 0;
+  }
+  .draft-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 14px;
+    align-items: start;
+    margin-bottom: 12px;
+  }
+  .draft-grid > .draft {
+    margin-bottom: 0;
+  }
+  .detail-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    grid-template-areas:
+      'primary side'
+      'extra   side';
+    column-gap: 24px;
+    align-items: start;
+  }
+  .detail-primary {
+    grid-area: primary;
+  }
+  .detail-side {
+    grid-area: side;
+  }
+  .detail-extra {
+    grid-area: extra;
+  }
+  .detail-side > .sec-head:first-child,
+  .detail-side > section:first-child > .sec-head:first-child {
+    margin-top: 4px;
+  }
+  .toast {
+    bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (min-width: 960px) {
+  :root {
+    --pad-x: 28px;
+    --nav-w: calc(168px + env(safe-area-inset-left));
+  }
+  .app:has(.navbar) {
+    max-width: 1080px;
+  }
+  .navbar {
+    padding-inline: calc(12px + env(safe-area-inset-left)) 12px;
+  }
+  .navbar button {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 11px 14px;
+    font-size: 14px;
+  }
+  .ticket-grid,
+  .card-grid {
+    gap: 16px;
+  }
+  .detail-layout {
+    column-gap: 32px;
+  }
 }

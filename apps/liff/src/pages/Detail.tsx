@@ -93,43 +93,51 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
     <>
       <TopBar back>{loading && <Syncing />}</TopBar>
 
-      <PracticePass v={v} />
+      <div class="detail-layout">
+        <div class="detail-primary">
+          <PracticePass v={v} />
 
-      <RsvpButtons
-        solo
-        value={v.myAnswer}
-        status={p.status}
-        busy={busy && !inList}
-        onAnswer={(a: Answer) => {
-          // 一覧にある練習は、待たずに切り替える（結果は一覧に入り、この画面もそれに合わせる）
-          if (inList) answer(id, a);
-          else update(() => api('rsvp', { id, answer: a }));
-        }}
-      />
+          <RsvpButtons
+            solo
+            value={v.myAnswer}
+            status={p.status}
+            busy={busy && !inList}
+            onAnswer={(a: Answer) => {
+              // 一覧にある練習は、待たずに切り替える（結果は一覧に入り、この画面もそれに合わせる）
+              if (inList) answer(id, a);
+              else update(() => api('rsvp', { id, answer: a }));
+            }}
+          />
+        </div>
 
-      <Attendees v={v} onRemove={(a) => update(() => api('removeAttendance', { id, participant: a.participant }), '削除しました')} />
+        <div class="detail-side">
+          <Attendees v={v} onRemove={(a) => update(() => api('removeAttendance', { id, participant: a.participant }), '削除しました')} />
+        </div>
 
-      <div class="sec-head" ref={calRef}>
-        <Icon name="calendar" size={18} />
-        カレンダー
+        <div class="detail-extra">
+          <div class="sec-head" ref={calRef}>
+            <Icon name="calendar" size={18} />
+            カレンダー
+          </div>
+          <div class="grid2">
+            <button class="btn ghost" onClick={() => openExternal(v.googleCalendarUrl)}>
+              Google
+            </button>
+            <button class="btn ghost" onClick={() => openExternal(v.icsUrl)}>
+              iPhone
+            </button>
+          </div>
+
+          {/* 古いお知らせのリンクなどから開いた予約者が、直す・消す場所に迷わないように */}
+          {v.canEdit && (
+            <p class="note" style={{ marginTop: 16 }}>
+              編集・削除は{' '}
+              <a href={`#/recruit/${encodeURIComponent(p.id)}`}>「募集」のこの予約情報</a>
+              から
+            </p>
+          )}
+        </div>
       </div>
-      <div class="grid2">
-        <button class="btn ghost" onClick={() => openExternal(v.googleCalendarUrl)}>
-          Google
-        </button>
-        <button class="btn ghost" onClick={() => openExternal(v.icsUrl)}>
-          iPhone
-        </button>
-      </div>
-
-      {/* 古いお知らせのリンクなどから開いた予約者が、直す・消す場所に迷わないように */}
-      {v.canEdit && (
-        <p class="note" style={{ marginTop: 16 }}>
-          編集・削除は{' '}
-          <a href={`#/recruit/${encodeURIComponent(p.id)}`}>「募集」のこの予約情報</a>
-          から
-        </p>
-      )}
     </>
   );
 }

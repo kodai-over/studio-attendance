@@ -47,17 +47,19 @@ export function RecruitListPage() {
       ) : list.length === 0 ? (
         <div class="empty">登録されている予約情報はありません。</div>
       ) : (
-        list.map((v) => (
-          <SwipeRow
-            key={v.practice.id}
-            open={opened === v.practice.id}
-            anyOpen={opened != null}
-            onOpen={(o) => setOpened(o ? v.practice.id : null)}
-            onDelete={() => remove(v)}
-          >
-            <RecruitTicket v={v} showBooker={admin && v.practice.booker !== me.member.userId} />
-          </SwipeRow>
-        ))
+        <div class="ticket-grid">
+          {list.map((v) => (
+            <SwipeRow
+              key={v.practice.id}
+              open={opened === v.practice.id}
+              anyOpen={opened != null}
+              onOpen={(o) => setOpened(o ? v.practice.id : null)}
+              onDelete={() => remove(v)}
+            >
+              <RecruitTicket v={v} showBooker={admin && v.practice.booker !== me.member.userId} />
+            </SwipeRow>
+          ))}
+        </div>
       )}
     </>
   );

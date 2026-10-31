@@ -268,88 +268,94 @@ export function RegisterPage({ draftId, recruit = false }: { draftId: string | n
         </div>
       )}
 
-      {rows.map((r, i) => {
-        return (
-          <section class="draft" key={r.key} data-kind={r.kind}>
-            <div class="draft-head">
-              <span class="grow">{r.date ? labelDate(r.date) : String(i + 1).padStart(2, '0')}</span>
-              {r.kind && KIND_TAG[r.kind] && <span class={`tag ${KIND_TAG[r.kind].cls}`}>{KIND_TAG[r.kind].label}</span>}
-              {rows.length > 1 && (
-                <button class="icon-btn" aria-label="この予約情報を削除" onClick={() => setRows(rows.filter((x) => x.key !== r.key))}>
-                  <Icon name="x" size={18} />
-                </button>
+      <div class="draft-grid">
+        {rows.map((r, i) => {
+          return (
+            <section class="draft" key={r.key} data-kind={r.kind}>
+              <div class="draft-head">
+                <span class="grow">{r.date ? labelDate(r.date) : String(i + 1).padStart(2, '0')}</span>
+                {r.kind && KIND_TAG[r.kind] && <span class={`tag ${KIND_TAG[r.kind].cls}`}>{KIND_TAG[r.kind].label}</span>}
+                {rows.length > 1 && (
+                  <button class="icon-btn" aria-label="この予約情報を削除" onClick={() => setRows(rows.filter((x) => x.key !== r.key))}>
+                    <Icon name="x" size={18} />
+                  </button>
+                )}
+              </div>
+              <div class="draft-pair">
+                <label class="field">
+                  <span>日付</span>
+                  <input type="date" value={r.date} onInput={(e) => update(r.key, 'date', e.currentTarget.value)} />
+                </label>
+                <div class="grid2">
+                  <label class="field">
+                    <span>開始</span>
+                    <input type="time" value={r.start} onInput={(e) => update(r.key, 'start', e.currentTarget.value)} />
+                  </label>
+                  <label class="field">
+                    <span>終了</span>
+                    <input type="time" value={r.end} onInput={(e) => update(r.key, 'end', e.currentTarget.value)} />
+                  </label>
+                </div>
+              </div>
+              <div class="draft-pair">
+                <div class="field">
+                  <span>スタジオ</span>
+                  <StudioSelect
+                    studios={me.settings.studios}
+                    value={r.studio}
+                    onChange={(v) => setRows((rs) => rs.map((x) => (x.key === r.key ? autoFee({ ...x, studio: v, room: v === x.studio ? x.room : '', kind: x.kind === 'incomplete' ? 'incomplete' : undefined, parts: undefined }) : x)))}
+                  />
+                </div>
+                <div class="field">
+                  <span>部屋</span>
+                  <RoomSelect key={r.studio} studios={me.settings.studios} studio={r.studio} value={r.room} onChange={(v) => update(r.key, 'room', v)} />
+                </div>
+              </div>
+              <RoomInfo studios={me.settings.studios} studio={r.studio} room={r.room} style={{ marginTop: -4, marginBottom: 10 }} />
+              <label class="field">
+                <span>
+                  スタジオ代 ¥{r.feeAuto && r.fee !== '' && <span class="tag soft" title="スタジオの料金表（曜日・時間帯）から計算">自動</span>}
+                </span>
+                <input type="number" inputMode="numeric" placeholder="円" value={r.fee} onInput={(e) => update(r.key, 'fee', e.currentTarget.value)} />
+              </label>
+              <details style={{ marginBottom: 8 }}>
+                <summary class="more-summary">
+                  <Icon name="plus" size={16} />
+                  人数・メモ
+                </summary>
+                <div class="grid2" style={{ marginTop: 8 }}>
+                  <label class="field">
+                    <span>上限人数</span>
+                    <input type="number" inputMode="numeric" placeholder="なし" value={r.max} onInput={(e) => update(r.key, 'max', e.currentTarget.value)} />
+                  </label>
+                  <label class="field">
+                    <span>最低人数</span>
+                    <input type="number" inputMode="numeric" placeholder={`標準 ${me.settings.minDefault}人`} value={r.min} onInput={(e) => update(r.key, 'min', e.currentTarget.value)} />
+                  </label>
+                </div>
+                <label class="field">
+                  <span>メモ</span>
+                  <input type="text" placeholder="例：ショーケースの通し" value={r.memo} onInput={(e) => update(r.key, 'memo', e.currentTarget.value)} />
+                </label>
+              </details>
+              {r.parts && r.parts.length > 1 && (
+                <div class="row muted" style={{ marginBottom: 10 }}>
+                  <span class="grow">続けて取った予約情報{r.parts.length}件をまとめています</span>
+                  <button class="btn small" onClick={() => splitRow(r)}>
+                    分ける
+                  </button>
+                </div>
               )}
-            </div>
-            <label class="field">
-              <span>日付</span>
-              <input type="date" value={r.date} onInput={(e) => update(r.key, 'date', e.currentTarget.value)} />
-            </label>
-            <div class="grid2">
-              <label class="field">
-                <span>開始</span>
-                <input type="time" value={r.start} onInput={(e) => update(r.key, 'start', e.currentTarget.value)} />
-              </label>
-              <label class="field">
-                <span>終了</span>
-                <input type="time" value={r.end} onInput={(e) => update(r.key, 'end', e.currentTarget.value)} />
-              </label>
-            </div>
-            <div class="field">
-              <span>スタジオ</span>
-              <StudioSelect
-                studios={me.settings.studios}
-                value={r.studio}
-                onChange={(v) => setRows((rs) => rs.map((x) => (x.key === r.key ? autoFee({ ...x, studio: v, room: v === x.studio ? x.room : '', kind: x.kind === 'incomplete' ? 'incomplete' : undefined, parts: undefined }) : x)))}
-              />
-            </div>
-            <div class="field">
-              <span>部屋</span>
-              <RoomSelect key={r.studio} studios={me.settings.studios} studio={r.studio} value={r.room} onChange={(v) => update(r.key, 'room', v)} />
-            </div>
-            <RoomInfo studios={me.settings.studios} studio={r.studio} room={r.room} style={{ marginTop: -4, marginBottom: 10 }} />
-            <label class="field">
-              <span>
-                スタジオ代 ¥{r.feeAuto && r.fee !== '' && <span class="tag soft" title="スタジオの料金表（曜日・時間帯）から計算">自動</span>}
-              </span>
-              <input type="number" inputMode="numeric" placeholder="円" value={r.fee} onInput={(e) => update(r.key, 'fee', e.currentTarget.value)} />
-            </label>
-            <details style={{ marginBottom: 8 }}>
-              <summary class="more-summary">
-                <Icon name="plus" size={16} />
-                人数・メモ
-              </summary>
-              <div class="grid2" style={{ marginTop: 8 }}>
-                <label class="field">
-                  <span>上限人数</span>
-                  <input type="number" inputMode="numeric" placeholder="なし" value={r.max} onInput={(e) => update(r.key, 'max', e.currentTarget.value)} />
-                </label>
-                <label class="field">
-                  <span>最低人数</span>
-                  <input type="number" inputMode="numeric" placeholder={`標準 ${me.settings.minDefault}人`} value={r.min} onInput={(e) => update(r.key, 'min', e.currentTarget.value)} />
-                </label>
-              </div>
-              <label class="field">
-                <span>メモ</span>
-                <input type="text" placeholder="例：ショーケースの通し" value={r.memo} onInput={(e) => update(r.key, 'memo', e.currentTarget.value)} />
-              </label>
-            </details>
-            {r.parts && r.parts.length > 1 && (
-              <div class="row muted" style={{ marginBottom: 10 }}>
-                <span class="grow">続けて取った予約情報{r.parts.length}件をまとめています</span>
-                <button class="btn small" onClick={() => splitRow(r)}>
-                  分ける
-                </button>
-              </div>
-            )}
-            {me.groups.length > 0 && pickable(r) && (
-              <div class="field">
-                <span>送り先（選ばなければ登録のみ）</span>
-                <GroupToggles groups={me.groups} defaults={me.member.defaultGroups} value={r.groups} onChange={(g) => setRowGroups(r.key, g)} />
-              </div>
-            )}
-          </section>
-        );
-      })}
+              {me.groups.length > 0 && pickable(r) && (
+                <div class="field">
+                  <span>送り先（選ばなければ登録のみ）</span>
+                  <GroupToggles groups={me.groups} defaults={me.member.defaultGroups} value={r.groups} onChange={(g) => setRowGroups(r.key, g)} />
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </div>
 
       <button class="add-row" onClick={() => setRows([...rows, emptyRow({ ...rows.at(-1), kind: undefined, parts: undefined, date: rows.at(-1)?.date ? addDays(rows.at(-1)!.date, 7) : '' })])}>
         <Icon name="plus" size={18} />
