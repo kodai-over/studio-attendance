@@ -125,7 +125,7 @@ a {
   position: sticky;
   top: 0;
   z-index: 5;
-  margin: 0 calc(var(--pad-x) * -1) 16px;
+  margin: 0 calc(var(--pad-x) * -1) 10px;
   padding-top: env(safe-area-inset-top);
   background: color-mix(in srgb, var(--bg) 92%, transparent);
   backdrop-filter: blur(10px);
@@ -139,18 +139,18 @@ a {
   flex: 1;
   position: relative;
   border: 0;
-  padding: 16px 4px 14px;
+  padding: 9px 4px 8px;
   background: transparent;
   color: var(--faint);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 500;
 }
 .tabs button + button::before {
   content: '';
   position: absolute;
   left: 0;
-  top: 12px;
-  bottom: 12px;
+  top: 8px;
+  bottom: 8px;
   border-left: 1px solid var(--line);
 }
 .tabs button[aria-selected='true'] {
@@ -282,7 +282,7 @@ a {
 .ticket-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 10px;
+  gap: 8px;
   container-type: inline-size;
 }
 .ticket-grid > .ticket,
@@ -290,48 +290,48 @@ a {
   margin-bottom: 0;
 }
 .ticket {
-  --stub-w: 84px;
+  --stub-w: 76px;
   position: relative;
   display: grid;
   grid-template-columns: var(--stub-w) 1fr;
   grid-template-rows: 1fr auto;
   height: 100%;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   border-radius: 14px;
   background: var(--paper);
   /* 半券と本体のあいだの切り込み */
-  -webkit-mask: radial-gradient(circle 9px at var(--stub-w) 0, transparent 8.5px, #000 9px) top / 100% 51% no-repeat,
-    radial-gradient(circle 9px at var(--stub-w) 100%, transparent 8.5px, #000 9px) bottom / 100% 51% no-repeat;
-  mask: radial-gradient(circle 9px at var(--stub-w) 0, transparent 8.5px, #000 9px) top / 100% 51% no-repeat,
-    radial-gradient(circle 9px at var(--stub-w) 100%, transparent 8.5px, #000 9px) bottom / 100% 51% no-repeat;
+  -webkit-mask: radial-gradient(circle 8px at var(--stub-w) 0, transparent 7.5px, #000 8px) top / 100% 51% no-repeat,
+    radial-gradient(circle 8px at var(--stub-w) 100%, transparent 7.5px, #000 8px) bottom / 100% 51% no-repeat;
+  mask: radial-gradient(circle 8px at var(--stub-w) 0, transparent 7.5px, #000 8px) top / 100% 51% no-repeat,
+    radial-gradient(circle 8px at var(--stub-w) 100%, transparent 7.5px, #000 8px) bottom / 100% 51% no-repeat;
 }
 @container (inline-size < 310px) {
   .ticket {
-    --stub-w: 70px;
+    --stub-w: 66px;
   }
   .ticket-main {
-    padding: 10px 12px 8px 13px;
+    padding: 7px 11px 6px 12px;
   }
   .stub .d {
-    font-size: 23px;
+    font-size: 20px;
   }
   .time {
-    font-size: 16px;
+    font-size: 15px;
   }
 }
 @media (min-width: 640px) {
   @container (inline-size < 620px) {
     .ticket {
-      --stub-w: 70px;
+      --stub-w: 66px;
     }
     .ticket-main {
-      padding: 10px 12px 8px 13px;
+      padding: 7px 11px 6px 12px;
     }
     .stub .d {
-      font-size: 23px;
+      font-size: 20px;
     }
     .time {
-      font-size: 16px;
+      font-size: 15px;
     }
   }
 }
@@ -346,7 +346,7 @@ a {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: 10px 14px 8px 16px;
+  padding: 8px 14px 7px 14px;
   cursor: pointer;
 }
 .ticket-main:focus-visible,
@@ -368,24 +368,24 @@ a {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 10px 0;
+  padding: 6px 0;
   border-right: 1.5px dashed var(--faint);
   font-family: var(--mono);
   line-height: 1;
   transition: background 0.25s, color 0.25s;
 }
 .stub .m {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--sub);
 }
 .stub .d {
-  margin: 4px 0 5px;
-  font-size: 26px;
+  margin: 2px 0 3px;
+  font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
 .stub .w {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.12em;
   color: var(--sub);
@@ -427,14 +427,16 @@ a {
   align-items: center;
   gap: 8px;
   font-family: var(--mono);
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 600;
+  line-height: 1.25;
   letter-spacing: -0.01em;
 }
 .place {
-  margin-top: 2px;
+  margin-top: 1px;
   overflow: hidden;
-  font-size: 14px;
+  font-size: 13px;
+  line-height: 1.35;
   color: var(--sub);
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -444,8 +446,8 @@ a {
   align-items: center;
   gap: 10px;
   margin-top: auto;
-  padding-top: 6px;
-  min-height: 22px;
+  padding-top: 4px;
+  min-height: 20px;
 }
 .count {
   display: inline-flex;
