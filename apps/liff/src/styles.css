@@ -17,8 +17,8 @@
   --nav-on: rgb(70 70 70 / 70%);
   --pad-x: 14px;
   --nav-w: 0px;
-  --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
-  --sans: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  --mono: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+  --sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Hiragino Sans', 'Noto Sans JP', 'Segoe UI', sans-serif;
   color-scheme: light;
 }
 
@@ -52,6 +52,7 @@ body {
   font-family: var(--sans);
   font-size: 14px;
   line-height: 1.5;
+  font-variant-numeric: tabular-nums;
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
 }
@@ -556,6 +557,27 @@ a {
   font-size: 10px;
   font-weight: 400;
 }
+.badge-full {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 3px;
+  padding: 0 4px;
+  height: 14px;
+  border-radius: 3px;
+  font-family: var(--sans);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 13%, transparent);
+}
+@media (prefers-color-scheme: dark) {
+  .badge-full {
+    color: #ff8577;
+    background: rgba(255, 133, 119, 0.2);
+  }
+}
 .fee {
   display: inline-flex;
   align-items: baseline;
@@ -578,7 +600,6 @@ a {
   line-height: 1.35;
   transform: rotate(-4deg);
 }
-.stamp.full,
 .stamp.cancel {
   color: var(--danger);
 }

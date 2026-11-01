@@ -68,7 +68,7 @@ export function PracticePass({ v }: { v: PracticeView }) {
         ...(p.room ? [{ label: '部屋', value: p.room, note: roomInfo(me.settings.studios, p.studio, p.room), jp: true }] : []),
         { label: '1人あたり', value: v.perPerson != null ? yen(v.perPerson) : '—', note: p.feeOverride ? '調整済み' : null },
         { label: 'スタジオ代', value: yen(p.fee) },
-        { label: '参加人数', value: <>{v.goingCount}{p.max ? <small class="of">/{p.max}</small> : null}</>, note: p.min ? `最低人数 ${p.min}人` : null },
+        { label: '参加人数', value: <>{v.goingCount}{p.max ? <small class="of">/{p.max}</small> : null} {p.status === '満員' && <span class="badge-full">FULL</span>}</>, note: p.min ? `最低人数 ${p.min}人` : null },
         { label: '予約者', value: v.bookerName, jp: true },
         ...(p.memo ? [{ label: 'メモ', value: p.memo, jp: true, wide: true }] : []),
       ]}

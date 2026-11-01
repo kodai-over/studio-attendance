@@ -176,6 +176,7 @@ export function PracticeCard({ v, onAnswer, busy }: { v: PracticeView; onAnswer:
             <Icon name="people" size={14} />
             {v.goingCount}
             {p.max ? <small>/{p.max}</small> : null}
+            {p.status === '満員' && <span class="badge-full">FULL</span>}
           </span>
           <Fee v={v} />
         </div>

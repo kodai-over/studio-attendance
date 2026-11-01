@@ -11,6 +11,7 @@ import {
   defaultFee,
   DEFAULT_FEES,
   formatFeeValue,
+  isHoliday,
   isHolidayOrWeekend,
   jpHolidays,
   parseFeeValue,
@@ -139,6 +140,8 @@ describe('設定', () => {
     const h = jpHolidays(2026);
     for (const d of ['2026-01-12', '2026-03-20', '2026-05-06', '2026-07-20', '2026-09-21', '2026-09-22', '2026-09-23', '2026-10-12', '2026-11-23']) expect(h.has(d)).toBe(true);
     expect(h.has('2026-10-26')).toBe(false);
+    expect(isHoliday('2026-11-03')).toBe(true); // 文化の日（火）
+    expect(isHoliday('2026-11-04')).toBe(false);
     expect(isHolidayOrWeekend('2026-10-25')).toBe(true);
     expect(isHolidayOrWeekend('2026-10-26')).toBe(false);
   });

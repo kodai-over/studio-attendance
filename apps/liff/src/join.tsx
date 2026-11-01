@@ -72,7 +72,7 @@ function JoinPage() {
           { label: '時間', value: `${v.start}–${v.end}`, wide: true },
           { label: 'スタジオ', value: v.studio, jp: true, wide: !v.room },
           ...(v.room ? [{ label: '部屋', value: v.room, note: v.roomInfo, jp: true }] : []),
-          { label: '参加人数', value: v.goingCount },
+          { label: '参加人数', value: <>{v.goingCount} {v.status === '満員' && <span class="badge-full">FULL</span>}</> },
           { label: '1人あたり', value: v.perPerson != null ? yen(v.perPerson) : '—' },
           ...(v.memo ? [{ label: 'メモ', value: v.memo, jp: true, wide: true }] : []),
         ]}

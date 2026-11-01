@@ -1,6 +1,6 @@
 import { createContext, type ComponentChildren } from 'preact';
 import { useCallback, useContext, useEffect, useState } from 'preact/hooks';
-import { canRegister, labelDate, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
+import { canRegister, isHoliday, labelDate, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
 
 // ---------------------------------------------------------------- ルーティング（ハッシュ）
 
@@ -194,11 +194,13 @@ export function NavBar() {
 export function Stub({ date, onClick }: { date: string; onClick?: () => void }) {
   const [, m, d] = date.split('-').map(Number);
   const w = weekday(date);
+  const hol = isHoliday(date);
+  const dayClass = hol || w === '日' ? ' sun' : w === '土' ? ' sat' : '';
   return (
     <div class="stub" aria-hidden="true" onClick={onClick}>
       <span class="m">{String(m).padStart(2, '0')}</span>
       <span class="d">{String(d).padStart(2, '0')}</span>
-      <span class={`w${w === '土' ? ' sat' : w === '日' ? ' sun' : ''}`}>{w}</span>
+      <span class={`w${dayClass}`}>{w}</span>
     </div>
   );
 }
@@ -206,7 +208,6 @@ export function Stub({ date, onClick }: { date: string; onClick?: () => void }) 
 export function StatusBadge({ v }: { v: { practice: { status: string } } | PracticeView }) {
   const s = v.practice.status;
   if (s === '中止') return <span class="stamp cancel">中止</span>;
-  if (s === '満員') return <span class="stamp full">満員</span>;
   return null;
 }
 
@@ -288,7 +289,7 @@ export function Pass({
       <div class="pass-head">
         <div class="pass-date">
           {String(m).padStart(2, '0')}.{String(d).padStart(2, '0')}
-          <span class={`w${weekday(date) === '土' ? ' sat' : weekday(date) === '日' ? ' sun' : ''}`}>{weekday(date)}</span>
+          <span class={`w${isHoliday(date) || weekday(date) === '日' ? ' sun' : weekday(date) === '土' ? ' sat' : ''}`}>{weekday(date)}</span>
         </div>
         <StatusBadge v={{ practice: { status } }} />
       </div>
