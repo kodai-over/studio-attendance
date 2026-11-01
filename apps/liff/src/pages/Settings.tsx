@@ -379,10 +379,10 @@ export function AdminPage() {
             </button>
           </section>
 
-          <div class="section-title">キャンセル期限前の警告通知</div>
+          <div class="section-title">キャンセル期限前のお知らせ</div>
           <section class="card">
             <div class="muted" style={{ marginBottom: 8, fontSize: 12 }}>
-              最低人数未満のとき、指定日前・指定時刻に予約者に警告を送ります。
+              各スタジオの無料キャンセル期限（何日前・時刻）を設定します。最低人数未満のとき、この日時に予約者へお知らせが届きます。
             </div>
             {rules.map((r, i) => (
               <div class="grid3" style={{ marginBottom: 8 }} key={i}>
@@ -406,7 +406,7 @@ export function AdminPage() {
               </div>
             ))}
             <button class="btn small" onClick={() => setRules([...rules, { studio: '', daysBefore: 1, time: '10:00' }])}>
-              ＋ 警告ルールを追加
+              ＋ キャンセルルールを追加
             </button>
           </section>
 

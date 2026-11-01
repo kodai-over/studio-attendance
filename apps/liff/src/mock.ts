@@ -24,7 +24,7 @@ store.s = {
   fees: DEFAULT_FEES,
   cancelRules: [
     { studio: 'worcle', daysBefore: 4, time: '10:00' },
-    { studio: 'BUZZ', daysBefore: 1, time: '10:00' },
+    { studio: 'BUZZ', daysBefore: 2, time: '10:00' },
   ],
   minDefault: 3,
   roundUnit: 10,
