@@ -17,6 +17,12 @@
     <!-- Apps Script への最初の通信を速くする -->
     <link rel="preconnect" href="https://script.google.com" />
     <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin />
+    <script>
+      try {
+        var t = localStorage.getItem('pb:theme');
+        if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="app"></div>

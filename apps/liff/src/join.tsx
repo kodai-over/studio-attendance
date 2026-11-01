@@ -4,7 +4,10 @@ import { useEffect, useState } from 'preact/hooks';
 import { yen, type Answer, type JoinView } from '@studio-attendance/shared';
 import { joinApi } from './api';
 import './styles.css';
+import { initTheme } from './theme';
 import { ANSWER_LABEL, Pass, RsvpButtons, Spinner, useToast } from './ui';
+
+initTheme();
 
 const q = new URLSearchParams(location.search);
 const id = q.get('p') ?? '';

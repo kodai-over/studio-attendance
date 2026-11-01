@@ -13,7 +13,10 @@ import { RecruitListPage } from './pages/RecruitList';
 import { RegisterPage } from './pages/Register';
 import { AdminPage, SettingsPage } from './pages/Settings';
 import './styles.css';
+import { initTheme } from './theme';
 import { AppContext, FRESH_MS, NavBar, Spinner, go, useRoute, useToast } from './ui';
+
+initTheme();
 
 function Router() {
   const { path, query } = useRoute();

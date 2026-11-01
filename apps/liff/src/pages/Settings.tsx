@@ -3,6 +3,7 @@ import { DEFAULT_STUDIOS, isAdmin, type ActAs, type CancelRule, type FeeDays, ty
 import { api, setActAs } from '../api';
 import { clientMode, logoutApp } from '../liff';
 import { Avatar, Icon, Spinner, TopBar, go, useApp, useRunner } from '../ui';
+import { applyTheme, getTheme, type ThemeMode } from '../theme';
 
 const ACT_AS_LABEL: Record<ActAs, string> = { self: '自分（管理者）', member: '自分（一般）', test: '確認用アカウント「admin」' };
 
@@ -34,6 +35,34 @@ function ActAsSwitch() {
         </div>
       </section>
     </>
+  );
+}
+
+/** 外観（ライト・ダークモード・自動）の切り替え */
+function ThemeSwitch() {
+  const [theme, setTheme] = useState<ThemeMode>(() => getTheme());
+  const select = (t: ThemeMode) => {
+    setTheme(t);
+    applyTheme(t);
+  };
+  return (
+    <div class="field" style={{ marginTop: 16 }}>
+      <span>外観</span>
+      <div class="toggles" style={{ marginTop: 4 }}>
+        <button class="toggle" aria-pressed={theme === 'system'} onClick={() => select('system')}>
+          <Icon name="device" size={15} />
+          端末に合わせる
+        </button>
+        <button class="toggle" aria-pressed={theme === 'light'} onClick={() => select('light')}>
+          <Icon name="sun" size={15} />
+          ライト
+        </button>
+        <button class="toggle" aria-pressed={theme === 'dark'} onClick={() => select('dark')}>
+          <Icon name="moon" size={15} />
+          ダーク
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -84,6 +113,8 @@ export function SettingsPage() {
           </button>
         )}
       </div>
+
+      <ThemeSwitch />
 
       {me.canSwitch && <ActAsSwitch />}
 

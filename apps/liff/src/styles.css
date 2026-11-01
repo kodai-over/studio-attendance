@@ -19,11 +19,22 @@
   --nav-w: 0px;
   --mono: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
   --sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Hiragino Sans', 'Noto Sans JP', 'Segoe UI', sans-serif;
+
+  --ink-sat: #93b7ff;
+  --ink-sat-bg: rgba(147, 183, 255, 0.25);
+  --ink-sun: #ff8577;
+  --ink-sun-bg: rgba(255, 133, 119, 0.25);
+  --maybe-accent: #f59e0b;
+  --maybe-stub-bg: color-mix(in srgb, #f59e0b 8%, var(--paper));
+  --maybe-btn-color: #ffffff;
+  --badge-full-c: var(--danger);
+  --badge-full-bg: color-mix(in srgb, var(--danger) 13%, transparent);
+
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     --bg: #000000;
     --paper: #171717;
     --ink: #ffffff;
@@ -36,8 +47,46 @@
     --sun: #ff6a55;
     --nav: rgb(70 70 70 / 70%);
     --nav-on: rgb(150 150 150 / 45%);
+
+    --ink-sat: #1d4ed8;
+    --ink-sat-bg: rgba(29, 78, 216, 0.15);
+    --ink-sun: #dc2626;
+    --ink-sun-bg: rgba(220, 38, 38, 0.15);
+    --maybe-accent: #fbbf24;
+    --maybe-stub-bg: color-mix(in srgb, #fbbf24 10%, var(--paper));
+    --maybe-btn-color: #000000;
+    --badge-full-c: #ff8577;
+    --badge-full-bg: rgba(255, 133, 119, 0.2);
+
     color-scheme: dark;
   }
+}
+
+:root[data-theme='dark'] {
+  --bg: #000000;
+  --paper: #171717;
+  --ink: #ffffff;
+  --sub: #8f8f8c;
+  --faint: #5c5c5a;
+  --line: #2a2a28;
+  --field: #0d0d0d;
+  --danger: #ff6a55;
+  --sat: #7aa2ff;
+  --sun: #ff6a55;
+  --nav: rgb(70 70 70 / 70%);
+  --nav-on: rgb(150 150 150 / 45%);
+
+  --ink-sat: #1d4ed8;
+  --ink-sat-bg: rgba(29, 78, 216, 0.15);
+  --ink-sun: #dc2626;
+  --ink-sun-bg: rgba(220, 38, 38, 0.15);
+  --maybe-accent: #fbbf24;
+  --maybe-stub-bg: color-mix(in srgb, #fbbf24 10%, var(--paper));
+  --maybe-btn-color: #000000;
+  --badge-full-c: #ff8577;
+  --badge-full-bg: rgba(255, 133, 119, 0.2);
+
+  color-scheme: dark;
 }
 
 * {
@@ -492,23 +541,23 @@ a {
 }
 .ticket[data-answer='行く'] .stub.sat .m,
 .ticket[data-answer='行く'] .stub.sat .d {
-  color: #93b7ff;
+  color: var(--ink-sat);
 }
 .ticket[data-answer='行く'] .stub .w.sat {
-  color: #93b7ff;
-  background: rgba(147, 183, 255, 0.25);
+  color: var(--ink-sat);
+  background: var(--ink-sat-bg);
 }
 .ticket[data-answer='行く'] .stub.sun .m,
 .ticket[data-answer='行く'] .stub.sun .d {
-  color: #ff8577;
+  color: var(--ink-sun);
 }
 .ticket[data-answer='行く'] .stub .w.sun {
-  color: #ff8577;
-  background: rgba(255, 133, 119, 0.25);
+  color: var(--ink-sun);
+  background: var(--ink-sun-bg);
 }
 .ticket[data-answer='保留'] > .stub {
-  background: color-mix(in srgb, #f59e0b 8%, var(--paper));
-  box-shadow: inset 3px 0 0 #f59e0b;
+  background: var(--maybe-stub-bg);
+  box-shadow: inset 3px 0 0 var(--maybe-accent);
 }
 @keyframes stamp {
   from {
@@ -599,14 +648,8 @@ a {
   font-weight: 700;
   letter-spacing: 0.04em;
   line-height: 1;
-  color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 13%, transparent);
-}
-@media (prefers-color-scheme: dark) {
-  .badge-full {
-    color: #ff8577;
-    background: rgba(255, 133, 119, 0.2);
-  }
+  color: var(--badge-full-c);
+  background: var(--badge-full-bg);
 }
 .fee {
   display: inline-flex;
@@ -720,11 +763,11 @@ a {
   color: var(--bg);
 }
 .rsvp button.maybe[aria-checked='true'] {
-  color: #d97706;
+  color: var(--maybe-accent);
 }
 .rsvp button.maybe[aria-checked='true'] .mark {
   background: #f59e0b;
-  color: #ffffff;
+  color: var(--maybe-btn-color);
   font-weight: 600;
 }
 .rsvp button.no[aria-checked='true'] {
@@ -777,9 +820,9 @@ a {
   color: var(--bg);
 }
 .rsvp.solo button.maybe[aria-checked='true'] {
-  border-color: #f59e0b;
+  border-color: var(--maybe-accent);
   background: #f59e0b;
-  color: #ffffff;
+  color: var(--maybe-btn-color);
 }
 .rsvp.solo button.no[aria-checked='true'] {
   border-color: var(--sub);
@@ -789,41 +832,6 @@ a {
 .rsvp.solo button[aria-checked='true'] .mark {
   background: transparent;
   color: inherit;
-}
-
-@media (prefers-color-scheme: dark) {
-  .ticket[data-answer='行く'] .stub.sat .m,
-  .ticket[data-answer='行く'] .stub.sat .d {
-    color: #1d4ed8;
-  }
-  .ticket[data-answer='行く'] .stub .w.sat {
-    color: #1d4ed8;
-    background: rgba(29, 78, 216, 0.15);
-  }
-  .ticket[data-answer='行く'] .stub.sun .m,
-  .ticket[data-answer='行く'] .stub.sun .d {
-    color: #dc2626;
-  }
-  .ticket[data-answer='行く'] .stub .w.sun {
-    color: #dc2626;
-    background: rgba(220, 38, 38, 0.15);
-  }
-  .ticket[data-answer='保留'] > .stub {
-    background: color-mix(in srgb, #fbbf24 10%, var(--paper));
-    box-shadow: inset 3px 0 0 #fbbf24;
-  }
-  .rsvp button.maybe[aria-checked='true'] {
-    color: #fbbf24;
-  }
-  .rsvp button.maybe[aria-checked='true'] .mark {
-    background: #f59e0b;
-    color: #000000;
-  }
-  .rsvp.solo button.maybe[aria-checked='true'] {
-    border-color: #fbbf24;
-    background: #f59e0b;
-    color: #000000;
-  }
 }
 
 /* ---------- パス（練習の詳細） ---------- */

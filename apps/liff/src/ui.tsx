@@ -120,6 +120,9 @@ const ICONS = {
   logout: 'M14 4.5H5.5v15H14M10 12h10M16.5 8.5 20 12l-3.5 3.5',
   refresh: 'M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4v4h-4',
   home: 'M4 11 12 4l8 7M6.5 9.5V20h11V9.5',
+  sun: 'M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10z',
+  moon: 'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z',
+  device: 'M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM12 17h.01',
 } as const;
 export type IconName = keyof typeof ICONS;
 
