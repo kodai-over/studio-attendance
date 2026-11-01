@@ -192,7 +192,7 @@ a {
   }
 }
 
-/* ---------- ナビ（ブラウザ縦画面では下端スリム固定、LINE内縦画面では浮遊カプセル、横画面・広い画面では左サイドバー） ---------- */
+/* ---------- ナビ（ブラウザ縦画面では下端スリム固定、LINE内・ホーム画面のアプリの縦画面では浮遊カプセル、横画面・広い画面では左サイドバー） ---------- */
 .navbar {
   position: fixed;
   inset-inline: 0;
@@ -236,10 +236,10 @@ a {
 }
 
 @media (max-width: 639.98px) and (orientation: portrait) {
-  :root[data-client='line'] .app {
+  :root:is([data-client='line'], [data-client='app']) .app {
     padding-bottom: calc(104px + env(safe-area-inset-bottom));
   }
-  :root[data-client='line'] .navbar {
+  :root:is([data-client='line'], [data-client='app']) .navbar {
     inset-inline: auto;
     left: 50%;
     bottom: calc(14px + env(safe-area-inset-bottom));
@@ -254,7 +254,7 @@ a {
     -webkit-backdrop-filter: blur(18px) saturate(1.4);
     box-shadow: 0 8px 28px rgb(0 0 0 / 18%);
   }
-  :root[data-client='line'] .navbar button {
+  :root:is([data-client='line'], [data-client='app']) .navbar button {
     flex-direction: column;
     gap: 2px;
     height: auto;
@@ -265,16 +265,16 @@ a {
     font-weight: 500;
     letter-spacing: 0.04em;
   }
-  :root[data-client='line'] .navbar button .icon {
+  :root:is([data-client='line'], [data-client='app']) .navbar button .icon {
     width: 22px;
     height: 22px;
   }
-  :root[data-client='line'] .navbar button[aria-current='page'] {
+  :root:is([data-client='line'], [data-client='app']) .navbar button[aria-current='page'] {
     background: var(--nav-on);
     color: #fff;
     font-weight: 500;
   }
-  :root[data-client='line'] .toast {
+  :root:is([data-client='line'], [data-client='app']) .toast {
     bottom: calc(96px + env(safe-area-inset-bottom));
   }
 }
@@ -1611,4 +1611,34 @@ details > summary {
   .detail-layout {
     column-gap: 32px;
   }
+}
+
+/* ---------- LINEの外で使うときの部品 ---------- */
+/* 行くと答えた予約情報の、回答ボタンのすぐ下のカレンダーに追加 */
+.cal-inline {
+  margin-top: 12px;
+}
+.copy-row .icon-btn + .icon-btn {
+  margin-left: -2px;
+}
+.add-home {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.add-home b {
+  font-weight: 500;
+}
+.add-home .muted .icon {
+  display: inline-block;
+  vertical-align: -2px;
+}
+.menu-row:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.signed-out strong {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 500;
 }

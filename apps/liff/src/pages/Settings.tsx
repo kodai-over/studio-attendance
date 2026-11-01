@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { DEFAULT_STUDIOS, isAdmin, type ActAs, type CancelRule, type FeeDays, type FeeRule, type Member, type Role, type StudioDef } from '@studio-attendance/shared';
 import { api, setActAs } from '../api';
+import { clientMode, logoutApp } from '../liff';
 import { Avatar, Icon, Spinner, TopBar, go, useApp, useRunner } from '../ui';
 
 const ACT_AS_LABEL: Record<ActAs, string> = { self: '自分（管理者）', member: '自分（一般）', test: '確認用アカウント「admin」' };
@@ -98,6 +99,47 @@ export function SettingsPage() {
           </li>
         </ul>
       )}
+
+      {clientMode() !== 'line' && <AppMenu />}
+    </>
+  );
+}
+
+/** LINEの外（ブラウザ・ホーム画面のアプリ）で開いたときだけ出す。最新にする・ログアウト・ホーム画面への追加の案内 */
+function AppMenu() {
+  const { loadHome } = useApp();
+  const [run, busy] = useRunner();
+  const mode = clientMode();
+  // iPhone の Safari で、まだホーム画面に追加していないとき
+  const canAddToHome = mode === 'browser' && /iPhone|iPad|iPod/.test(navigator.userAgent);
+  return (
+    <>
+      <div class="section-title">このアプリ</div>
+      {canAddToHome && (
+        <section class="card add-home">
+          <Icon name="home" size={18} />
+          <div>
+            <b>ホーム画面に追加</b>
+            <div class="muted">
+              Safari の共有ボタン（<Icon name="share" size={13} />）から「ホーム画面に追加」を選ぶと、URLバーのないアプリとして開けます
+            </div>
+          </div>
+        </section>
+      )}
+      <ul class="menu">
+        <li>
+          <button class="menu-row" disabled={busy} onClick={() => run(loadHome, '最新の内容にしました')}>
+            <Icon name="refresh" size={20} />
+            <span class="grow">最新の内容にする</span>
+          </button>
+        </li>
+        <li>
+          <button class="menu-row danger" onClick={() => confirm('ログアウトしますか？') && logoutApp()}>
+            <Icon name="logout" size={20} />
+            <span class="grow">ログアウト</span>
+          </button>
+        </li>
+      </ul>
     </>
   );
 }

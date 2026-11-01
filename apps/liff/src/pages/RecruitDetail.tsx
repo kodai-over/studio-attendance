@@ -1,7 +1,8 @@
 import { useState } from 'preact/hooks';
 import type { AttendeeView, PracticeView } from '@studio-attendance/shared';
 import { api } from '../api';
-import { Avatar, Icon, Spinner, Syncing, TopBar, go, useApp } from '../ui';
+import { shareLink } from '../liff';
+import { Avatar, Icon, Spinner, Syncing, TopBar, go, shareData, useApp } from '../ui';
 import { EditForm, PracticePass, usePractice } from './Detail';
 
 /** 「募集」から開く練習の画面。募集先のグループ・ゲストの追加・参加リンク・（予約者と管理者は）編集と削除 */
@@ -57,7 +58,7 @@ export function RecruitDetailPage({ id }: { id: string }) {
             <GuestForm onAdd={(name) => update(() => api('addGuest', { id, name }), `${name}さんを追加しました`)} busy={busy} />
           </section>
 
-          {v.joinUrl && <JoinLink url={v.joinUrl} />}
+          {v.joinUrl && <JoinLink v={v} />}
 
           {v.canEdit && (
             <EditForm
@@ -151,8 +152,9 @@ function RecruitForm({ v, onSend, busy }: { v: PracticeView; onSend: (groups: st
   );
 }
 
-function JoinLink({ url }: { url: string }) {
+function JoinLink({ v }: { v: PracticeView }) {
   const { toast } = useApp();
+  const url = v.joinUrl!;
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(url);
@@ -160,6 +162,10 @@ function JoinLink({ url }: { url: string }) {
     } catch {
       prompt('参加リンク', url);
     }
+  };
+  const share = async () => {
+    const r = await shareLink(shareData(v, url));
+    if (r === 'copied') toast('参加リンクをコピーしました');
   };
   return (
     <section>
@@ -171,10 +177,12 @@ function JoinLink({ url }: { url: string }) {
       <div class="copy-row">
         <code>{url.replace(/^https?:\/\//, '')}</code>
         <button class="icon-btn" aria-label="参加リンクをコピー" onClick={copy}>
-          <Icon name="copy" size={20} />
+          <Icon name="copy" size={18} />
+        </button>
+        <button class="icon-btn" aria-label="参加リンクを共有" onClick={share}>
+          <Icon name="share" size={18} />
         </button>
       </div>
     </section>
   );
 }
-

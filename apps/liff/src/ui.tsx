@@ -1,6 +1,6 @@
 import { createContext, type ComponentChildren } from 'preact';
 import { useCallback, useContext, useEffect, useState } from 'preact/hooks';
-import { canRegister, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
+import { canRegister, labelDate, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
 
 // ---------------------------------------------------------------- ルーティング（ハッシュ）
 
@@ -116,6 +116,10 @@ const ICONS = {
   gear: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6a7 7 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z',
   check: 'M5 12.5 10 17.5 19 7',
   trash: 'M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 12.5h9l1-12.5M10 10.5v6M14 10.5v6',
+  share: 'M12 14.5V3.5M8 7.5l4-4 4 4M6 11H5v9.5h14V11h-1',
+  logout: 'M14 4.5H5.5v15H14M10 12h10M16.5 8.5 20 12l-3.5 3.5',
+  refresh: 'M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4v4h-4',
+  home: 'M4 11 12 4l8 7M6.5 9.5V20h11V9.5',
 } as const;
 export type IconName = keyof typeof ICONS;
 
@@ -324,3 +328,10 @@ export const Fee = ({ v }: { v: PracticeView }) => (
 );
 
 export const place = (p: { studio: string; room: string }) => `${p.studio}${p.room ? ' ' + p.room : ''}`;
+
+/** 共有の画面に渡す文。日時と場所を先に書き、参加リンクから回答できると添える */
+export const shareData = (v: PracticeView, url: string) => ({
+  title: 'スタジオ練出欠管理',
+  text: `${labelDate(v.practice.date)} ${v.practice.start}–${v.practice.end} ${place(v.practice)}\n参加リンクから回答できます`,
+  url,
+});

@@ -26,11 +26,19 @@ liff
 
 const LIFF_ID = import.meta.env.VITE_LIFF_ID as string;
 
+/** どこで開いているか。line: LINE内 / app: ホーム画面に追加したアプリ / browser: Safari などのブラウザ */
+export type ClientMode = 'line' | 'app' | 'browser';
+
+const isStandalone = () =>
+  typeof window !== 'undefined' &&
+  (window.matchMedia?.('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true);
+
 function setClientMode(inClient: boolean) {
-  if (typeof document !== 'undefined') {
-    document.documentElement.dataset.client = inClient ? 'line' : 'browser';
-  }
+  if (typeof document === 'undefined') return;
+  document.documentElement.dataset.client = inClient ? 'line' : isStandalone() ? 'app' : 'browser';
 }
+
+export const clientMode = (): ClientMode => (document.documentElement.dataset.client as ClientMode | undefined) ?? 'browser';
 
 setClientMode(
   MOCK
@@ -38,14 +46,36 @@ setClientMode(
     : typeof navigator !== 'undefined' && /\bLine\//i.test(navigator.userAgent),
 );
 
-/** LIFFを初期化し、未ログインならLINEログインへ。戻り値は起動時のURLパラメータ */
-export async function initLiff(): Promise<URLSearchParams> {
-  if (!MOCK) {
+/** ログアウトしたあと、勝手にログインし直さないための印（次に「ログイン」を押すまで残す） */
+const LOGGED_OUT_KEY = 'pb:loggedOut';
+const loggedOut = () => {
+  try {
+    return localStorage.getItem(LOGGED_OUT_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * LIFFを初期化し、未ログインならLINEログインへ。戻り値は起動時のURLパラメータ。
+ * ブラウザでログアウトしたあとは、ログインの画面を出すため null を返す
+ */
+export async function initLiff(): Promise<URLSearchParams | null> {
+  if (MOCK) {
+    if (loggedOut()) return null;
+  } else {
     await liff.init({ liffId: LIFF_ID });
     setClientMode(liff.isInClient());
     if (!liff.isLoggedIn()) {
+      if (loggedOut() && !liff.isInClient()) return null;
       liff.login({ redirectUri: location.href });
       await new Promise(() => {}); // リダイレクトを待つ
+    }
+    // ログインできているなら、ログアウトの印は要らない
+    try {
+      localStorage.removeItem(LOGGED_OUT_KEY);
+    } catch {
+      /* 消せなくても動く */
     }
     configureAuth(
       () => liff.getIDToken(),
@@ -70,6 +100,61 @@ export function openExternal(url: string) {
 
 export function closeApp() {
   if (!MOCK && liff.isInClient()) liff.closeWindow();
+}
+
+/** ブラウザ・ホーム画面のアプリでログアウトする。この端末に残した前回の表示も消す */
+export function logoutApp() {
+  try {
+    localStorage.setItem(LOGGED_OUT_KEY, '1');
+    localStorage.removeItem('pb:home');
+    sessionStorage.removeItem('pb:relogin');
+  } catch {
+    /* 消せなくてもログアウトは続ける */
+  }
+  if (!MOCK && liff.isLoggedIn()) liff.logout();
+  location.reload();
+}
+
+/** ログアウトしたあとの画面から、LINEでログインし直す */
+export function loginApp() {
+  try {
+    localStorage.removeItem(LOGGED_OUT_KEY);
+  } catch {
+    /* 消せなくてもログインは続ける */
+  }
+  if (MOCK) location.reload();
+  else liff.login({ redirectUri: location.href.split('#')[0] });
+}
+
+/** カレンダーに追加する。iPhone の .ics は、ブラウザ・アプリでは同じ画面のまま開くと追加の画面がすぐ出る */
+export function openCalendar(url: string, kind: 'ics' | 'google') {
+  if (kind === 'ics' && clientMode() !== 'line') location.href = url;
+  else openExternal(url);
+}
+
+/** iPhone・iPad・Mac なら iPhone のカレンダー（.ics）を先に出す */
+export const prefersIcs = () => /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
+
+/**
+ * スマホの共有の画面を開く。使えないときはリンクをコピーする。
+ * 戻り値: shared（共有した）/ copied（コピーした）/ cancelled（閉じた）
+ */
+export async function shareLink(data: { title: string; text: string; url: string }): Promise<'shared' | 'copied' | 'cancelled'> {
+  if (typeof navigator.share === 'function' && (!navigator.canShare || navigator.canShare(data))) {
+    try {
+      await navigator.share(data);
+      return 'shared';
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return 'cancelled';
+      // 共有できない場所（LINE内の一部など）では、下のコピーに切り替える
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(`${data.text}\n${data.url}`);
+  } catch {
+    prompt('共有するリンク', data.url);
+  }
+  return 'copied';
 }
 
 /**

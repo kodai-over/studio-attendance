@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { endAfterStart, labelDate, roomInfo, yen, type Answer, type AttendeeView, type PracticePatch, type PracticeView } from '@studio-attendance/shared';
 import { api } from '../api';
 import { RoomSelect } from '../components/StudioRoom';
-import { openExternal } from '../liff';
-import { Avatar, FRESH_MS, Icon, Pass, RsvpButtons, Spinner, Syncing, TopBar, useApp, useRunner } from '../ui';
+import { openCalendar, prefersIcs, shareLink } from '../liff';
+import { Avatar, FRESH_MS, Icon, Pass, RsvpButtons, Spinner, Syncing, TopBar, shareData, useApp, useRunner } from '../ui';
 import { isAnswering } from '../answering';
 import { useAnswer } from './List';
 
@@ -80,6 +80,7 @@ export function PracticePass({ v }: { v: PracticeView }) {
 export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null }) {
   const { v, inList, loading, busy, update } = usePractice(id);
   const { answer } = useAnswer();
+  const { toast } = useApp();
   const calRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -88,10 +89,27 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
 
   if (!v) return <><TopBar back />{loading ? <Spinner /> : <div class="empty">予約情報が見つかりません</div>}</>;
   const p = v.practice;
+  // 行くと答えたら、カレンダーに追加をボタンのすぐ下に出す（答えてそのまま追加できるように）
+  const going = v.myAnswer === '行く' && p.status !== '中止';
+  const calendar = <CalendarButtons v={v} highlight={going} />;
 
   return (
     <>
-      <TopBar back>{loading && <Syncing />}</TopBar>
+      <TopBar back>
+        {loading && <Syncing />}
+        {v.joinUrl && (
+          <button
+            class="icon-btn"
+            style={{ marginLeft: 'auto' }}
+            aria-label="参加リンクを共有"
+            onClick={async () => {
+              if ((await shareLink(shareData(v, v.joinUrl!))) === 'copied') toast('参加リンクをコピーしました');
+            }}
+          >
+            <Icon name="share" size={20} />
+          </button>
+        )}
+      </TopBar>
 
       <div class="detail-layout">
         <div class="detail-primary">
@@ -108,6 +126,12 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
               else update(() => api('rsvp', { id, answer: a }));
             }}
           />
+
+          {going && (
+            <div ref={calRef} class="cal-inline">
+              {calendar}
+            </div>
+          )}
         </div>
 
         <div class="detail-side">
@@ -115,18 +139,15 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
         </div>
 
         <div class="detail-extra">
-          <div class="sec-head" ref={calRef}>
-            <Icon name="calendar" size={18} />
-            カレンダー
-          </div>
-          <div class="grid2">
-            <button class="btn ghost" onClick={() => openExternal(v.googleCalendarUrl)}>
-              Google
-            </button>
-            <button class="btn ghost" onClick={() => openExternal(v.icsUrl)}>
-              iPhone
-            </button>
-          </div>
+          {!going && (
+            <>
+              <div class="sec-head" ref={calRef}>
+                <Icon name="calendar" size={18} />
+                カレンダーに追加
+              </div>
+              {calendar}
+            </>
+          )}
 
           {/* 古いお知らせのリンクなどから開いた予約者が、直す・消す場所に迷わないように */}
           {v.canEdit && (
@@ -139,6 +160,24 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
         </div>
       </div>
     </>
+  );
+}
+
+/** カレンダーに追加。iPhone・Mac なら iPhone のカレンダーを、それ以外なら Google を大きく出す */
+function CalendarButtons({ v, highlight }: { v: PracticeView; highlight: boolean }) {
+  const ics = { label: 'iPhone', open: () => openCalendar(v.icsUrl, 'ics') };
+  const google = { label: 'Google', open: () => openCalendar(v.googleCalendarUrl, 'google') };
+  const [first, second] = prefersIcs() ? [ics, google] : [google, ics];
+  return (
+    <div class="grid2">
+      <button class={`btn ${highlight ? 'primary' : 'ghost'}`} onClick={first.open}>
+        <Icon name="calendar" size={16} />
+        {first.label}
+      </button>
+      <button class="btn ghost" onClick={second.open}>
+        {second.label}
+      </button>
+    </div>
   );
 }
 
