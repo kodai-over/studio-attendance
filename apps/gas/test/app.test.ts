@@ -841,14 +841,16 @@ describe('ルーター', () => {
 });
 
 describe('リッチメニュー', () => {
-  it('全面が1つのボタンで、アプリのトップを開く', async () => {
+  it('3つのカードボタンで、予定確認・予約登録・ブラウザ起動を行う', async () => {
     const { richMenuDefinition } = await import('../src/app/richmenu');
-    const def = richMenuDefinition('https://example.com/app');
+    const def = richMenuDefinition('https://example.com/app', '1234567890-abcdefgh');
     expect(def.size).toEqual({ width: 2500, height: 843 });
     expect(def.selected).toBe(false);
-    expect(def.chatBarText).toBe('アプリ起動');
+    expect(def.chatBarText).toBe('メニュー');
     expect(def.areas).toEqual([
-      { bounds: { x: 0, y: 0, width: 2500, height: 843 }, action: { type: 'uri', label: 'アプリ起動', uri: 'https://example.com/app/?openExternalBrowser=1' } },
+      { bounds: { x: 0, y: 0, width: 833, height: 843 }, action: { type: 'uri', label: '予定確認', uri: 'https://liff.line.me/1234567890-abcdefgh' } },
+      { bounds: { x: 833, y: 0, width: 834, height: 843 }, action: { type: 'uri', label: '予約登録', uri: 'https://liff.line.me/1234567890-abcdefgh?view=register' } },
+      { bounds: { x: 1667, y: 0, width: 833, height: 843 }, action: { type: 'uri', label: 'ブラウザで開く', uri: 'https://example.com/app/?openExternalBrowser=1' } },
     ]);
     // LINEの上限（バーの文字は14文字、ボタンのラベルは20文字まで）
     expect(def.chatBarText.length).toBeLessThanOrEqual(14);
@@ -858,13 +860,13 @@ describe('リッチメニュー', () => {
   it('URL形式に応じた openExternalBrowser=1 の補完を正しく行う', async () => {
     const { richMenuDefinition } = await import('../src/app/richmenu');
     // 末尾スラッシュなし
-    expect(richMenuDefinition('https://example.com/app').areas[0].action.uri).toBe('https://example.com/app/?openExternalBrowser=1');
+    expect(richMenuDefinition('https://example.com/app').areas[2].action.uri).toBe('https://example.com/app/?openExternalBrowser=1');
     // 末尾スラッシュあり
-    expect(richMenuDefinition('https://example.com/app/').areas[0].action.uri).toBe('https://example.com/app/?openExternalBrowser=1');
+    expect(richMenuDefinition('https://example.com/app/').areas[2].action.uri).toBe('https://example.com/app/?openExternalBrowser=1');
     // 既存クエリあり
-    expect(richMenuDefinition('https://example.com/app?tab=1').areas[0].action.uri).toBe('https://example.com/app?tab=1&openExternalBrowser=1');
+    expect(richMenuDefinition('https://example.com/app?tab=1').areas[2].action.uri).toBe('https://example.com/app?tab=1&openExternalBrowser=1');
     // 既に openExternalBrowser=1 が付与されている場合は二重付与しない
-    expect(richMenuDefinition('https://example.com/app/?openExternalBrowser=1').areas[0].action.uri).toBe('https://example.com/app/?openExternalBrowser=1');
+    expect(richMenuDefinition('https://example.com/app/?openExternalBrowser=1').areas[2].action.uri).toBe('https://example.com/app/?openExternalBrowser=1');
   });
 });
 
