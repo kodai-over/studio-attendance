@@ -44,6 +44,7 @@ description: スタジオ練出欠管理 の新しいバージョンを出す。
    git push origin main vX.Y.Z
    ```
 5. GitHub Pages の公開を確かめる：`gh run list --workflow pages.yml --limit 1`。
+   - ※リッチメニューを変更した場合は、必ず GitHub Pages のデプロイ完了を確認した後に、Apps Script エディタで `setupRichMenu` を1回実行してメニュー定義を反映する（デプロイ完了前に実行すると古い画像に新しい当たり判定が付き、見た目と押した先が食い違うため）。
 6. GitHub Release を作る。本文は CHANGELOG.md のその版の部分だけ。
    ```bash
    gh release create vX.Y.Z --title "vX.Y.Z" --notes-file <その版の部分を書き出したファイル>

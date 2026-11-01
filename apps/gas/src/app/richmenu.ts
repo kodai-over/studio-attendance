@@ -16,6 +16,11 @@ export function richMenuDefinition(appUrl: string, liffId: string) {
   const scheduleUri = liffBase;
   const registerUri = `${liffBase}?view=register`;
 
+  // タップ領域の分割（3等分: 833 + 834 + 833 = 2500）
+  // 画像側（scripts/richmenu.mjs）の3枚カードレイアウト（padX=40, cardW=786, gap=30）に対応。
+  // カード1: [40..826], カード2: [856..1642], カード3: [1672..2460]
+  // カード間の隙間（826〜856、1642〜1672）の中間点（841、1657）付近で境界（833、1667）を区切り、
+  // 余白タップ時も直近のカードボタンが自然に反応するよう全幅を隙間なくカバーする。
   const w1 = 833;
   const w2 = 834;
   const w3 = 833;

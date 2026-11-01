@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { checkLiffRedirect, decideLiffInitAction } from '../src/liff';
-import { resolveInitialHash } from '../src/main';
+import { resolveInitialHash } from '../src/route';
 
 describe('LIFF 初期化 & 画面遷移ロジック', () => {
   describe('checkLiffRedirect', () => {
@@ -137,6 +137,22 @@ describe('LIFF 初期化 & 画面遷移ロジック', () => {
       expect(resolveInitialHash(new URLSearchParams('p=p123&cal=1'))).toBe('/p/p123?cal=1');
       expect(resolveInitialHash(new URLSearchParams('manage=p123'))).toBe('/recruit/p123');
       expect(resolveInitialHash(new URLSearchParams('r=p1&r=p2'))).toBe('/answer?r=p1&r=p2');
+    });
+
+    it('draft パラメータおよび recruit=1 の組み合わせを正しく振り分ける', () => {
+      expect(resolveInitialHash(new URLSearchParams('draft=d1'))).toBe('/register?draft=d1');
+      expect(resolveInitialHash(new URLSearchParams('draft=d1&recruit=1'))).toBe('/register?draft=d1&recruit=1');
+    });
+
+    it('パラメータが重複した場合の優先順位（回答 > 募集管理 > 予約詳細 > 下書き > メニュー）を守る', () => {
+      // p と view が同時 -> p が優先
+      expect(resolveInitialHash(new URLSearchParams('p=p123&view=register'))).toBe('/p/p123');
+      // manage と p が同時 -> manage が優先
+      expect(resolveInitialHash(new URLSearchParams('manage=m1&p=p123'))).toBe('/recruit/m1');
+      // r と manage が同時 -> r が優先
+      expect(resolveInitialHash(new URLSearchParams('r=r1&manage=m1'))).toBe('/answer?r=r1');
+      // draft と view が同時 -> draft が優先
+      expect(resolveInitialHash(new URLSearchParams('draft=d1&view=register'))).toBe('/register?draft=d1');
     });
   });
 });
