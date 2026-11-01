@@ -56,7 +56,7 @@ export function RecruitListPage() {
               onOpen={(o) => setOpened(o ? v.practice.id : null)}
               onDelete={() => remove(v)}
             >
-              <RecruitTicket v={v} showBooker={admin && v.practice.booker !== me.member.userId} />
+              <RecruitTicket v={v} />
             </SwipeRow>
           ))}
         </div>
@@ -65,7 +65,7 @@ export function RecruitListPage() {
   );
 }
 
-function RecruitTicket({ v, showBooker }: { v: PracticeView; showBooker: boolean }) {
+function RecruitTicket({ v }: { v: PracticeView }) {
   const { me } = useApp();
   const p = v.practice;
   const open = () => go(`/recruit/${encodeURIComponent(p.id)}`);
@@ -82,8 +82,7 @@ function RecruitTicket({ v, showBooker }: { v: PracticeView; showBooker: boolean
         <span class="sr">{labelDate(p.date)}</span>
         <div class="time">
           <span>{p.start}–{p.end}</span>
-          {p.status === '中止' && <span class="stamp cancel">中止</span>}
-          {showBooker && v.bookerName && (
+          {v.bookerName && (
             <span class="booker" title={`予約者: ${v.bookerName}`}>
               <Icon name="user" size={11} />
               <span>{v.bookerName}</span>
