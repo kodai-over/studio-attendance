@@ -1,0 +1,50 @@
+# PR が開かれたら Claude Code が自動でレビューし、コメントで指摘する（コメントのみ。マージは止めない）
+name: Claude PR review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # fork からの PR では Secret が使えないため対象外。下書き PR も対象外
+    if: github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            このプルリクエストをレビューし、日本語でコメントしてください。コードは変更せず、コメントだけを出します。
+
+            まず CLAUDE.md を読み、次の観点で差分を確認します。
+            - 動作の不具合、抜け漏れ、境界条件の見落とし
+            - 実運用中のスプレッドシートや参加リンクを壊す変更になっていないか（壊す恐れがあれば強く指摘する）
+            - ユーザーに見える文字列が docs/glossary.md の用語集に沿っているか、「使わない言い方」が入っていないか
+            - CHANGELOG・タグ・コミットなど公開する文に、使っているグループの名前や内輪の言い方が入っていないか
+            - テストが足りているか
+
+            出し方:
+            - 行ごとの指摘は、インラインコメントで出す
+            - 最後に、全体の所見を PR コメントに1つだけまとめる（良い点は1〜2行、直してほしい点は優先度の高い順）
+            - 直してほしい点は「何を・なぜ・どう直すか」を具体的に書く
+            - 好みの問題や細かすぎる指摘は出さない
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
