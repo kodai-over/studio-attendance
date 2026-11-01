@@ -219,3 +219,7 @@ npm run typecheck            # 型チェック
 npm run dev:mock -w @studio-attendance/liff # LINE・Googleなしで画面を確認（?as=U3 で一般の表示）
 npm run build -w @studio-attendance/gas     # apps/gas/dist/Code.js を作る
 ```
+
+## 動作確認用のメモ
+
+練習のチケットを登録したら、予約を確認してください。
