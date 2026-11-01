@@ -431,7 +431,7 @@ a {
 .stub .d {
   margin: 2px 0 3px;
   font-size: 20px;
-  font-weight: 400;
+  font-weight: 500;
   letter-spacing: -0.02em;
 }
 .stub .w {
@@ -448,9 +448,31 @@ a {
   line-height: 1;
   color: var(--sub);
 }
+/* 土曜日：半券全体がブルー */
+.stub.sat {
+  background: color-mix(in srgb, var(--sat) 5%, var(--paper));
+  border-right-color: color-mix(in srgb, var(--sat) 25%, transparent);
+}
+.stub.sat .m {
+  color: color-mix(in srgb, var(--sat) 70%, var(--sub));
+}
+.stub.sat .d {
+  color: var(--sat);
+}
 .stub .w.sat {
   color: var(--sat);
   background: color-mix(in srgb, var(--sat) 14%, transparent);
+}
+/* 日曜・祝日：半券全体がレッド */
+.stub.sun {
+  background: color-mix(in srgb, var(--sun) 5%, var(--paper));
+  border-right-color: color-mix(in srgb, var(--sun) 25%, transparent);
+}
+.stub.sun .m {
+  color: color-mix(in srgb, var(--sun) 70%, var(--sub));
+}
+.stub.sun .d {
+  color: var(--sun);
 }
 .stub .w.sun {
   color: var(--sun);
@@ -468,9 +490,17 @@ a {
 .ticket[data-answer='行く'] .stub .w:not(.sat):not(.sun) {
   color: color-mix(in srgb, var(--bg) 70%, transparent);
 }
+.ticket[data-answer='行く'] .stub.sat .m,
+.ticket[data-answer='行く'] .stub.sat .d {
+  color: #93b7ff;
+}
 .ticket[data-answer='行く'] .stub .w.sat {
   color: #93b7ff;
   background: rgba(147, 183, 255, 0.25);
+}
+.ticket[data-answer='行く'] .stub.sun .m,
+.ticket[data-answer='行く'] .stub.sun .d {
+  color: #ff8577;
 }
 .ticket[data-answer='行く'] .stub .w.sun {
   color: #ff8577;
@@ -762,9 +792,17 @@ a {
 }
 
 @media (prefers-color-scheme: dark) {
+  .ticket[data-answer='行く'] .stub.sat .m,
+  .ticket[data-answer='行く'] .stub.sat .d {
+    color: #1d4ed8;
+  }
   .ticket[data-answer='行く'] .stub .w.sat {
     color: #1d4ed8;
     background: rgba(29, 78, 216, 0.15);
+  }
+  .ticket[data-answer='行く'] .stub.sun .m,
+  .ticket[data-answer='行く'] .stub.sun .d {
+    color: #dc2626;
   }
   .ticket[data-answer='行く'] .stub .w.sun {
     color: #dc2626;
@@ -807,9 +845,15 @@ a {
 .pass-date {
   font-family: var(--mono);
   font-size: 22px;
-  font-weight: 400;
+  font-weight: 500;
   letter-spacing: -0.02em;
   line-height: 1;
+}
+.pass-date.sat {
+  color: var(--sat);
+}
+.pass-date.sun {
+  color: var(--sun);
 }
 .pass-date .w {
   margin-left: 6px;

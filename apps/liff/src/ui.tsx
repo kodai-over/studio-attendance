@@ -195,12 +195,12 @@ export function Stub({ date, onClick }: { date: string; onClick?: () => void }) 
   const [, m, d] = date.split('-').map(Number);
   const w = weekday(date);
   const hol = isHoliday(date);
-  const dayClass = hol || w === '日' ? ' sun' : w === '土' ? ' sat' : '';
+  const dayClass = hol || w === '日' ? 'sun' : w === '土' ? 'sat' : 'weekday';
   return (
-    <div class="stub" aria-hidden="true" onClick={onClick}>
+    <div class={`stub ${dayClass}`} aria-hidden="true" onClick={onClick}>
       <span class="m">{String(m).padStart(2, '0')}</span>
       <span class="d">{String(d).padStart(2, '0')}</span>
-      <span class={`w${dayClass}`}>{w}</span>
+      <span class={`w ${dayClass}`}>{w}</span>
     </div>
   );
 }
@@ -284,12 +284,15 @@ export function Pass({
   fields: { label: string; value: ComponentChildren; note?: string | null; wide?: boolean; jp?: boolean }[];
 }) {
   const [, m, d] = date.split('-').map(Number);
+  const w = weekday(date);
+  const hol = isHoliday(date);
+  const dayClass = hol || w === '日' ? 'sun' : w === '土' ? 'sat' : 'weekday';
   return (
     <section class="pass" data-status={status}>
       <div class="pass-head">
-        <div class="pass-date">
+        <div class={`pass-date ${dayClass}`}>
           {String(m).padStart(2, '0')}.{String(d).padStart(2, '0')}
-          <span class={`w${isHoliday(date) || weekday(date) === '日' ? ' sun' : weekday(date) === '土' ? ' sat' : ''}`}>{weekday(date)}</span>
+          <span class={`w ${dayClass}`}>{w}</span>
         </div>
         <StatusBadge v={{ practice: { status } }} />
       </div>
