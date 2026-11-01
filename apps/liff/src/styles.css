@@ -1617,6 +1617,7 @@ details > summary {
 /* 行くと答えた予約情報の、回答ボタンのすぐ下のカレンダーに追加 */
 .cal-inline {
   margin-top: 12px;
+  scroll-margin-top: calc(52px + env(safe-area-inset-top));
 }
 .copy-row .icon-btn + .icon-btn {
   margin-left: -2px;

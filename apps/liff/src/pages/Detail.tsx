@@ -82,15 +82,15 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
   const { answer } = useAnswer();
   const { toast } = useApp();
   const calRef = useRef<HTMLDivElement>(null);
+  const going = v ? v.myAnswer === '行く' && v.practice.status !== '中止' : false;
 
   useEffect(() => {
-    if (v && focus === 'calendar') calRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, [v != null, focus]);
+    if (v && focus === 'calendar') calRef.current?.scrollIntoView({ behavior: 'smooth', block: going ? 'nearest' : 'start' });
+  }, [v != null, focus, going]);
 
   if (!v) return <><TopBar back />{loading ? <Spinner /> : <div class="empty">予約情報が見つかりません</div>}</>;
   const p = v.practice;
   // 行くと答えたら、カレンダーに追加をボタンのすぐ下に出す（答えてそのまま追加できるように）
-  const going = v.myAnswer === '行く' && p.status !== '中止';
   const calendar = <CalendarButtons v={v} highlight={going} />;
 
   return (

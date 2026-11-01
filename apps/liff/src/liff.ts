@@ -108,6 +108,8 @@ export function logoutApp() {
     localStorage.setItem(LOGGED_OUT_KEY, '1');
     localStorage.removeItem('pb:home');
     sessionStorage.removeItem('pb:relogin');
+    sessionStorage.removeItem('pb:actAs');
+    if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   } catch {
     /* 消せなくてもログアウトは続ける */
   }

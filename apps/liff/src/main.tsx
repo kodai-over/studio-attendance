@@ -33,6 +33,7 @@ const CACHE_KEY = 'pb:home';
 /** 前回開いたときの表示。開いた瞬間に出し、裏で最新に入れ替える */
 function loadCache(): HomeView | null {
   try {
+    if (localStorage.getItem('pb:loggedOut') === '1') return null;
     const raw = localStorage.getItem(CACHE_KEY);
     return raw ? (JSON.parse(raw) as HomeView) : null;
   } catch {
@@ -42,6 +43,8 @@ function loadCache(): HomeView | null {
 
 function saveCache(h: HomeView) {
   try {
+    // 別アカウント（一般・admin）として見ている内容は、キャッシュに保存しない
+    if (h.me.actAs && h.me.actAs !== 'self') return;
     localStorage.setItem(CACHE_KEY, JSON.stringify(h));
   } catch {
     /* 保存できなくても動く */
