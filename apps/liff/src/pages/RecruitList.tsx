@@ -69,26 +69,41 @@ function RecruitTicket({ v, showBooker }: { v: PracticeView; showBooker: boolean
   const { me } = useApp();
   const p = v.practice;
   const open = () => go(`/recruit/${encodeURIComponent(p.id)}`);
-  const sent = v.groupNames.length > 0;
+  const targetGroups =
+    v.groupNames.length > 0
+      ? v.groupNames
+      : p.groups.map((gid) => me.groups.find((g) => g.id === gid)?.name ?? gid);
+  const hasGroups = targetGroups.length > 0;
+
   return (
-    <article class="ticket" data-answer={sent ? 'sent' : 'none'} data-status={p.status}>
+    <article class="ticket" data-answer={hasGroups ? 'sent' : 'none'} data-status={p.status}>
       <Stub date={p.date} onClick={open} />
       <button class="ticket-main" onClick={open}>
         <span class="sr">{labelDate(p.date)}</span>
         <div class="time">
-          {p.start}–{p.end}
-          {p.status === '中止' ? <span class="stamp cancel">中止</span> : <span class={`stamp ${sent ? 'ok' : 'todo'}`}>{sent ? '募集済' : '未募集'}</span>}
+          <span>{p.start}–{p.end}</span>
+          {p.status === '中止' && <span class="stamp cancel">中止</span>}
+          {showBooker && v.bookerName && (
+            <span class="booker" title={`予約者: ${v.bookerName}`}>
+              <Icon name="user" size={11} />
+              <span>{v.bookerName}</span>
+            </span>
+          )}
         </div>
-        <div class="place">
-          {place(p)}
-          {showBooker && <span class="muted">　{v.bookerName}</span>}
-        </div>
+        <div class="place">{place(p)}</div>
         <div class="ticket-foot">
-          <span class="toggles">
-            {me.groups.map((g) => (
-              <span class={`tag${p.groups.includes(g.id) ? '' : ' soft'}`}>{g.name}</span>
-            ))}
-          </span>
+          <div class={`recruit-groups${hasGroups ? ' has-groups' : ''}`}>
+            <Icon name="send" size={12} />
+            {hasGroups ? (
+              targetGroups.map((name) => (
+                <span class="tag" key={name}>
+                  {name}
+                </span>
+              ))
+            ) : (
+              <span class="no-groups">No groups</span>
+            )}
+          </div>
           <span class="fee">
             <Icon name="chevron" size={15} />
           </span>

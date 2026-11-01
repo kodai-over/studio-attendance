@@ -1642,14 +1642,39 @@ details > summary {
   border-radius: 12px;
   font-size: 15px;
 }
-.ticket-foot .toggles {
-  gap: 4px;
+.ticket-foot .recruit-groups {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
 }
-.ticket-foot .tag {
+.ticket-foot .recruit-groups .icon {
+  flex: none;
+  color: var(--sub);
+  opacity: 0.8;
+}
+.ticket-foot .recruit-groups.has-groups .icon {
+  color: var(--ink);
+  opacity: 0.9;
+}
+.ticket-foot .recruit-groups .tag {
   padding: 0 6px;
   font-size: 10px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-width: 140px;
+}
+.ticket-foot .recruit-groups .no-groups {
+  font-size: 11px;
+  color: var(--sub);
+  letter-spacing: 0.02em;
   font-weight: 400;
-  line-height: 1.45;
+  white-space: nowrap;
 }
 .menu.edit {
   margin-top: 20px;
