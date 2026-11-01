@@ -108,8 +108,10 @@ export interface CancelDeadline {
   time: string;
   /** 'M/D(曜) HH:mm' (例: '10/29(木) 10:00') */
   formatted: string;
-  /** 現在時刻を過ぎているか */
+  /** 現在時刻を過ぎているか（期限切れ） */
   isPast: boolean;
+  /** 期限まで24時間以内か（強調対象） */
+  isSoon: boolean;
 }
 
 /**
@@ -126,12 +128,15 @@ export function computeCancelDeadline(
   if (!rule) return null;
   const deadlineDate = addDays(practiceDate, -rule.daysBefore);
   const deadlineDateTime = cancelWarningAt(practiceDate, rule);
-  const isPast = now.getTime() >= deadlineDateTime.getTime();
+  const diffMs = deadlineDateTime.getTime() - now.getTime();
+  const isPast = diffMs <= 0;
+  const isSoon = !isPast && diffMs <= 24 * 60 * 60 * 1000;
   return {
     date: deadlineDate,
     time: rule.time,
     formatted: `${labelDate(deadlineDate)} ${rule.time}`,
     isPast,
+    isSoon,
   };
 }
 

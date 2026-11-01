@@ -157,17 +157,23 @@ describe('設定', () => {
     expect(findCancelRule(settings.cancelRules, 'その他')).toBeNull();
   });
   it('キャンセル期限の計算', () => {
-    // 2026-11-02(月) の worcle(4日前 10:00) -> 2026-10-29(木) 10:00
-    const deadline = computeCancelDeadline('2026-11-02', 'studio worcle 横浜', settings.cancelRules, new Date('2026-10-29T00:59:00.000Z'));
-    expect(deadline).not.toBeNull();
-    expect(deadline?.date).toBe('2026-10-29');
-    expect(deadline?.time).toBe('10:00');
-    expect(deadline?.formatted).toBe('10/29(木) 10:00');
-    expect(deadline?.isPast).toBe(false);
+    // 2026-11-02(月) の worcle(4日前 10:00 JST = 2026-10-29T01:00:00Z)
+    // 期限より25時間前 -> isPast: false, isSoon: false
+    const far = computeCancelDeadline('2026-11-02', 'studio worcle 横浜', settings.cancelRules, new Date('2026-10-27T23:59:00.000Z'));
+    expect(far).not.toBeNull();
+    expect(far?.formatted).toBe('10/29(木) 10:00');
+    expect(far?.isPast).toBe(false);
+    expect(far?.isSoon).toBe(false);
 
-    // 期限後
+    // 期限より20時間前（24時間以内） -> isPast: false, isSoon: true (強調対象)
+    const soon = computeCancelDeadline('2026-11-02', 'studio worcle 横浜', settings.cancelRules, new Date('2026-10-28T05:00:00.000Z'));
+    expect(soon?.isPast).toBe(false);
+    expect(soon?.isSoon).toBe(true);
+
+    // 期限後 -> isPast: true, isSoon: false (期限切れ)
     const past = computeCancelDeadline('2026-11-02', 'studio worcle 横浜', settings.cancelRules, new Date('2026-10-29T01:01:00.000Z'));
     expect(past?.isPast).toBe(true);
+    expect(past?.isSoon).toBe(false);
 
     // ルール未設定のスタジオ
     expect(computeCancelDeadline('2026-11-02', '不明なスタジオ', settings.cancelRules)).toBeNull();

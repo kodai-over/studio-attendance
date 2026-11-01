@@ -67,7 +67,21 @@ export function PracticePass({ v }: { v: PracticeView }) {
         { label: '時間', value: `${p.start}–${p.end}`, wide: true },
         { label: 'スタジオ', value: p.studio, jp: true, wide: !p.room },
         ...(p.room ? [{ label: '部屋', value: p.room, note: roomInfo(me.settings.studios, p.studio, p.room), jp: true }] : []),
-        ...(deadline ? [{ label: 'キャンセル期限', value: `${deadline.formatted}${deadline.isPast ? '（締切）' : ''}`, jp: true, wide: true }] : []),
+        ...(deadline
+          ? [
+              {
+                label: 'キャンセル期限',
+                value: (
+                  <span class={`deadline-text${deadline.isSoon ? ' is-soon' : ''}${deadline.isPast ? ' is-past' : ''}`}>
+                    {deadline.formatted}
+                    {deadline.isSoon ? '（まもなく締切）' : deadline.isPast ? '（期限切れ）' : ''}
+                  </span>
+                ),
+                jp: true,
+                wide: true,
+              },
+            ]
+          : []),
         { label: '1人あたり', value: v.perPerson != null ? yen(v.perPerson) : '—', note: p.feeOverride ? '調整済み' : null },
         { label: 'スタジオ代', value: yen(p.fee) },
         { label: '参加人数', value: <>{v.goingCount}{p.max ? <small class="of">/{p.max}</small> : null} {p.status === '満員' && <span class="badge-full">FULL</span>}</>, note: p.min ? `最低人数 ${p.min}人` : null },

@@ -644,14 +644,31 @@ a {
 }
 .ticket-deadline .icon {
   flex-shrink: 0;
-  color: var(--sub);
+  color: currentColor;
   opacity: 0.85;
+}
+.ticket-deadline.is-soon {
+  color: var(--maybe-accent);
+  font-weight: 600;
+  background: color-mix(in srgb, var(--maybe-accent) 12%, transparent);
+  padding: 1px 5px 1px 4px;
+  border-radius: 4px;
+  width: fit-content;
+}
+.ticket-deadline.is-soon .icon {
+  opacity: 1;
 }
 .ticket-deadline.is-past {
   color: var(--faint);
 }
 .ticket-deadline.is-past .icon {
-  opacity: 0.5;
+  opacity: 0.55;
+}
+.deadline-text.is-soon {
+  color: var(--maybe-accent);
+}
+.deadline-text.is-past {
+  color: var(--faint);
 }
 .ticket-foot {
   display: flex;
