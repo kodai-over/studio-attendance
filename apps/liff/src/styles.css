@@ -509,13 +509,17 @@ a {
   align-items: center;
   gap: 3px;
   max-width: 105px;
+  min-width: 0;
   font-family: var(--sans);
   font-size: 11px;
   font-weight: 400;
   color: var(--sub);
-  white-space: nowrap;
+}
+.time .booker > span {
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 .time .booker .icon {
   flex-shrink: 0;
@@ -737,6 +741,14 @@ a {
 }
 
 @media (prefers-color-scheme: dark) {
+  .ticket[data-answer='行く'] .stub .w.sat {
+    color: #1d4ed8;
+    background: rgba(29, 78, 216, 0.15);
+  }
+  .ticket[data-answer='行く'] .stub .w.sun {
+    color: #dc2626;
+    background: rgba(220, 38, 38, 0.15);
+  }
   .ticket[data-answer='保留'] > .stub {
     background: color-mix(in srgb, #fbbf24 10%, var(--paper));
     box-shadow: inset 3px 0 0 #fbbf24;
