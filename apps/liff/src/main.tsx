@@ -54,6 +54,29 @@ function saveCache(h: HomeView) {
   }
 }
 
+/**
+ * 起動時のURLパラメータ（?p= / ?r= / ?view= 等）から初期ハッシュルーティング先を解決する。
+ * リッチメニューの「予約登録」（?view=register）や、募集カード・確認カードの遷移で使用される。
+ */
+export function resolveInitialHash(params: URLSearchParams): string | undefined {
+  const p = params.get('p');
+  const manage = params.get('manage');
+  const answers = params.getAll('r');
+  const draft = params.get('draft');
+  // ?view= はリッチメニューの「予約登録」（?view=register）や過去のリンクから各画面を開くのに使用
+  const views: Record<string, string> = { register: '/register', recruit: '/recruit', mine: '/?tab=mine', feedback: '/feedback' };
+  const view = views[params.get('view') ?? ''];
+  return answers.length
+    ? `/answer?${answers.map((id) => `r=${encodeURIComponent(id)}`).join('&')}`
+    : manage
+      ? `/recruit/${encodeURIComponent(manage)}`
+      : p
+      ? `/p/${encodeURIComponent(p)}${params.get('cal') ? '?cal=1' : ''}`
+      : draft
+        ? `/register?draft=${encodeURIComponent(draft)}${params.get('recruit') === '1' ? '&recruit=1' : ''}`
+        : view;
+}
+
 function App() {
   const [cached] = useState(loadCache);
   const [me, setMe] = useState<MeView | null>(cached?.me ?? null);
@@ -91,29 +114,12 @@ function App() {
         setLoggedOut(true);
         return;
       }
-      // 募集カードや確認カードのリンク（?p= / ?cal= / ?draft=）を画面に振り分ける
-      // ?view= は以前のメニュー（4つのボタン）のリンク。古いリンクから開かれても困らないよう残す
-      const p = params.get('p');
-      // キャンセル期限前のお知らせなど、予約者が練習を直す・消すためのリンク（「募集」の練習の画面）
-      const manage = params.get('manage');
-      // 募集カードの「回答」は ?r=練習ID を練習の数だけ付けて開く
-      const answers = params.getAll('r');
-      const draft = params.get('draft');
       // グループのカードから開いたときは、先にそのグループのメンバーとして覚えてもらう（でないと練習が見えない）
       const group = params.get('g');
       const key = params.get('k');
       if (group && key) entry.current = { group, key };
-      const views: Record<string, string> = { register: '/register', recruit: '/recruit', mine: '/?tab=mine', feedback: '/feedback' };
-      const view = views[params.get('view') ?? ''];
-      const hash = answers.length
-        ? `/answer?${answers.map((id) => `r=${encodeURIComponent(id)}`).join('&')}`
-        : manage
-          ? `/recruit/${encodeURIComponent(manage)}`
-          : p
-          ? `/p/${encodeURIComponent(p)}${params.get('cal') ? '?cal=1' : ''}`
-          : draft
-            ? `/register?draft=${encodeURIComponent(draft)}${params.get('recruit') === '1' ? '&recruit=1' : ''}`
-            : view;
+
+      const hash = resolveInitialHash(params);
       if (hash) {
         history.replaceState(null, '', `${location.pathname}#${hash}`);
         window.dispatchEvent(new HashChangeEvent('hashchange'));
@@ -238,4 +244,6 @@ function App() {
   );
 }
 
-render(<App />, document.getElementById('app')!);
+if (typeof document !== 'undefined') {
+  render(<App />, document.getElementById('app')!);
+}

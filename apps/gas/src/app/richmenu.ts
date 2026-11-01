@@ -7,14 +7,14 @@ export const RICH_MENU_SIZE = { width: 2500, height: 843 };
  * 2. 予約登録: LINE内アプリ（予約登録画面）を起動
  * 3. ブラウザで開く: Safari・Chrome等の外部ブラウザで全画面起動（openExternalBrowser=1）
  */
-export function richMenuDefinition(appUrl: string, liffId?: string) {
+export function richMenuDefinition(appUrl: string, liffId: string) {
   // パス形式でスラッシュもクエリもハッシュもない場合は末尾スラッシュを補完してリダイレクト時のクエリ脱落を防ぐ
   const base = !appUrl.includes('?') && !appUrl.includes('#') && !appUrl.endsWith('/') ? `${appUrl}/` : appUrl;
   const externalUri = base.includes('openExternalBrowser=1') ? base : `${base}${base.includes('?') ? '&' : '?'}openExternalBrowser=1`;
 
-  const liffBase = liffId ? `https://liff.line.me/${liffId}` : appUrl;
+  const liffBase = `https://liff.line.me/${liffId}`;
   const scheduleUri = liffBase;
-  const registerUri = `${liffBase}${liffBase.includes('?') ? '&' : '?'}view=register`;
+  const registerUri = `${liffBase}?view=register`;
 
   const w1 = 833;
   const w2 = 834;

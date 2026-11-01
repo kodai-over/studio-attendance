@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { checkLiffRedirect, decideLiffInitAction } from '../src/liff';
+import { resolveInitialHash } from '../src/main';
 
 describe('LIFF 初期化 & 画面遷移ロジック', () => {
   describe('checkLiffRedirect', () => {
@@ -111,6 +112,31 @@ describe('LIFF 初期化 & 画面遷移ロジック', () => {
         isLoggedOut: false,
       });
       expect(action).toEqual({ action: 'ready' });
+    });
+  });
+
+  describe('resolveInitialHash (ルーティング振り分け)', () => {
+    it('リッチメニュー「予約登録」の ?view=register で /register に振り分ける', () => {
+      const hash = resolveInitialHash(new URLSearchParams('view=register'));
+      expect(hash).toBe('/register');
+    });
+
+    it('パラメータがない通常起動時は undefined（トップ＝予定タブ）になる', () => {
+      const hash = resolveInitialHash(new URLSearchParams(''));
+      expect(hash).toBeUndefined();
+    });
+
+    it('過去の ?view= パラメータも互換性を保って振り分けられる', () => {
+      expect(resolveInitialHash(new URLSearchParams('view=recruit'))).toBe('/recruit');
+      expect(resolveInitialHash(new URLSearchParams('view=mine'))).toBe('/?tab=mine');
+      expect(resolveInitialHash(new URLSearchParams('view=feedback'))).toBe('/feedback');
+    });
+
+    it('予約詳細や募集カードのリンクが優先して振り分けられる', () => {
+      expect(resolveInitialHash(new URLSearchParams('p=p123'))).toBe('/p/p123');
+      expect(resolveInitialHash(new URLSearchParams('p=p123&cal=1'))).toBe('/p/p123?cal=1');
+      expect(resolveInitialHash(new URLSearchParams('manage=p123'))).toBe('/recruit/p123');
+      expect(resolveInitialHash(new URLSearchParams('r=p1&r=p2'))).toBe('/answer?r=p1&r=p2');
     });
   });
 });
