@@ -26,10 +26,23 @@ liff
 
 const LIFF_ID = import.meta.env.VITE_LIFF_ID as string;
 
+function setClientMode(inClient: boolean) {
+  if (typeof document !== 'undefined') {
+    document.documentElement.dataset.client = inClient ? 'line' : 'browser';
+  }
+}
+
+setClientMode(
+  MOCK
+    ? typeof location !== 'undefined' && (new URLSearchParams(location.search).get('inClient') === '1' || /\bLine\//i.test(navigator.userAgent))
+    : typeof navigator !== 'undefined' && /\bLine\//i.test(navigator.userAgent),
+);
+
 /** LIFFを初期化し、未ログインならLINEログインへ。戻り値は起動時のURLパラメータ */
 export async function initLiff(): Promise<URLSearchParams> {
   if (!MOCK) {
     await liff.init({ liffId: LIFF_ID });
+    setClientMode(liff.isInClient());
     if (!liff.isLoggedIn()) {
       liff.login({ redirectUri: location.href });
       await new Promise(() => {}); // リダイレクトを待つ

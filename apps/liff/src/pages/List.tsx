@@ -36,6 +36,8 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
     }
   };
 
+  const { answer } = useAnswer();
+
   // 「予定」に出すのは、自分に招待が来た（入っているグループに募集された）練習と、自分が招待を送った（登録した）練習。
   // 答えた・ゲストを足した練習も出す。管理者でも、ほかの練習は「募集」で見る
   const mine = (list ?? []).filter(
@@ -75,7 +77,7 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
       ) : (
         <div class="ticket-grid">
           {shown.map((v) => (
-            <PracticeCard key={v.practice.id} v={v} />
+            <PracticeCard key={v.practice.id} v={v} onAnswer={(a) => answer(v.practice.id, a)} />
           ))}
         </div>
       )}
@@ -149,7 +151,7 @@ export function useAnswer() {
   return { answer };
 }
 
-export function PracticeCard({ v, onAnswer, busy }: { v: PracticeView; onAnswer?: (a: Answer) => void; busy?: boolean }) {
+export function PracticeCard({ v, onAnswer, busy }: { v: PracticeView; onAnswer: (a: Answer) => void; busy?: boolean }) {
   const p = v.practice;
   const open = () => go(`/p/${encodeURIComponent(p.id)}`);
   return (
@@ -165,14 +167,14 @@ export function PracticeCard({ v, onAnswer, busy }: { v: PracticeView; onAnswer?
         <div class="ticket-foot">
           <AvatarStack names={v.going.map((a) => ({ name: a.name, guest: a.kind === 'ゲスト' }))} />
           <span class="count">
-            <Icon name="people" size={14} />
+            <Icon name="people" size={15} />
             {v.goingCount}
             {p.max ? <small>/{p.max}</small> : null}
           </span>
           <Fee v={v} />
         </div>
       </button>
-      {onAnswer && <RsvpButtons value={v.myAnswer} status={p.status} busy={busy} onAnswer={onAnswer} />}
+      <RsvpButtons value={v.myAnswer} status={p.status} busy={busy} onAnswer={onAnswer} />
     </article>
   );
 }

@@ -13,6 +13,8 @@
   --danger: #d23b2a;
   --sat: #2d5fd3;
   --sun: #d23b2a;
+  --nav: rgb(128 128 128 / 62%);
+  --nav-on: rgb(70 70 70 / 70%);
   --pad-x: 16px;
   --nav-w: 0px;
   --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
@@ -32,6 +34,8 @@
     --danger: #ff6a55;
     --sat: #7aa2ff;
     --sun: #ff6a55;
+    --nav: rgb(70 70 70 / 70%);
+    --nav-on: rgb(150 150 150 / 45%);
     color-scheme: dark;
   }
 }
@@ -188,7 +192,7 @@ a {
   }
 }
 
-/* ---------- ナビ（縦画面では下端にスリム固定、横画面・広い画面では左サイドバー） ---------- */
+/* ---------- ナビ（ブラウザ縦画面では下端スリム固定、LINE内縦画面では浮遊カプセル、横画面・広い画面では左サイドバー） ---------- */
 .navbar {
   position: fixed;
   inset-inline: 0;
@@ -231,12 +235,56 @@ a {
   font-weight: 600;
 }
 
+@media (max-width: 639.98px) and (orientation: portrait) {
+  :root[data-client='line'] .app {
+    padding-bottom: calc(104px + env(safe-area-inset-bottom));
+  }
+  :root[data-client='line'] .navbar {
+    inset-inline: auto;
+    left: 50%;
+    bottom: calc(14px + env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    gap: 2px;
+    width: min(calc(100% - 32px), 420px);
+    padding: 5px;
+    border-top: 0;
+    border-radius: 999px;
+    background: var(--nav);
+    backdrop-filter: blur(18px) saturate(1.4);
+    -webkit-backdrop-filter: blur(18px) saturate(1.4);
+    box-shadow: 0 8px 28px rgb(0 0 0 / 18%);
+  }
+  :root[data-client='line'] .navbar button {
+    flex-direction: column;
+    gap: 2px;
+    height: auto;
+    padding: 8px 0 6px;
+    border-radius: 999px;
+    color: rgb(255 255 255 / 82%);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+  }
+  :root[data-client='line'] .navbar button .icon {
+    width: 22px;
+    height: 22px;
+  }
+  :root[data-client='line'] .navbar button[aria-current='page'] {
+    background: var(--nav-on);
+    color: #fff;
+    font-weight: 500;
+  }
+  :root[data-client='line'] .toast {
+    bottom: calc(96px + env(safe-area-inset-bottom));
+  }
+}
+
 /* ---------- 左にスワイプして削除する行（募集） ---------- */
 .swipe {
   position: relative;
   height: 100%;
-  margin-bottom: 6px;
-  border-radius: 12px;
+  margin-bottom: 12px;
+  border-radius: 14px;
   overflow: hidden;
 }
 .swipe-body {
@@ -261,14 +309,14 @@ a {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 4px;
   width: 88px;
   border: 0;
-  border-radius: 0 12px 12px 0;
+  border-radius: 0 14px 14px 0;
   background: var(--danger);
   color: #fff;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
 }
 /* 閉じているときは、チケットの角から赤がのぞかないよう隠す */
 .swipe:not(.open):not(.dragging) .swipe-delete {
@@ -282,7 +330,7 @@ a {
 .ticket-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 6px;
+  gap: 12px;
   container-type: inline-size;
 }
 .ticket-grid > .ticket,
@@ -290,55 +338,55 @@ a {
   margin-bottom: 0;
 }
 .ticket {
-  --stub-w: 64px;
+  --stub-w: 78px;
   position: relative;
   display: grid;
   grid-template-columns: var(--stub-w) 1fr;
   grid-template-rows: 1fr auto;
   height: 100%;
-  margin-bottom: 6px;
-  border-radius: 12px;
+  margin-bottom: 12px;
+  border-radius: 14px;
   background: var(--paper);
   /* 半券と本体のあいだの切り込み */
-  -webkit-mask: radial-gradient(circle 6.5px at var(--stub-w) 0, transparent 6px, #000 6.5px) top / 100% 51% no-repeat,
-    radial-gradient(circle 6.5px at var(--stub-w) 100%, transparent 6px, #000 6.5px) bottom / 100% 51% no-repeat;
-  mask: radial-gradient(circle 6.5px at var(--stub-w) 0, transparent 6px, #000 6.5px) top / 100% 51% no-repeat,
-    radial-gradient(circle 6.5px at var(--stub-w) 100%, transparent 6px, #000 6.5px) bottom / 100% 51% no-repeat;
+  -webkit-mask: radial-gradient(circle 8px at var(--stub-w) 0, transparent 7.5px, #000 8px) top / 100% 51% no-repeat,
+    radial-gradient(circle 8px at var(--stub-w) 100%, transparent 7.5px, #000 8px) bottom / 100% 51% no-repeat;
+  mask: radial-gradient(circle 8px at var(--stub-w) 0, transparent 7.5px, #000 8px) top / 100% 51% no-repeat,
+    radial-gradient(circle 8px at var(--stub-w) 100%, transparent 7.5px, #000 8px) bottom / 100% 51% no-repeat;
 }
 @container (inline-size < 310px) {
   .ticket {
-    --stub-w: 58px;
+    --stub-w: 68px;
   }
   .ticket-main {
-    padding: 5px 10px 5px 10px;
+    padding: 10px 13px 9px 14px;
   }
   .stub .d {
-    font-size: 17px;
+    font-size: 20px;
   }
   .time {
-    font-size: 13px;
+    font-size: 14px;
   }
 }
 @media (min-width: 640px) {
   @container (inline-size < 620px) {
     .ticket {
-      --stub-w: 58px;
+      --stub-w: 68px;
     }
     .ticket-main {
-      padding: 5px 10px 5px 10px;
+      padding: 10px 13px 9px 14px;
     }
     .stub .d {
-      font-size: 17px;
+      font-size: 20px;
     }
     .time {
-      font-size: 13px;
+      font-size: 14px;
     }
   }
 }
 .ticket > .stub {
   grid-row: span 2;
   cursor: pointer;
-  border-radius: 12px 0 0 12px;
+  border-radius: 14px 0 0 14px;
 }
 .ticket-main {
   all: unset;
@@ -346,7 +394,7 @@ a {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: 6px 12px 5px 12px;
+  padding: 12px 16px 10px 16px;
   cursor: pointer;
 }
 .ticket-main:focus-visible,
@@ -368,25 +416,26 @@ a {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 4px 0;
+  padding: 10px 0;
   border-right: 1.5px dashed var(--faint);
   font-family: var(--mono);
   line-height: 1;
   transition: background 0.25s, color 0.25s;
 }
 .stub .m {
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 400;
   color: var(--sub);
 }
 .stub .d {
-  margin: 1px 0 2px;
-  font-size: 18px;
-  font-weight: 600;
+  margin: 3px 0 4px;
+  font-size: 22px;
+  font-weight: 400;
   letter-spacing: -0.02em;
 }
 .stub .w {
-  font-size: 9px;
-  font-weight: 500;
+  font-size: 10px;
+  font-weight: 400;
   letter-spacing: 0.12em;
   color: var(--sub);
 }
@@ -425,18 +474,19 @@ a {
 .time {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-family: var(--mono);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.2;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.3;
   letter-spacing: -0.01em;
 }
 .place {
-  margin-top: 1px;
+  margin-top: 3px;
   overflow: hidden;
-  font-size: 12px;
-  line-height: 1.25;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.4;
   color: var(--sub);
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -444,22 +494,22 @@ a {
 .ticket-foot {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   margin-top: auto;
-  padding-top: 3px;
-  min-height: 18px;
+  padding-top: 8px;
+  min-height: 22px;
 }
 .count {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 400;
 }
 .count small {
   color: var(--sub);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 400;
 }
 .fee {
@@ -469,19 +519,19 @@ a {
   margin-left: auto;
   white-space: nowrap;
   font-family: var(--mono);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 400;
 }
 .stamp {
   display: inline-block;
-  padding: 0 5px;
-  border: 1.5px solid currentColor;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
   border-radius: 4px;
   font-family: var(--sans);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: 0.1em;
-  line-height: 1.3;
+  line-height: 1.35;
   transform: rotate(-4deg);
 }
 .stamp.full,
@@ -506,7 +556,7 @@ a {
   background: var(--ink);
   color: var(--bg);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1;
 }
 .avatar.guest {
@@ -524,10 +574,11 @@ a {
   display: inline-flex;
 }
 .stack .avatar {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   font-size: 10px;
-  box-shadow: 0 0 0 1.5px var(--paper);
+  font-weight: 400;
+  box-shadow: 0 0 0 2px var(--paper);
 }
 .stack .avatar + .avatar {
   margin-left: -6px;
@@ -543,7 +594,7 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 38px;
+  min-height: 36px;
   border: 0;
   background: transparent;
   color: var(--faint);
@@ -555,11 +606,11 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 400;
   line-height: 1;
   transition: background 0.2s, color 0.2s, transform 0.2s;
 }
@@ -1333,9 +1384,10 @@ details > summary {
   gap: 4px;
 }
 .ticket-foot .tag {
-  padding: 0 6px;
-  font-size: 10px;
-  line-height: 1.45;
+  padding: 0 7px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.5;
 }
 .menu.edit {
   margin-top: 28px;
@@ -1489,7 +1541,7 @@ details > summary {
   .card-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px 10px;
+    gap: 12px;
   }
   .card-grid > .card {
     margin-bottom: 0;
