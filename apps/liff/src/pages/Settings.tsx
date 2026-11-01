@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'preact/hooks';
 import { DEFAULT_STUDIOS, isAdmin, type ActAs, type CancelRule, type FeeDays, type FeeRule, type Member, type Role, type StudioDef } from '@studio-attendance/shared';
 import { api, setActAs } from '../api';
-import { clientMode, logoutApp } from '../liff';
-import { Avatar, Icon, Spinner, TopBar, go, useApp, useRunner } from '../ui';
-import { applyTheme, getTheme, type ThemeMode } from '../theme';
+import { getProfile, logoutApp, type UserProfile } from '../liff';
+import { Avatar, Icon, Spinner, Tabs, TopBar, go, useApp, useRunner } from '../ui';
 
 const ACT_AS_LABEL: Record<ActAs, string> = { self: '自分（管理者）', member: '自分（一般）', test: '確認用アカウント「admin」' };
 
@@ -23,8 +22,8 @@ function ActAsSwitch() {
     <>
       <div class="section-title">見え方の確認</div>
       <section class="card">
-        <div class="muted" style={{ marginBottom: 8 }}>
-          「一般」では、所属グループの予約情報だけが見えます。「admin」（予約者）で予約情報を登録して募集し、自分に切り替えると、参加者からの見え方を確かめられます。「admin」で募集すると本当にグループに届くので、テスト用のグループに送ってください。アプリを閉じると自分（管理者）に戻ります。
+        <div class="muted" style={{ marginBottom: 8, fontSize: 12 }}>
+          「一般」では所属グループの予約情報のみ表示。「admin」（予約者）で予約情報を登録・募集し、自分に切り替えることで参加者からの見え方をテストできます。アプリを閉じると管理者に戻ります。
         </div>
         <div class="toggles">
           {(['self', 'member', 'test'] as ActAs[]).map((v) => (
@@ -38,146 +37,133 @@ function ActAsSwitch() {
   );
 }
 
-/** 外観（ライト・ダークモード・自動）の切り替え */
-function ThemeSwitch() {
-  const [theme, setTheme] = useState<ThemeMode>(() => getTheme());
-  const select = (t: ThemeMode) => {
-    setTheme(t);
-    applyTheme(t);
-  };
-  return (
-    <div class="field" style={{ marginTop: 16 }}>
-      <span>外観</span>
-      <div class="toggles" style={{ marginTop: 4 }}>
-        <button class="toggle" aria-pressed={theme === 'system'} onClick={() => select('system')}>
-          <Icon name="device" size={15} />
-          端末に合わせる
-        </button>
-        <button class="toggle" aria-pressed={theme === 'light'} onClick={() => select('light')}>
-          <Icon name="sun" size={15} />
-          ライト
-        </button>
-        <button class="toggle" aria-pressed={theme === 'dark'} onClick={() => select('dark')}>
-          <Icon name="moon" size={15} />
-          ダーク
-        </button>
-      </div>
-    </div>
-  );
-}
-
+/** アカウントページ */
 export function SettingsPage() {
   const { me, setMe } = useApp();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [name, setName] = useState(me.member.name);
   const [run, busy] = useRunner();
-
   const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    getProfile().then((p) => p && setProfile(p));
+  }, []);
+
   const save = async () => {
-    const m = await run(() => api('setDisplayName', { name: name.trim() }), '保存しました');
+    const trimmed = name.trim();
+    if (!trimmed || trimmed === me.member.name) {
+      setEditing(false);
+      return;
+    }
+    const m = await run(() => api('setDisplayName', { name: trimmed }), '表示名を変更しました');
     if (m) {
       setMe({ ...me, member: m });
       setEditing(false);
     }
   };
 
+  const isBoss = isAdmin(me.member);
+
   return (
     <>
-      <TopBar />
-      <div class="profile">
-        <Avatar name={me.member.name} />
-        <div>
-          <div class="name">{me.member.name}</div>
-          <span class="pill">{me.member.role}</span>
-        </div>
-      </div>
+      <TopBar title="アカウント" showTheme />
 
-      <div class="field">
-        <span>表示名</span>
-        {editing ? (
-          <form
-            class="inline-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              save();
-            }}
-          >
-            <input type="text" value={name} maxLength={20} aria-label="表示名" autoFocus onInput={(e) => setName(e.currentTarget.value)} />
-            <button class="round-btn" aria-label="保存" disabled={busy || !name.trim() || name === me.member.name}>
-              <Icon name="check" />
-            </button>
-          </form>
-        ) : (
-          <button class="menu-row name-row" onClick={() => setEditing(true)}>
-            <span class="grow">{me.member.name}</span>
-            <Icon name="edit" size={20} />
-          </button>
-        )}
-      </div>
-
-      <ThemeSwitch />
-
-      {me.canSwitch && <ActAsSwitch />}
-
-      {isAdmin(me.member) && (
-        <ul class="menu" style={{ marginTop: 24 }}>
-          <li>
-            <button class="menu-row" onClick={() => go('/admin')}>
-              <Icon name="gear" size={20} />
-              <span class="grow">管理</span>
-              <span class="val">グループ・メンバー・スタジオ</span>
-              <Icon name="chevron" size={18} />
-            </button>
-          </li>
-        </ul>
-      )}
-
-      {clientMode() !== 'line' && <AppMenu />}
-    </>
-  );
-}
-
-/** LINEの外（ブラウザ・ホーム画面のアプリ）で開いたときだけ出す。最新にする・ログアウト・ホーム画面への追加の案内 */
-function AppMenu() {
-  const { loadHome } = useApp();
-  const [run, busy] = useRunner();
-  const mode = clientMode();
-  // iPhone の Safari で、まだホーム画面に追加していないとき
-  const canAddToHome = mode === 'browser' && /iPhone|iPad|iPod/.test(navigator.userAgent);
-  return (
-    <>
-      <div class="section-title">このアプリ</div>
-      {canAddToHome && (
-        <section class="card add-home">
-          <Icon name="home" size={18} />
-          <div>
-            <b>ホーム画面に追加</b>
-            <div class="muted">
-              Safari の共有ボタン（<Icon name="share" size={13} />）から「ホーム画面に追加」を選ぶと、URLバーのないアプリとして開けます
+      {/* プロフィールカード（添付画像スタイル） */}
+      <section class="account-card">
+        <div class="account-avatar-wrap">
+          {profile?.pictureUrl ? (
+            <img class="account-avatar-img" src={profile.pictureUrl} alt={me.member.name} />
+          ) : (
+            <div class="account-avatar-fallback">
+              {[...me.member.name.trim()][0] ?? '?'}
             </div>
+          )}
+        </div>
+        <div class="account-details">
+          {editing ? (
+            <form
+              class="account-edit-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                save();
+              }}
+            >
+              <input
+                type="text"
+                value={name}
+                maxLength={20}
+                aria-label="表示名"
+                autoFocus
+                onInput={(e) => setName(e.currentTarget.value)}
+              />
+              <button class="account-icon-btn check" aria-label="保存" disabled={busy || !name.trim()}>
+                <Icon name="check" size={16} />
+              </button>
+              <button
+                type="button"
+                class="account-icon-btn cancel"
+                aria-label="キャンセル"
+                onClick={() => {
+                  setName(me.member.name);
+                  setEditing(false);
+                }}
+              >
+                <Icon name="x" size={16} />
+              </button>
+            </form>
+          ) : (
+            <div class="account-name-row">
+              <span class="account-name">{me.member.name}</span>
+              <button class="account-edit-trigger" aria-label="表示名を変更" onClick={() => setEditing(true)}>
+                <Icon name="edit" size={15} />
+              </button>
+            </div>
+          )}
+          <div class="account-status-badge">
+            <span class="check-dot">✓</span>
+            <span>LINEアカウント連携済み</span>
+            {isBoss && <span class="role-pill">管理者</span>}
           </div>
-        </section>
+        </div>
+      </section>
+
+      {/* 管理者のみ表示 */}
+      {isBoss && (
+        <>
+          {me.canSwitch && <ActAsSwitch />}
+
+          <div class="section-title">管理</div>
+          <ul class="menu" style={{ marginTop: 8 }}>
+            <li>
+              <button class="menu-row" onClick={() => go('/admin')}>
+                <Icon name="gear" size={20} />
+                <span class="grow">管理画面</span>
+                <span class="val">グループ・メンバー・スタジオ・料金</span>
+                <Icon name="chevron" size={18} />
+              </button>
+            </li>
+          </ul>
+        </>
       )}
-      <ul class="menu">
-        <li>
-          <button class="menu-row" disabled={busy} onClick={() => run(loadHome, '最新の内容にしました')}>
-            <Icon name="refresh" size={20} />
-            <span class="grow">最新の内容にする</span>
-          </button>
-        </li>
-        <li>
-          <button class="menu-row danger" onClick={() => confirm('ログアウトしますか？') && logoutApp()}>
-            <Icon name="logout" size={20} />
-            <span class="grow">ログアウト</span>
-          </button>
-        </li>
-      </ul>
+
+      {/* ログアウトボタン（添付画像スタイル） */}
+      <div class="account-logout-section">
+        <button class="account-logout-btn" onClick={() => confirm('ログアウトしますか？') && logoutApp()}>
+          <Icon name="logout" size={18} />
+          <span>ログアウト</span>
+        </button>
+      </div>
     </>
   );
 }
 
+type AdminTab = 'members' | 'studios' | 'fees';
+
+/** 管理画面（タブ整理版） */
 export function AdminPage() {
   const { me, setMe } = useApp();
   const [members, setMembers] = useState<Member[] | null>(null);
+  const [tab, setTab] = useState<AdminTab>('members');
   const [run, busy] = useRunner();
   const [studios, setStudios] = useState<StudioDef[]>(me.settings.studios);
   const [fees, setFees] = useState<FeeRule[]>(me.settings.fees);
@@ -190,162 +176,259 @@ export function AdminPage() {
     run(() => api('listMembers')).then((m) => m && setMembers(m));
   }, []);
 
-  if (!isAdmin(me.member)) return <><TopBar title="管理" back /><div class="empty">管理者だけが使えます</div></>;
+  if (!isAdmin(me.member)) {
+    return (
+      <>
+        <TopBar title="管理" back />
+        <div class="empty">管理者だけが使えます</div>
+      </>
+    );
+  }
 
   const saveMember = async (userId: string, patch: Partial<Pick<Member, 'role' | 'defaultGroups' | 'groups'>>) => {
     const m = await run(() => api('updateMember', { userId, patch }), '保存しました');
     if (m) setMembers((ms) => ms!.map((x) => (x.userId === userId ? m : x)));
   };
 
+  const saveSettings = async () => {
+    const settings = await run(
+      () => api('updateSettings', { studios, fees, cancelRules: rules, minDefault: Number(minDefault), roundUnit: Number(roundUnit) }),
+      '設定を保存しました',
+    );
+    if (settings) {
+      setMe({ ...me, settings });
+      setStudios(settings.studios);
+      setFees(settings.fees);
+      setRules(settings.cancelRules);
+    }
+  };
+
+  const tabs = [
+    { key: 'members' as const, label: 'メンバー・グループ', count: members?.length },
+    { key: 'studios' as const, label: 'スタジオ・部屋', count: studios.length },
+    { key: 'fees' as const, label: '料金・共通ルール' },
+  ];
+
   return (
     <>
-      <TopBar title="管理" back />
+      <TopBar title="管理" back showTheme />
 
-      <div class="section-title">グループ</div>
-      <section class="card">
-        {me.groups.length === 0 ? (
-          <div class="muted">Botをグループに招待すると出ます</div>
-        ) : (
-          <div class="muted" style={{ marginBottom: 8 }}>
-            名前はLINEのグループ名に1時間ごとにそろえます
-          </div>
-        )}
-        {me.groups.map((g) => (
-          <div key={g.id} style={{ marginBottom: 8 }}>
-            {g.name}
-          </div>
-        ))}
-      </section>
+      <Tabs items={tabs} value={tab} onChange={setTab} />
 
-      <div class="section-title">メンバー</div>
-      <div class="muted" style={{ marginBottom: 8 }}>
-        予約情報が見えるのは、予約者・送り先グループに所属している人・回答した人・管理者です。「所属」はグループでの発言・ボタン・カードから開いたことで自動で付きます（外しても、そのグループでまた発言すると付き直ります）
-      </div>
-      {members == null ? (
-        <Spinner />
-      ) : (
-        <div class="card-grid">
-          {members.map((m) => (
-            <section class="card" key={m.userId}>
-              <div class="row">
-                <strong class="grow">{m.name}</strong>
-                <select style={{ width: 'auto' }} value={m.role} disabled={busy} onChange={(e) => saveMember(m.userId, { role: e.currentTarget.value as Role })}>
-                  <option>一般</option>
-                  <option>予約者</option>
-                  <option>管理者</option>
-                </select>
+      {tab === 'members' && (
+        <div class="admin-tab-pane">
+          <div class="section-title">登録グループ（{me.groups.length}）</div>
+          <section class="card">
+            {me.groups.length === 0 ? (
+              <div class="muted">Botをグループに招待すると自動で登録されます</div>
+            ) : (
+              <div class="admin-groups-list">
+                {me.groups.map((g) => (
+                  <div key={g.id} class="admin-group-item">
+                    <Icon name="people" size={16} />
+                    <strong>{g.name}</strong>
+                  </div>
+                ))}
               </div>
-              {me.groups.map((g) => (
-                <label class="check">
-                  <input
-                    type="checkbox"
-                    checked={m.groups.includes(g.id)}
-                    disabled={busy}
-                    onChange={(e) => saveMember(m.userId, { groups: e.currentTarget.checked ? [...m.groups, g.id] : m.groups.filter((x) => x !== g.id) })}
-                  />
-                  {g.name}に所属
-                </label>
+            )}
+            <div class="muted" style={{ marginTop: 8, fontSize: 11 }}>
+              ※ グループ名はLINEのグループ名に1時間ごとに自動同期されます
+            </div>
+          </section>
+
+          <div class="section-title">メンバー一覧</div>
+          <div class="muted" style={{ marginBottom: 10, fontSize: 12 }}>
+            予約情報が見えるのは、予約者・送り先グループのメンバー・回答者・管理者です。
+          </div>
+
+          {members == null ? (
+            <Spinner />
+          ) : (
+            <div class="card-grid">
+              {members.map((m) => (
+                <section class="card admin-member-card" key={m.userId}>
+                  <div class="row" style={{ alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                      <Avatar name={m.name} />
+                      <strong class="grow" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {m.name}
+                      </strong>
+                    </div>
+                    <select
+                      style={{ width: 'auto', minWidth: 90 }}
+                      value={m.role}
+                      disabled={busy}
+                      onChange={(e) => saveMember(m.userId, { role: e.currentTarget.value as Role })}
+                    >
+                      <option>一般</option>
+                      <option>予約者</option>
+                      <option>管理者</option>
+                    </select>
+                  </div>
+
+                  {me.groups.length > 0 && (
+                    <div class="admin-member-groups" style={{ marginTop: 10 }}>
+                      <div class="muted" style={{ fontSize: 11, marginBottom: 4 }}>
+                        所属グループ（発言や予約閲覧で自動付与）:
+                      </div>
+                      <div class="check-chips">
+                        {me.groups.map((g) => (
+                          <label key={g.id} class="check-chip">
+                            <input
+                              type="checkbox"
+                              checked={m.groups.includes(g.id)}
+                              disabled={busy}
+                              onChange={(e) =>
+                                saveMember(m.userId, {
+                                  groups: e.currentTarget.checked ? [...m.groups, g.id] : m.groups.filter((x) => x !== g.id),
+                                })
+                              }
+                            />
+                            <span>{g.name}</span>
+                          </label>
+                        ))}
+                      </div>
+
+                      <div class="muted" style={{ fontSize: 11, marginTop: 8, marginBottom: 4 }}>
+                        ふだんの送り先:
+                      </div>
+                      <div class="check-chips">
+                        {me.groups.map((g) => (
+                          <label key={g.id} class="check-chip">
+                            <input
+                              type="checkbox"
+                              checked={m.defaultGroups.includes(g.id)}
+                              disabled={busy}
+                              onChange={(e) =>
+                                saveMember(m.userId, {
+                                  defaultGroups: e.currentTarget.checked
+                                    ? [...m.defaultGroups, g.id]
+                                    : m.defaultGroups.filter((x) => x !== g.id),
+                                })
+                              }
+                            />
+                            <span>{g.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </section>
               ))}
-              {me.groups.map((g) => (
-                <label class="check">
-                  <input
-                    type="checkbox"
-                    checked={m.defaultGroups.includes(g.id)}
-                    disabled={busy}
-                    onChange={(e) =>
-                      saveMember(m.userId, { defaultGroups: e.currentTarget.checked ? [...m.defaultGroups, g.id] : m.defaultGroups.filter((x) => x !== g.id) })
-                    }
-                  />
-                  {g.name}をふだんの送り先にする
-                </label>
-              ))}
-            </section>
-          ))}
+            </div>
+          )}
         </div>
       )}
 
-      <StudioEditor studios={studios} onChange={setStudios} />
-
-      <div class="section-title">スタジオ代の料金表（30分あたり）</div>
-      <section class="card">
-        <div class="muted" style={{ marginBottom: 10 }}>
-          登録時にスタジオ代を自動で入れます。部屋が空欄＝全部屋、時間が空欄＝終日
+      {tab === 'studios' && (
+        <div class="admin-tab-pane">
+          <StudioEditor studios={studios} onChange={setStudios} />
+          <button class="btn primary block" style={{ marginTop: 20 }} disabled={busy} onClick={saveSettings}>
+            スタジオ・部屋の変更を保存
+          </button>
         </div>
-        {fees.map((f, i) => (
-          <div class="fee-rule">
-            <div class="grid3">
-              <input type="text" placeholder="スタジオ" value={f.studio} onInput={(e) => setFee(i, { studio: e.currentTarget.value })} />
-              <input type="text" placeholder="部屋" value={f.room} onInput={(e) => setFee(i, { room: e.currentTarget.value })} />
-              <select value={f.days ?? ''} onChange={(e) => setFee(i, { days: e.currentTarget.value as FeeDays })}>
-                <option value="">毎日</option>
-                <option value="平日">平日</option>
-                <option value="土日祝">土日祝</option>
-              </select>
+      )}
+
+      {tab === 'fees' && (
+        <div class="admin-tab-pane">
+          <div class="section-title">スタジオ代の料金表（30分あたり）</div>
+          <section class="card">
+            <div class="muted" style={{ marginBottom: 10, fontSize: 12 }}>
+              予約登録時に料金を自動計算します。部屋が空欄＝全部屋共通、時間が空欄＝終日適用。
             </div>
-            <div class="grid3" style={{ marginTop: 6 }}>
-              <input type="text" inputMode="numeric" placeholder="開始 17:00" value={f.from ?? ''} onInput={(e) => setFee(i, { from: e.currentTarget.value })} />
-              <input type="text" inputMode="numeric" placeholder="終了 23:30" value={f.to ?? ''} onInput={(e) => setFee(i, { to: e.currentTarget.value })} />
-              <input type="number" placeholder="円/30分" value={f.fee} onInput={(e) => setFee(i, { fee: Number(e.currentTarget.value) })} />
-            </div>
-            <button class="btn small danger" style={{ marginTop: 6 }} onClick={() => setFees(fees.filter((_, j) => j !== i))}>
-              削除
+            {fees.map((f, i) => (
+              <div class="fee-rule-card" key={i}>
+                <div class="grid3">
+                  <input type="text" placeholder="スタジオ" value={f.studio} onInput={(e) => setFee(i, { studio: e.currentTarget.value })} />
+                  <input type="text" placeholder="部屋" value={f.room} onInput={(e) => setFee(i, { room: e.currentTarget.value })} />
+                  <select value={f.days ?? ''} onChange={(e) => setFee(i, { days: e.currentTarget.value as FeeDays })}>
+                    <option value="">毎日</option>
+                    <option value="平日">平日</option>
+                    <option value="土日祝">土日祝</option>
+                  </select>
+                </div>
+                <div class="grid3" style={{ marginTop: 6 }}>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="開始 17:00"
+                    value={f.from ?? ''}
+                    onInput={(e) => setFee(i, { from: e.currentTarget.value })}
+                  />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="終了 23:30"
+                    value={f.to ?? ''}
+                    onInput={(e) => setFee(i, { to: e.currentTarget.value })}
+                  />
+                  <input
+                    type="number"
+                    placeholder="円/30分"
+                    value={f.fee}
+                    onInput={(e) => setFee(i, { fee: Number(e.currentTarget.value) })}
+                  />
+                </div>
+                <button class="btn small danger" style={{ marginTop: 8 }} onClick={() => setFees(fees.filter((_, j) => j !== i))}>
+                  このルールを削除
+                </button>
+              </div>
+            ))}
+            <button class="btn small" onClick={() => setFees([...fees, { studio: '', room: '', days: '', from: '', to: '', fee: 0 }])}>
+              ＋ 料金ルールを追加
             </button>
-          </div>
-        ))}
-        <button class="btn small" onClick={() => setFees([...fees, { studio: '', room: '', days: '', from: '', to: '', fee: 0 }])}>
-          ＋ 追加
-        </button>
-      </section>
+          </section>
 
-      <div class="section-title">キャンセル期限前の警告</div>
-      <section class="card">
-        <div class="muted" style={{ marginBottom: 8 }}>
-          スタジオ・何日前・何時に、最低人数未満を予約者に知らせる
+          <div class="section-title">キャンセル期限前の警告通知</div>
+          <section class="card">
+            <div class="muted" style={{ marginBottom: 8, fontSize: 12 }}>
+              最低人数未満のとき、指定日前・指定時刻に予約者に警告を送ります。
+            </div>
+            {rules.map((r, i) => (
+              <div class="grid3" style={{ marginBottom: 8 }} key={i}>
+                <input
+                  type="text"
+                  placeholder="スタジオ名"
+                  value={r.studio}
+                  onInput={(e) => setRules(rules.map((x, j) => (j === i ? { ...x, studio: e.currentTarget.value } : x)))}
+                />
+                <input
+                  type="number"
+                  placeholder="日前"
+                  value={r.daysBefore}
+                  onInput={(e) => setRules(rules.map((x, j) => (j === i ? { ...x, daysBefore: Number(e.currentTarget.value) } : x)))}
+                />
+                <input
+                  type="time"
+                  value={r.time}
+                  onInput={(e) => setRules(rules.map((x, j) => (j === i ? { ...x, time: e.currentTarget.value } : x)))}
+                />
+              </div>
+            ))}
+            <button class="btn small" onClick={() => setRules([...rules, { studio: '', daysBefore: 1, time: '10:00' }])}>
+              ＋ 警告ルールを追加
+            </button>
+          </section>
+
+          <div class="section-title">共通ルール</div>
+          <section class="card">
+            <div class="grid2">
+              <label class="field">
+                <span>最低人数の標準値</span>
+                <input type="number" value={minDefault} onInput={(e) => setMinDefault(e.currentTarget.value)} />
+              </label>
+              <label class="field">
+                <span>割り勘の切り上げ単位（円）</span>
+                <input type="number" value={roundUnit} onInput={(e) => setRoundUnit(e.currentTarget.value)} />
+              </label>
+            </div>
+          </section>
+
+          <button class="btn primary block" style={{ marginTop: 20 }} disabled={busy} onClick={saveSettings}>
+            料金・共通ルールの変更を保存
+          </button>
         </div>
-        {rules.map((r, i) => (
-          <div class="grid3" style={{ marginBottom: 8 }}>
-            <input type="text" placeholder="スタジオ" value={r.studio} onInput={(e) => setRules(rules.map((x, j) => (j === i ? { ...x, studio: e.currentTarget.value } : x)))} />
-            <input type="number" placeholder="日前" value={r.daysBefore} onInput={(e) => setRules(rules.map((x, j) => (j === i ? { ...x, daysBefore: Number(e.currentTarget.value) } : x)))} />
-            <input type="time" value={r.time} onInput={(e) => setRules(rules.map((x, j) => (j === i ? { ...x, time: e.currentTarget.value } : x)))} />
-          </div>
-        ))}
-        <button class="btn small" onClick={() => setRules([...rules, { studio: '', daysBefore: 1, time: '10:00' }])}>
-          ＋ 追加
-        </button>
-      </section>
-
-      <div class="section-title">共通</div>
-      <section class="card">
-        <div class="grid2">
-          <label class="field">
-            <span>最低人数の標準値</span>
-            <input type="number" value={minDefault} onInput={(e) => setMinDefault(e.currentTarget.value)} />
-          </label>
-          <label class="field">
-            <span>割り勘の切り上げ単位（円）</span>
-            <input type="number" value={roundUnit} onInput={(e) => setRoundUnit(e.currentTarget.value)} />
-          </label>
-        </div>
-      </section>
-
-      <button
-        class="btn primary block"
-        disabled={busy}
-        onClick={async () => {
-          const settings = await run(
-            () => api('updateSettings', { studios, fees, cancelRules: rules, minDefault: Number(minDefault), roundUnit: Number(roundUnit) }),
-            '保存しました',
-          );
-          if (settings) {
-            setMe({ ...me, settings });
-            setStudios(settings.studios);
-            setFees(settings.fees);
-            setRules(settings.cancelRules);
-          }
-        }}
-      >
-        保存
-      </button>
+      )}
     </>
   );
 }
@@ -357,44 +440,109 @@ function StudioEditor({ studios, onChange }: { studios: StudioDef[]; onChange: (
     <>
       <div class="section-title">スタジオと部屋</div>
       <section class="card">
-        <div class="muted" style={{ marginBottom: 8 }}>
-          別名（カンマ区切り）は読み取りの表記ゆれをそろえます
+        <div class="muted" style={{ marginBottom: 8, fontSize: 12 }}>
+          スタジオ名と部屋（定員目安・広さ）を登録しておくと、予約登録時に補完されます。
         </div>
-        {studios.map((st, i) => (
-          <div key={i} style={{ borderTop: i ? '1px solid var(--line)' : 'none', paddingTop: i ? 10 : 0, marginTop: i ? 10 : 0 }}>
-            <div class="row" style={{ marginBottom: 6 }}>
-              <input type="text" class="grow" placeholder="スタジオ名（正式名称）" value={st.name} onInput={(e) => setStudio(i, { name: e.currentTarget.value })} />
-              <button class="btn small danger" onClick={() => confirm(`${st.name || 'このスタジオ'}を一覧から削除しますか？`) && onChange(studios.filter((_, j) => j !== i))}>
+        {studios.map((s, i) => (
+          <details key={i} class="studio-details" style={{ marginBottom: 12 }}>
+            <summary class="row" style={{ alignItems: 'center' }}>
+              <strong class="grow">{s.name || '（新しいスタジオ）'}</strong>
+              <button
+                type="button"
+                class="btn small danger"
+                style={{ marginLeft: 8 }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (confirm(`${s.name}を削除しますか？`)) onChange(studios.filter((_, j) => j !== i));
+                }}
+              >
                 削除
               </button>
-            </div>
-            <input
-              type="text"
-              placeholder="別名（例：わーくる横浜, worcle横浜）"
-              value={st.aliases.join(', ')}
-              onInput={(e) => setStudio(i, { aliases: e.currentTarget.value.split(/[,、]/).map((x) => x.trim()).filter(Boolean) })}
-            />
-            {st.rooms.map((r, k) => (
-              <div class="row" style={{ marginTop: 6 }}>
-                <input type="text" style={{ width: '30%' }} placeholder="部屋" value={r.name} onInput={(e) => setStudio(i, { rooms: st.rooms.map((x, m) => (m === k ? { ...x, name: e.currentTarget.value } : x)) })} />
-                <input type="text" class="grow" placeholder="広さ（例：46.5㎡・天井2.3m）" value={r.size} onInput={(e) => setStudio(i, { rooms: st.rooms.map((x, m) => (m === k ? { ...x, size: e.currentTarget.value } : x)) })} />
-                <button class="btn small" onClick={() => setStudio(i, { rooms: st.rooms.filter((_, m) => m !== k) })}>
-                  ×
-                </button>
+            </summary>
+            <div style={{ marginTop: 8 }}>
+              <input
+                type="text"
+                placeholder="スタジオ名"
+                value={s.name}
+                onInput={(e) => setStudio(i, { name: e.currentTarget.value })}
+              />
+              <input
+                type="text"
+                placeholder="表記ゆれ（カンマ区切り）"
+                style={{ marginTop: 6 }}
+                value={s.aliases.join(', ')}
+                onInput={(e) =>
+                  setStudio(i, {
+                    aliases: e.currentTarget.value
+                      .split(',')
+                      .map((x) => x.trim())
+                      .filter(Boolean),
+                  })
+                }
+              />
+              <div class="section-title" style={{ marginTop: 12, fontSize: 11 }}>
+                部屋一覧
               </div>
-            ))}
-            <button class="btn small" style={{ marginTop: 6 }} onClick={() => setStudio(i, { rooms: [...st.rooms, { name: '', size: '' }] })}>
-              ＋ 部屋を追加
-            </button>
-          </div>
+              {s.rooms.map((r, ri) => (
+                <div class="row" style={{ marginTop: 6, gap: 6 }} key={ri}>
+                  <input
+                    type="text"
+                    placeholder="部屋名（例: 202）"
+                    value={r.name}
+                    onInput={(e) =>
+                      setStudio(i, {
+                        rooms: s.rooms.map((x, j) => (j === ri ? { ...x, name: e.currentTarget.value } : x)),
+                      })
+                    }
+                  />
+                  <input
+                    type="text"
+                    placeholder="広さ（例: 30㎡）"
+                    value={r.size}
+                    onInput={(e) =>
+                      setStudio(i, {
+                        rooms: s.rooms.map((x, j) => (j === ri ? { ...x, size: e.currentTarget.value } : x)),
+                      })
+                    }
+                  />
+                  <button
+                    type="button"
+                    class="btn small"
+                    onClick={() =>
+                      setStudio(i, {
+                        rooms: s.rooms.filter((_, j) => j !== ri),
+                      })
+                    }
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                class="btn small"
+                style={{ marginTop: 8 }}
+                onClick={() =>
+                  setStudio(i, {
+                    rooms: [...s.rooms, { name: '', size: '' }],
+                  })
+                }
+              >
+                ＋ 部屋を追加
+              </button>
+            </div>
+          </details>
         ))}
-        <div class="row" style={{ marginTop: 12 }}>
+        <div class="row" style={{ marginTop: 14 }}>
           <button class="btn small" onClick={() => onChange([...studios, { name: '', aliases: [], rooms: [] }])}>
             ＋ スタジオを追加
           </button>
           <button
             class="btn small"
-            onClick={() => confirm('スタジオと部屋の一覧を初期値（2026年10月時点の公式サイトの情報）に戻しますか？') && onChange(DEFAULT_STUDIOS.map((x) => ({ ...x, rooms: x.rooms.map((r) => ({ ...r })) })))}
+            onClick={() =>
+              confirm('スタジオと部屋の一覧を初期値に戻しますか？') &&
+              onChange(DEFAULT_STUDIOS.map((s) => ({ ...s, rooms: s.rooms.map((r) => ({ ...r })) })))
+            }
           >
             初期値に戻す
           </button>

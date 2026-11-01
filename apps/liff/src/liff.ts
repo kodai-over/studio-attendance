@@ -3,6 +3,7 @@ import liff from '@line/liff/core';
 import CloseWindow from '@line/liff/close-window';
 import GetContext from '@line/liff/get-context';
 import GetIDToken from '@line/liff/get-id-token';
+import GetProfile from '@line/liff/get-profile';
 import IsInClient from '@line/liff/is-in-client';
 import IsLoggedIn from '@line/liff/is-logged-in';
 import Login from '@line/liff/login';
@@ -17,6 +18,7 @@ liff
   .use(new Login())
   .use(new Logout())
   .use(new GetIDToken())
+  .use(new GetProfile())
   .use(new IsInClient())
   .use(new OpenWindow())
   .use(new CloseWindow())
@@ -126,6 +128,41 @@ export function logoutApp() {
   }
   if (!MOCK && liff.isLoggedIn()) liff.logout();
   location.reload();
+}
+
+export interface UserProfile {
+  userId: string;
+  displayName: string;
+  pictureUrl?: string;
+}
+
+let cachedProfile: UserProfile | null = null;
+
+/** LINEのプロフィール（アイコン画像・表示名）を取得 */
+export async function getProfile(): Promise<UserProfile | null> {
+  if (cachedProfile) return cachedProfile;
+  if (MOCK) {
+    cachedProfile = {
+      userId: 'Ume',
+      displayName: 'おおゆち',
+      pictureUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
+    };
+    return cachedProfile;
+  }
+  try {
+    if (liff.isLoggedIn()) {
+      const p = await liff.getProfile();
+      cachedProfile = {
+        userId: p.userId,
+        displayName: p.displayName,
+        pictureUrl: p.pictureUrl,
+      };
+      return cachedProfile;
+    }
+  } catch (e) {
+    console.warn('[getProfile error]', e);
+  }
+  return null;
 }
 
 /** ログアウトしたあとの画面から、LINEでログインし直す */

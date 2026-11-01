@@ -1,6 +1,7 @@
 import { createContext, type ComponentChildren } from 'preact';
 import { useCallback, useContext, useEffect, useState } from 'preact/hooks';
 import { canRegister, isHoliday, labelDate, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
+import { applyTheme, getTheme, type ThemeMode } from './theme';
 
 // ---------------------------------------------------------------- ルーティング（ハッシュ）
 
@@ -139,8 +140,30 @@ export const Spinner = () => <div class="spinner" aria-label="読み込み中" /
 /** 裏で最新に入れ替えている間、画面上端に細い線を流す */
 export const Syncing = () => <div class="syncing" role="progressbar" aria-label="更新中" />;
 
-export function TopBar({ title, back, children }: { title?: string; back?: boolean; children?: ComponentChildren }) {
-  if (!title && !back && children === undefined) return null;
+/** ヘッダー右上に配置する外観（ライト/ダーク）切り替えボタン */
+export function ThemeToggle() {
+  const [theme, setTheme] = useState<ThemeMode>(() => getTheme());
+  const toggle = () => {
+    const isDark =
+      document.documentElement.dataset.theme === 'dark' ||
+      (!document.documentElement.dataset.theme && typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
+    const next: ThemeMode = isDark ? 'light' : 'dark';
+    setTheme(next);
+    applyTheme(next);
+  };
+  const isDark =
+    theme === 'dark' ||
+    (theme === 'system' && typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
+
+  return (
+    <button class="icon-btn theme-toggle-btn" aria-label={`外観テーマ切り替え（現在: ${isDark ? 'ダーク' : 'ライト'}）`} onClick={toggle} title="外観切り替え">
+      <Icon name={isDark ? 'sun' : 'moon'} size={19} />
+    </button>
+  );
+}
+
+export function TopBar({ title, back, children, showTheme }: { title?: string; back?: boolean; children?: ComponentChildren; showTheme?: boolean }) {
+  if (!title && !back && children === undefined && !showTheme) return null;
   return (
     <header class="topbar">
       {back && (
@@ -149,7 +172,10 @@ export function TopBar({ title, back, children }: { title?: string; back?: boole
         </button>
       )}
       <h1>{title}</h1>
-      {children}
+      <div class="topbar-actions">
+        {showTheme && <ThemeToggle />}
+        {children}
+      </div>
     </header>
   );
 }
@@ -178,7 +204,7 @@ export function NavBar() {
     { to: '/', key: '', icon: 'ticket', label: '予定' },
     ...(canRegister(me.member) ? ([{ to: '/recruit', key: 'recruit', icon: 'send', label: '募集' }] as const) : []),
     { to: '/feedback', key: 'feedback', icon: 'chat', label: '要望' },
-    { to: '/settings', key: 'settings', icon: 'user', label: '自分' },
+    { to: '/settings', key: 'settings', icon: 'user', label: 'アカウント' },
   ];
   const active = here === 'admin' ? 'settings' : here;
   return (

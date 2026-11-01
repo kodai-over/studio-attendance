@@ -159,6 +159,19 @@ a {
   font-weight: 500;
   letter-spacing: 0.02em;
 }
+.topbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+.theme-toggle-btn {
+  color: var(--ink);
+  transition: transform 0.15s ease;
+}
+.theme-toggle-btn:active {
+  transform: scale(0.92);
+}
 .icon-btn {
   display: inline-flex;
   align-items: center;
@@ -1940,4 +1953,224 @@ details > summary {
   color: var(--ink);
   font-size: 15px;
   font-weight: 500;
+}
+
+/* ---------- アカウントページ ---------- */
+.account-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 12px 0 20px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.account-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.account-avatar-img {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  border: 1.5px solid var(--line);
+}
+.account-avatar-fallback {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 24px;
+  font-weight: 500;
+  border: 1.5px solid var(--line);
+}
+.account-details {
+  flex: 1;
+  min-width: 0;
+}
+.account-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.account-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-edit-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 0;
+  background: var(--line);
+  color: var(--ink);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: opacity 0.15s ease;
+}
+.account-edit-trigger:active {
+  opacity: 0.7;
+}
+.account-edit-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.account-edit-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  font-size: 14px;
+  border-radius: 8px;
+  border: 1.5px solid var(--ink);
+  background: var(--bg);
+  color: var(--ink);
+}
+.account-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.account-icon-btn.check {
+  background: var(--ink);
+  color: var(--bg);
+}
+.account-icon-btn.cancel {
+  background: var(--line);
+  color: var(--sub);
+}
+.account-status-badge {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #10b981;
+}
+.account-status-badge .check-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #10b981;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+.account-status-badge .role-pill {
+  margin-left: 4px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--line);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 600;
+}
+.account-logout-section {
+  margin-top: 36px;
+  padding-bottom: 24px;
+}
+.account-logout-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: #ef4444;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.account-logout-btn:active {
+  background: var(--line);
+}
+
+/* ---------- 管理画面の整理スタイル ---------- */
+.admin-tab-pane {
+  margin-top: 14px;
+}
+.admin-groups-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.admin-group-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--ink);
+}
+.admin-member-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.check-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.check-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+}
+.check-chip input {
+  margin: 0;
+  width: 14px;
+  height: 14px;
+  accent-color: var(--ink);
+}
+.fee-rule-card {
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  margin-bottom: 10px;
+}
+.studio-details summary {
+  cursor: pointer;
+  padding: 6px 0;
 }
