@@ -15,7 +15,7 @@
   --sun: #d23b2a;
   --nav: rgb(128 128 128 / 62%);
   --nav-on: rgb(70 70 70 / 70%);
-  --pad-x: 16px;
+  --pad-x: 14px;
   --nav-w: 0px;
   --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
   --sans: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
@@ -50,7 +50,7 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--sans);
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.5;
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
@@ -95,26 +95,26 @@ a {
   display: flex;
   align-items: center;
   gap: 4px;
-  min-height: 52px;
-  margin: 0 calc(var(--pad-x) * -1) 8px;
-  padding: calc(4px + env(safe-area-inset-top)) calc(var(--pad-x) - 8px) 4px;
+  min-height: 44px;
+  margin: 0 calc(var(--pad-x) * -1) 6px;
+  padding: calc(3px + env(safe-area-inset-top)) calc(var(--pad-x) - 6px) 3px;
   background: color-mix(in srgb, var(--bg) 90%, transparent);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
 .topbar h1 {
   flex: 1;
-  margin: 0 8px;
-  font-size: 17px;
-  font-weight: 600;
+  margin: 0 6px;
+  font-size: 15px;
+  font-weight: 500;
   letter-spacing: 0.02em;
 }
 .icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border: 0;
   border-radius: 50%;
   background: transparent;
@@ -146,8 +146,8 @@ a {
   padding: 9px 4px 8px;
   background: transparent;
   color: var(--faint);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 400;
 }
 .tabs button + button::before {
   content: '';
@@ -159,13 +159,13 @@ a {
 }
 .tabs button[aria-selected='true'] {
   color: var(--ink);
-  font-weight: 600;
+  font-weight: 500;
 }
 .tabs .count {
-  margin-left: 6px;
+  margin-left: 5px;
   font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 11px;
+  font-weight: 400;
 }
 .syncing {
   position: absolute;
@@ -283,8 +283,8 @@ a {
 .swipe {
   position: relative;
   height: 100%;
-  margin-bottom: 12px;
-  border-radius: 14px;
+  margin-bottom: 9px;
+  border-radius: 12px;
   overflow: hidden;
 }
 .swipe-body {
@@ -309,13 +309,13 @@ a {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  width: 88px;
+  gap: 3px;
+  width: 82px;
   border: 0;
-  border-radius: 0 14px 14px 0;
+  border-radius: 0 12px 12px 0;
   background: var(--danger);
   color: #fff;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
 }
 /* 閉じているときは、チケットの角から赤がのぞかないよう隠す */
@@ -330,7 +330,7 @@ a {
 .ticket-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 12px;
+  gap: 9px;
   container-type: inline-size;
 }
 .ticket-grid > .ticket,
@@ -338,55 +338,55 @@ a {
   margin-bottom: 0;
 }
 .ticket {
-  --stub-w: 78px;
+  --stub-w: 70px;
   position: relative;
   display: grid;
   grid-template-columns: var(--stub-w) 1fr;
   grid-template-rows: 1fr auto;
   height: 100%;
-  margin-bottom: 12px;
-  border-radius: 14px;
+  margin-bottom: 9px;
+  border-radius: 12px;
   background: var(--paper);
   /* 半券と本体のあいだの切り込み */
-  -webkit-mask: radial-gradient(circle 8px at var(--stub-w) 0, transparent 7.5px, #000 8px) top / 100% 51% no-repeat,
-    radial-gradient(circle 8px at var(--stub-w) 100%, transparent 7.5px, #000 8px) bottom / 100% 51% no-repeat;
-  mask: radial-gradient(circle 8px at var(--stub-w) 0, transparent 7.5px, #000 8px) top / 100% 51% no-repeat,
-    radial-gradient(circle 8px at var(--stub-w) 100%, transparent 7.5px, #000 8px) bottom / 100% 51% no-repeat;
+  -webkit-mask: radial-gradient(circle 7px at var(--stub-w) 0, transparent 6.5px, #000 7px) top / 100% 51% no-repeat,
+    radial-gradient(circle 7px at var(--stub-w) 100%, transparent 6.5px, #000 7px) bottom / 100% 51% no-repeat;
+  mask: radial-gradient(circle 7px at var(--stub-w) 0, transparent 6.5px, #000 7px) top / 100% 51% no-repeat,
+    radial-gradient(circle 7px at var(--stub-w) 100%, transparent 6.5px, #000 7px) bottom / 100% 51% no-repeat;
 }
 @container (inline-size < 310px) {
   .ticket {
-    --stub-w: 68px;
+    --stub-w: 62px;
   }
   .ticket-main {
-    padding: 10px 13px 9px 14px;
+    padding: 8px 12px 7px 12px;
   }
   .stub .d {
-    font-size: 20px;
+    font-size: 18px;
   }
   .time {
-    font-size: 14px;
+    font-size: 13px;
   }
 }
 @media (min-width: 640px) {
   @container (inline-size < 620px) {
     .ticket {
-      --stub-w: 68px;
+      --stub-w: 62px;
     }
     .ticket-main {
-      padding: 10px 13px 9px 14px;
+      padding: 8px 12px 7px 12px;
     }
     .stub .d {
-      font-size: 20px;
+      font-size: 18px;
     }
     .time {
-      font-size: 14px;
+      font-size: 13px;
     }
   }
 }
 .ticket > .stub {
   grid-row: span 2;
   cursor: pointer;
-  border-radius: 14px 0 0 14px;
+  border-radius: 12px 0 0 12px;
 }
 .ticket-main {
   all: unset;
@@ -394,7 +394,7 @@ a {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: 12px 16px 10px 16px;
+  padding: 9px 14px 8px 14px;
   cursor: pointer;
 }
 .ticket-main:focus-visible,
@@ -416,25 +416,25 @@ a {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 10px 0;
+  padding: 8px 0;
   border-right: 1.5px dashed var(--faint);
   font-family: var(--mono);
   line-height: 1;
   transition: background 0.25s, color 0.25s;
 }
 .stub .m {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 400;
   color: var(--sub);
 }
 .stub .d {
-  margin: 3px 0 4px;
-  font-size: 22px;
+  margin: 2px 0 3px;
+  font-size: 20px;
   font-weight: 400;
   letter-spacing: -0.02em;
 }
 .stub .w {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 400;
   letter-spacing: 0.12em;
   color: var(--sub);
@@ -474,19 +474,19 @@ a {
 .time {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-family: var(--mono);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 400;
-  line-height: 1.3;
+  line-height: 1.25;
   letter-spacing: -0.01em;
 }
 .place {
-  margin-top: 3px;
+  margin-top: 2px;
   overflow: hidden;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 400;
-  line-height: 1.4;
+  line-height: 1.35;
   color: var(--sub);
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -494,22 +494,22 @@ a {
 .ticket-foot {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin-top: auto;
-  padding-top: 8px;
-  min-height: 22px;
+  padding-top: 5px;
+  min-height: 18px;
 }
 .count {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 400;
 }
 .count small {
   color: var(--sub);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 400;
 }
 .fee {
@@ -519,18 +519,18 @@ a {
   margin-left: auto;
   white-space: nowrap;
   font-family: var(--mono);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 400;
 }
 .stamp {
   display: inline-block;
-  padding: 1px 6px;
+  padding: 0 5px;
   border: 1px solid currentColor;
   border-radius: 4px;
   font-family: var(--sans);
   font-size: 10px;
   font-weight: 500;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   line-height: 1.35;
   transform: rotate(-4deg);
 }
@@ -550,13 +550,13 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: var(--ink);
   color: var(--bg);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 11px;
+  font-weight: 400;
   line-height: 1;
 }
 .avatar.guest {
@@ -568,17 +568,17 @@ a {
   background: var(--line);
   color: var(--ink);
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 9px;
 }
 .stack {
   display: inline-flex;
 }
 .stack .avatar {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   font-size: 10px;
   font-weight: 400;
-  box-shadow: 0 0 0 2px var(--paper);
+  box-shadow: 0 0 0 1.5px var(--paper);
 }
 .stack .avatar + .avatar {
   margin-left: -6px;
@@ -594,7 +594,7 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 36px;
+  min-height: 30px;
   border: 0;
   background: transparent;
   color: var(--faint);
@@ -606,10 +606,10 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 21px;
+  height: 21px;
   border-radius: 50%;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 400;
   line-height: 1;
   transition: background 0.2s, color 0.2s, transform 0.2s;
@@ -629,14 +629,14 @@ a {
 /* チケットの外（詳細・参加リンク）では、大きな丸いボタン3つにする */
 .rsvp.solo {
   justify-content: center;
-  gap: 20px;
-  padding: 6px 0 4px;
+  gap: 16px;
+  padding: 4px 0 2px;
   border: 0;
 }
 .rsvp.solo button {
   flex: none;
-  width: 52px;
-  height: 52px;
+  width: 44px;
+  height: 44px;
   border: 1.5px solid var(--line);
   border-radius: 50%;
 }
@@ -646,7 +646,7 @@ a {
 .rsvp.solo .mark {
   width: auto;
   height: auto;
-  font-size: 19px;
+  font-size: 16px;
   background: transparent;
 }
 .rsvp.solo button[aria-checked='true'] {
@@ -662,30 +662,30 @@ a {
 /* ---------- パス（練習の詳細） ---------- */
 .pass {
   position: relative;
-  margin: 4px 0 14px;
-  padding: 18px 18px 14px;
-  border-radius: 16px;
+  margin: 2px 0 10px;
+  padding: 13px 15px 11px;
+  border-radius: 14px;
   background: var(--paper);
-  box-shadow: 0 1px 0 var(--line), 0 10px 30px rgb(0 0 0 / 6%);
+  box-shadow: 0 1px 0 var(--line), 0 8px 24px rgb(0 0 0 / 5%);
 }
 .pass-head {
   display: flex;
   align-items: baseline;
-  gap: 10px;
-  padding-bottom: 14px;
+  gap: 8px;
+  padding-bottom: 10px;
   border-bottom: 1.5px dashed var(--faint);
 }
 .pass-date {
   font-family: var(--mono);
-  font-size: 30px;
-  font-weight: 600;
+  font-size: 22px;
+  font-weight: 400;
   letter-spacing: -0.02em;
   line-height: 1;
 }
 .pass-date .w {
-  margin-left: 8px;
-  font-size: 13px;
-  font-weight: 500;
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 400;
   letter-spacing: 0.12em;
   color: var(--sub);
 }
@@ -695,8 +695,8 @@ a {
 .pass-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px 16px;
-  padding: 14px 0;
+  gap: 10px 14px;
+  padding: 10px 0 2px;
 }
 .pass-grid .wide {
   grid-column: 1 / -1;
@@ -706,52 +706,52 @@ a {
 }
 .fld > span {
   display: block;
-  margin-bottom: 3px;
+  margin-bottom: 2px;
   font-family: var(--sans);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 500;
   letter-spacing: 0.04em;
   color: var(--sub);
 }
 .fld > b {
   display: block;
   font-family: var(--mono);
-  font-size: 17px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 400;
   overflow-wrap: anywhere;
 }
 .fld > b.jp {
   font-family: var(--sans);
-  font-size: 16px;
+  font-size: 14px;
 }
 .fld > small {
   display: block;
-  margin-top: 2px;
-  font-size: 12px;
+  margin-top: 1px;
+  font-size: 11px;
   color: var(--sub);
 }
 /* ---------- 区切りと見出し ---------- */
 .sec-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 26px 0 10px;
-  scroll-margin-top: calc(60px + env(safe-area-inset-top));
-  font-size: 13px;
-  font-weight: 600;
+  gap: 6px;
+  margin: 18px 0 8px;
+  scroll-margin-top: calc(52px + env(safe-area-inset-top));
+  font-size: 12px;
+  font-weight: 500;
 }
 .sec-head .n {
   font-family: var(--mono);
   color: var(--sub);
-  font-weight: 500;
+  font-weight: 400;
 }
 .sec-head .grow {
   flex: 1;
 }
 .section-title {
-  margin: 26px 0 10px;
-  font-size: 13px;
-  font-weight: 600;
+  margin: 18px 0 8px;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--ink);
 }
 
@@ -759,16 +759,16 @@ a {
 .people {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 .person {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 4px 3px 3px;
+  gap: 5px;
+  padding: 2px 3px 2px 2px;
   border-radius: 999px;
   background: var(--paper);
-  font-size: 14px;
+  font-size: 12px;
 }
 .person > span:not(.avatar) {
   padding-right: 6px;
@@ -809,8 +809,8 @@ a {
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
   border: 0;
   border-radius: 50%;
   background: var(--ink);
@@ -824,11 +824,11 @@ a {
 
 /* 一覧の行（設定画面など） */
 .menu {
-  margin: 0 0 12px;
+  margin: 0 0 10px;
   padding: 0;
   list-style: none;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 12px;
   overflow: hidden;
 }
 .menu > li + li {
@@ -839,12 +839,12 @@ a {
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
-  min-height: 52px;
-  padding: 12px 16px;
+  min-height: 44px;
+  padding: 9px 14px;
   cursor: pointer;
-  font-size: 15px;
+  font-size: 14px;
 }
 .menu-row .grow {
   flex: 1;
@@ -853,7 +853,7 @@ a {
 .menu-row .val {
   color: var(--sub);
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 12px;
 }
 .menu-row:focus-visible {
   outline: 2px solid var(--ink);
@@ -877,8 +877,8 @@ details[open] > summary.menu-row .icon:last-child {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 6px 6px 14px;
-  border-radius: 12px;
+  padding: 5px 5px 5px 12px;
+  border-radius: 10px;
   background: var(--paper);
 }
 .copy-row code {
@@ -886,32 +886,32 @@ details[open] > summary.menu-row .icon:last-child {
   min-width: 0;
   overflow: hidden;
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 12px;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 .copy-row .icon-btn {
   background: var(--bg);
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 /* 切り替えできる丸いチップ（グループ選択など） */
 .toggles {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 .toggle {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-height: 38px;
-  padding: 6px 14px;
+  gap: 5px;
+  min-height: 34px;
+  padding: 4px 12px;
   border: 1.5px solid var(--line);
   border-radius: 999px;
   background: transparent;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 400;
 }
 .toggle[aria-pressed='true'] {
   border-color: var(--ink);
@@ -933,38 +933,38 @@ details[open] > summary.menu-row .icon:last-child {
 .profile {
   display: flex;
   align-items: center;
-  gap: 18px;
-  margin: 12px 0 24px;
+  gap: 14px;
+  margin: 8px 0 16px;
   padding-top: env(safe-area-inset-top);
 }
 .profile .avatar {
-  width: 72px;
-  height: 72px;
-  font-size: 30px;
-  font-weight: 500;
+  width: 54px;
+  height: 54px;
+  font-size: 22px;
+  font-weight: 400;
   background: radial-gradient(circle at 30% 25%, #ffffff, #d9f5e6 60%, #c7ece0);
   color: #1a1a1a;
 }
 .profile .name {
-  font-size: 26px;
+  font-size: 20px;
   font-weight: 500;
   line-height: 1.2;
 }
 .pill {
   display: inline-block;
-  margin-top: 6px;
-  padding: 2px 10px;
-  border: 1.5px solid var(--ink);
+  margin-top: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--ink);
   border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 500;
 }
 
 /* ---------- 汎用 ---------- */
 .card {
-  margin-bottom: 12px;
-  padding: 16px;
-  border-radius: 14px;
+  margin-bottom: 10px;
+  padding: 13px 14px;
+  border-radius: 12px;
   background: var(--paper);
 }
 .btn {
@@ -972,14 +972,14 @@ details[open] > summary.menu-row .icon:last-child {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 44px;
-  padding: 10px 18px;
+  min-height: 38px;
+  padding: 7px 16px;
   border: 1.5px solid var(--ink);
   border-radius: 999px;
   background: transparent;
   color: var(--ink);
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 500;
   text-decoration: none;
 }
 .btn.primary {
@@ -994,9 +994,9 @@ details[open] > summary.menu-row .icon:last-child {
   border-color: var(--line);
 }
 .btn.small {
-  min-height: 34px;
-  padding: 5px 12px;
-  font-size: 13px;
+  min-height: 30px;
+  padding: 4px 10px;
+  font-size: 12px;
 }
 .btn.block {
   width: 100%;
@@ -1018,16 +1018,16 @@ details[open] > summary.menu-row .icon:last-child {
 }
 .muted {
   color: var(--sub);
-  font-size: 13px;
+  font-size: 12px;
 }
 .empty {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
-  padding: 72px 16px;
+  gap: 12px;
+  padding: 56px 16px;
   color: var(--sub);
-  font-size: 14px;
+  font-size: 13px;
   letter-spacing: 0.04em;
   text-align: center;
 }
@@ -1040,27 +1040,27 @@ details[open] > summary.menu-row .icon:last-child {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 0;
+  padding: 6px 0;
   border-bottom: 1px solid var(--line);
 }
 .list li:last-child {
   border-bottom: 0;
 }
 .room-info {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--sub);
 }
 .memo {
   white-space: pre-wrap;
-  font-size: 15px;
+  font-size: 14px;
 }
 .badge {
   display: inline-block;
-  padding: 1px 8px;
+  padding: 1px 7px;
   border: 1px solid currentColor;
   border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 500;
 }
 .badge.todo {
   color: var(--sub);
@@ -1076,15 +1076,15 @@ details[open] > summary.menu-row .icon:last-child {
 label.field,
 div.field {
   display: block;
-  margin-bottom: 12px;
+  margin-bottom: 9px;
 }
 label.field > span,
 div.field > span {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 5px;
-  font-size: 12px;
+  margin-bottom: 3px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--sub);
 }
@@ -1098,10 +1098,10 @@ textarea {
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  min-height: 46px;
-  padding: 10px 12px;
+  min-height: 40px;
+  padding: 7px 10px;
   border: 1.5px solid var(--line);
-  border-radius: 12px;
+  border-radius: 10px;
   background-color: var(--field);
   /* iPhone では16px未満だと入力時に画面が拡大されてレイアウトが崩れる */
   font-size: 16px;
@@ -1204,23 +1204,23 @@ details > summary {
 .sources {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 .source {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 56px;
-  padding: 0 12px;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 10px;
   border: 0;
-  border-radius: 16px;
+  border-radius: 12px;
   background: var(--paper);
   color: var(--ink);
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
 }
 .source.primary {
@@ -1239,9 +1239,9 @@ details > summary {
 }
 .draft {
   position: relative;
-  margin-bottom: 12px;
-  padding: 14px 16px 6px;
-  border-radius: 16px;
+  margin-bottom: 10px;
+  padding: 12px 14px 4px;
+  border-radius: 14px;
   background: var(--paper);
   container-type: inline-size;
 }
@@ -1249,7 +1249,7 @@ details > summary {
   .draft-pair {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 12px;
+    gap: 10px;
     align-items: start;
   }
 }
@@ -1257,10 +1257,10 @@ details > summary {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: -2px -6px 12px 0;
+  margin: -2px -6px 8px 0;
   font-family: var(--mono);
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 500;
 }
 .draft[data-kind='duplicate'] {
   opacity: 0.5;
@@ -1372,29 +1372,29 @@ details > summary {
 }
 .fld .of {
   color: var(--sub);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 11px;
+  font-weight: 400;
 }
 .menu-row.name-row {
   border: 1.5px solid var(--ink);
   border-radius: 12px;
-  font-size: 18px;
+  font-size: 15px;
 }
 .ticket-foot .toggles {
   gap: 4px;
 }
 .ticket-foot .tag {
-  padding: 0 7px;
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1.5;
+  padding: 0 6px;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.45;
 }
 .menu.edit {
-  margin-top: 28px;
+  margin-top: 20px;
 }
 .sec-mark {
-  font-size: 17px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 500;
   line-height: 1;
 }
 
@@ -1403,8 +1403,8 @@ details > summary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
   margin-left: 4px;
   border: 0;
   border-radius: 50%;
@@ -1426,16 +1426,16 @@ details > summary {
   justify-content: center;
   gap: 6px;
   width: 100%;
-  min-height: 48px;
+  min-height: 40px;
   border: 1.5px dashed var(--faint);
-  border-radius: 14px;
+  border-radius: 12px;
   background: transparent;
   color: var(--sub);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
 }
 .btn.submit {
-  margin-top: 24px;
+  margin-top: 16px;
 }
 
 .feedback-form textarea {
@@ -1541,7 +1541,7 @@ details > summary {
   .card-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
+    gap: 10px 12px;
   }
   .card-grid > .card {
     margin-bottom: 0;
