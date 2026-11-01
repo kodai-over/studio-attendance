@@ -854,6 +854,18 @@ describe('リッチメニュー', () => {
     expect(def.chatBarText.length).toBeLessThanOrEqual(14);
     expect(def.areas.every((a) => a.action.label.length <= 20)).toBe(true);
   });
+
+  it('URL形式に応じた openExternalBrowser=1 の補完を正しく行う', async () => {
+    const { richMenuDefinition } = await import('../src/app/richmenu');
+    // 末尾スラッシュなし
+    expect(richMenuDefinition('https://example.com/app').areas[0].action.uri).toBe('https://example.com/app/?openExternalBrowser=1');
+    // 末尾スラッシュあり
+    expect(richMenuDefinition('https://example.com/app/').areas[0].action.uri).toBe('https://example.com/app/?openExternalBrowser=1');
+    // 既存クエリあり
+    expect(richMenuDefinition('https://example.com/app?tab=1').areas[0].action.uri).toBe('https://example.com/app?tab=1&openExternalBrowser=1');
+    // 既に openExternalBrowser=1 が付与されている場合は二重付与しない
+    expect(richMenuDefinition('https://example.com/app/?openExternalBrowser=1').areas[0].action.uri).toBe('https://example.com/app/?openExternalBrowser=1');
+  });
 });
 
 describe('設定シート', () => {

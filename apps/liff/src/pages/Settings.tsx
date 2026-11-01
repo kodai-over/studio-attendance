@@ -179,7 +179,7 @@ export function AdminPage() {
   if (!isAdmin(me.member)) {
     return (
       <>
-        <TopBar title="管理" back />
+        <TopBar title="管理画面" back />
         <div class="empty">管理者だけが使えます</div>
       </>
     );
@@ -211,7 +211,7 @@ export function AdminPage() {
 
   return (
     <>
-      <TopBar title="管理" back showTheme />
+      <TopBar title="管理画面" back showTheme />
 
       <Tabs items={tabs} value={tab} onChange={setTab} />
 

@@ -448,8 +448,8 @@ export function refreshStatus(ctx: Ctx, p: Practice): void {
 }
 
 /** キャンセル期限前のお知らせで「もう一度募集」を出すグループ。募集済のグループ、まだなければ予約者のふだんの送り先 */
-export function remindGroups(ctx: Ctx, p: Practice): Group[] {
-  const groups = ctx.store.settings().groups;
+export function remindGroups(ctx: Ctx, p: Practice, allGroups?: Group[]): Group[] {
+  const groups = allGroups ?? ctx.store.settings().groups;
   const sent = groups.filter((g) => p.groups.includes(g.id));
   if (sent.length > 0) return sent;
   const booker = ctx.store.getMember(p.booker);

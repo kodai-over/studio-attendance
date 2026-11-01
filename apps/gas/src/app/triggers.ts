@@ -34,7 +34,7 @@ export function hourlyJob(ctx: Ctx): void {
       const min = p.min ?? settings.minDefault;
       // 確認用アカウントはLINEのユーザーではないので送らない
       if (going < min && p.booker !== TEST_MEMBER_ID) {
-        warnings.push({ to: p.booker, message: warningCard({ practice: p, going, min, groups: remindGroups(ctx, p), appUrl: ctx.config.appUrl }) });
+        warnings.push({ to: p.booker, message: warningCard({ practice: p, going, min, groups: remindGroups(ctx, p, settings.groups), appUrl: ctx.config.appUrl }) });
       }
     }
   });

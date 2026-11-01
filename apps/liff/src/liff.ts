@@ -49,14 +49,54 @@ setClientMode(
 );
 
 /** ログアウトしたあと、勝手にログインし直さないための印（次に「ログイン」を押すまで残す） */
-const LOGGED_OUT_KEY = 'pb:loggedOut';
-const loggedOut = () => {
+export const LOGGED_OUT_KEY = 'pb:loggedOut';
+export const loggedOut = () => {
   try {
     return localStorage.getItem(LOGGED_OUT_KEY) === '1';
   } catch {
     return false;
   }
 };
+
+/** LINE内から外部ブラウザへ転送するためのURLパラメータ判定・除去 */
+export function checkLiffRedirect(search: string, origin: string, pathname: string, hash: string): { dest: string } | null {
+  const sp = new URLSearchParams(search);
+  if (sp.get('openExternalBrowser') === '1') {
+    sp.delete('openExternalBrowser');
+    const qs = sp.toString();
+    return { dest: `${origin}${pathname}${qs ? `?${qs}` : ''}${hash}` };
+  }
+  return null;
+}
+
+export type LiffInitResult =
+  | { action: 'redirect-external'; dest: string }
+  | { action: 'show-login' } // 手動ログイン画面を出す（null 返却）
+  | { action: 'login'; redirectUri: string }
+  | { action: 'ready' };
+
+/** LIFF初期化時の分岐ロジックを決定（単体テスト可能） */
+export function decideLiffInitAction(params: {
+  isInClient: boolean;
+  isLoggedIn: boolean;
+  isLoggedOut: boolean;
+  search: string;
+  origin: string;
+  pathname: string;
+  hash: string;
+  href: string;
+}): LiffInitResult {
+  if (params.isInClient) {
+    const redirect = checkLiffRedirect(params.search, params.origin, params.pathname, params.hash);
+    if (redirect) return { action: 'redirect-external', dest: redirect.dest };
+  }
+  if (!params.isLoggedIn) {
+    // 外部ブラウザで明示的にログアウトした場合は自動リダイレクトせずログイン画面を表示
+    if (params.isLoggedOut && !params.isInClient) return { action: 'show-login' };
+    return { action: 'login', redirectUri: params.href };
+  }
+  return { action: 'ready' };
+}
 
 /**
  * LIFFを初期化し、未ログインならLINEログインへ。戻り値は起動時のURLパラメータ。
@@ -67,23 +107,39 @@ export async function initLiff(): Promise<URLSearchParams | null> {
     if (loggedOut()) return null;
   } else {
     await liff.init({ liffId: LIFF_ID });
-    setClientMode(liff.isInClient());
-    if (liff.isInClient()) {
-      const sp = new URLSearchParams(location.search);
-      if (sp.get('openExternalBrowser') === '1') {
-        sp.delete('openExternalBrowser');
-        const qs = sp.toString();
-        const dest = `${location.origin}${location.pathname}${qs ? `?${qs}` : ''}${location.hash}`;
-        liff.openWindow({ url: dest, external: true });
-        liff.closeWindow();
-        return null;
-      }
+    const inClient = liff.isInClient();
+    setClientMode(inClient);
+    if (inClient) {
+      // LINE内で開いた場合は外部ブラウザでのログアウト印を消去
+      try {
+        localStorage.removeItem(LOGGED_OUT_KEY);
+      } catch {}
     }
-    if (!liff.isLoggedIn()) {
-      if (loggedOut() && !liff.isInClient()) return null;
-      liff.login({ redirectUri: location.href });
+
+    const decision = decideLiffInitAction({
+      isInClient: inClient,
+      isLoggedIn: liff.isLoggedIn(),
+      isLoggedOut: loggedOut(),
+      search: location.search,
+      origin: location.origin,
+      pathname: location.pathname,
+      hash: location.hash,
+      href: location.href,
+    });
+
+    if (decision.action === 'redirect-external') {
+      liff.openWindow({ url: decision.dest, external: true });
+      liff.closeWindow();
+      return null;
+    }
+    if (decision.action === 'show-login') {
+      return null;
+    }
+    if (decision.action === 'login') {
+      liff.login({ redirectUri: decision.redirectUri });
       await new Promise(() => {}); // リダイレクトを待つ
     }
+
     // ログインできているなら、ログアウトの印は要らない
     try {
       localStorage.removeItem(LOGGED_OUT_KEY);

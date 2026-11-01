@@ -8,4 +8,4 @@
   2. 作業完了後はリモートに作業ブランチを push し、GitHub CLI (`gh pr create`) または Web 上で Pull Request を作成する。
   3. PR 作成後はユーザーのレビューと承認を必ず待ち、ユーザーの指示または承認後にマージする。
 - **リリース手順**:
-  本番へのデプロイ（Google Apps Script のデプロイやリッチメニュー更新等）は、PR が `main` にマージされた後に実施する。
+  本番リリースは、PR が `main` にマージされた後、release スキル（`.claude/skills/release/SKILL.md`）に従って実施する。
