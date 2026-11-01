@@ -377,10 +377,7 @@ export function CancelDeadlineBadge({ date, studio }: { date: string; studio: st
   return (
     <div class={`ticket-deadline${deadline.isSoon ? ' is-soon' : ''}${deadline.isPast ? ' is-past' : ''}`}>
       <Icon name="clock" size={10} />
-      <span>
-        キャンセル期限: {deadline.formatted}
-        {deadline.isSoon ? ' (まもなく)' : deadline.isPast ? ' (期限切れ)' : ''}
-      </span>
+      <span>{deadline.isPast ? '期限切れ' : `キャンセル期限: ${deadline.formatted}`}</span>
     </div>
   );
 }
