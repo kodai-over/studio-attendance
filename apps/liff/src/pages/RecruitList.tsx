@@ -99,7 +99,7 @@ function RecruitTicket({ v, showBooker }: { v: PracticeView; showBooker: boolean
 }
 
 /** 削除ボタンの幅。これより左に引くと開いたままになる */
-const DELETE_WIDTH = 88;
+const DELETE_WIDTH = 82;
 
 /**
  * iPhone のメールのように、左にスワイプすると右端に削除ボタンが出る行。

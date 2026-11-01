@@ -775,8 +775,8 @@ a {
 }
 .person .x {
   display: inline-flex;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   align-items: center;
   justify-content: center;
   margin-left: -4px;
