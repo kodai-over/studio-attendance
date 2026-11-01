@@ -933,15 +933,16 @@ a {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 18px 0 8px;
+  margin: 18px 0 10px;
   scroll-margin-top: calc(52px + env(safe-area-inset-top));
   font-size: 12px;
   font-weight: 500;
 }
 .sec-head .n {
-  font-family: var(--mono);
+  font-family: var(--sans);
+  font-variant-numeric: tabular-nums;
   color: var(--sub);
-  font-weight: 400;
+  font-weight: 500;
 }
 .sec-head .grow {
   flex: 1;
@@ -953,11 +954,74 @@ a {
   color: var(--ink);
 }
 
+/* 参加メンバー一覧（詳細画面） */
+.attendees-section {
+  display: flex;
+  flex-direction: column;
+}
+.attendee-group {
+  margin-bottom: 18px;
+}
+.attendee-group:last-child {
+  margin-bottom: 0;
+}
+.attendee-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+.attendee-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+.attendee-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.attendee-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  color: var(--sub);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--sans);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.status-going .attendee-mark {
+  color: var(--ink);
+}
+.status-maybe .attendee-mark {
+  color: var(--maybe-accent);
+}
+.status-notGoing .attendee-mark {
+  color: var(--sub);
+}
+.status-notGoing .attendee-label {
+  color: var(--sub);
+  font-weight: 500;
+}
+
 /* 出欠の名前 */
 .people {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px 6px;
 }
 .person {
   display: inline-flex;

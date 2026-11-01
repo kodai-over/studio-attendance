@@ -183,25 +183,31 @@ function CalendarButtons({ v, highlight, compact = false }: { v: PracticeView; h
 
 /** 参加メンバーの一覧。行く・保留・行かないの順に名前を出す。自分が足したゲスト（予約者と管理者はすべてのゲスト）は取り消せる */
 function Attendees({ v, onRemove }: { v: PracticeView; onRemove: (a: AttendeeView) => void }) {
-  const lists = [
-    { label: '○ 行く', people: v.going },
-    { label: '△ 未定', people: v.maybe },
-    { label: '✕ 行かない', people: v.notGoing },
+  const groups = [
+    { key: 'going' as const, mark: '○', label: '行く', people: v.going },
+    { key: 'maybe' as const, mark: '△', label: '未定', people: v.maybe },
+    { key: 'notGoing' as const, mark: '✕', label: '行かない', people: v.notGoing },
   ];
+  const total = v.going.length + v.maybe.length + v.notGoing.length;
+
   return (
-    <>
+    <div class="attendees-section">
       <div class="sec-head">
         <Icon name="people" size={18} />
         参加者
-        <span class="n">{v.going.length + v.maybe.length + v.notGoing.length}</span>
+        <span class="n">{total}</span>
       </div>
-      {lists.map(({ label, people }) =>
+      {groups.map(({ key, mark, label, people }) =>
         people.length === 0 ? null : (
-          <div key={label} style={{ marginBottom: 10 }}>
-            <div class="muted" style={{ marginBottom: 4 }}>
-              {label}（{people.length}）
+          <div key={key} class={`attendee-group status-${key}`}>
+            <div class="attendee-head">
+              <span class="attendee-mark" aria-hidden="true">
+                {mark}
+              </span>
+              <span class="attendee-label">{label}</span>
+              <span class="attendee-count">{people.length}</span>
             </div>
-            <div class="people">
+            <div class={`people${key === 'notGoing' ? ' dim' : ''}`}>
               {people.map((a) => (
                 <span class="person" key={a.participant}>
                   <Avatar name={a.name} guest={a.kind === 'ゲスト'} />
@@ -217,8 +223,8 @@ function Attendees({ v, onRemove }: { v: PracticeView; onRemove: (a: AttendeeVie
           </div>
         ),
       )}
-      {v.going.length + v.maybe.length + v.notGoing.length === 0 && <div class="muted">まだ誰も回答していません</div>}
-    </>
+      {total === 0 && <div class="muted">まだ誰も回答していません</div>}
+    </div>
   );
 }
 
