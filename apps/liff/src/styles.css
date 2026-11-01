@@ -6,13 +6,14 @@
   --bg: #ffffff;
   --paper: #f3f3ef;
   --ink: #000000;
-  --sub: #8c8c8a;
+  --sub: #6f6f6b;
   --faint: #b9b9b6;
   --line: #e4e4e0;
   --field: #ffffff;
   --danger: #d23b2a;
   --sat: #2d5fd3;
   --sun: #d23b2a;
+  --brand-green: #059669;
   --nav: rgb(128 128 128 / 62%);
   --nav-on: rgb(70 70 70 / 70%);
   --pad-x: 14px;
@@ -45,6 +46,7 @@
     --danger: #ff6a55;
     --sat: #7aa2ff;
     --sun: #ff6a55;
+    --brand-green: #34d399;
     --nav: rgb(70 70 70 / 70%);
     --nav-on: rgb(150 150 150 / 45%);
 
@@ -73,6 +75,7 @@
   --danger: #ff6a55;
   --sat: #7aa2ff;
   --sun: #ff6a55;
+  --brand-green: #34d399;
   --nav: rgb(70 70 70 / 70%);
   --nav-on: rgb(150 150 150 / 45%);
 
@@ -500,20 +503,17 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 20px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 4px;
   font-family: var(--sans);
   font-size: 10px;
   font-weight: 600;
   line-height: 1;
   color: var(--sub);
+  background: transparent;
 }
-/* 土曜日：半券全体がブルー */
+/* 土曜日：半券全体が淡いブルーティント、曜日は文字色のみ */
 .stub.sat {
-  background: color-mix(in srgb, var(--sat) 5%, var(--paper));
-  border-right-color: color-mix(in srgb, var(--sat) 25%, transparent);
+  background: color-mix(in srgb, var(--sat) 6%, var(--paper));
+  border-right-color: color-mix(in srgb, var(--sat) 22%, transparent);
 }
 .stub.sat .m {
   color: color-mix(in srgb, var(--sat) 70%, var(--sub));
@@ -523,12 +523,12 @@ a {
 }
 .stub .w.sat {
   color: var(--sat);
-  background: color-mix(in srgb, var(--sat) 14%, transparent);
+  background: transparent;
 }
-/* 日曜・祝日：半券全体がレッド */
+/* 日曜・祝日：半券全体が淡いレッドティント、曜日は文字色のみ */
 .stub.sun {
-  background: color-mix(in srgb, var(--sun) 5%, var(--paper));
-  border-right-color: color-mix(in srgb, var(--sun) 25%, transparent);
+  background: color-mix(in srgb, var(--sun) 6%, var(--paper));
+  border-right-color: color-mix(in srgb, var(--sun) 22%, transparent);
 }
 .stub.sun .m {
   color: color-mix(in srgb, var(--sun) 70%, var(--sub));
@@ -538,7 +538,7 @@ a {
 }
 .stub .w.sun {
   color: var(--sun);
-  background: color-mix(in srgb, var(--sun) 14%, transparent);
+  background: transparent;
 }
 .ticket[data-answer='行く'] .stub {
   background: var(--ink);
@@ -558,7 +558,7 @@ a {
 }
 .ticket[data-answer='行く'] .stub .w.sat {
   color: var(--ink-sat);
-  background: var(--ink-sat-bg);
+  background: transparent;
 }
 .ticket[data-answer='行く'] .stub.sun .m,
 .ticket[data-answer='行く'] .stub.sun .d {
@@ -566,7 +566,7 @@ a {
 }
 .ticket[data-answer='行く'] .stub .w.sun {
   color: var(--ink-sun);
-  background: var(--ink-sun-bg);
+  background: transparent;
 }
 .ticket[data-answer='保留'] > .stub {
   background: var(--maybe-stub-bg);
@@ -881,24 +881,21 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 22px;
-  height: 18px;
-  padding: 0 4px;
-  border-radius: 4px;
   font-family: var(--sans);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   line-height: 1;
   vertical-align: 1px;
   color: var(--sub);
+  background: transparent;
 }
 .pass-date .w.sat {
   color: var(--sat);
-  background: color-mix(in srgb, var(--sat) 14%, transparent);
+  background: transparent;
 }
 .pass-date .w.sun {
   color: var(--sun);
-  background: color-mix(in srgb, var(--sun) 14%, transparent);
+  background: transparent;
 }
 .pass-head .stamp {
   margin-left: auto;
@@ -2070,7 +2067,7 @@ details > summary {
   margin-top: 6px;
   font-size: 12px;
   font-weight: 500;
-  color: #10b981;
+  color: var(--brand-green);
 }
 .account-status-badge .check-dot {
   display: inline-flex;
@@ -2079,7 +2076,7 @@ details > summary {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #10b981;
+  background: var(--brand-green);
   color: #ffffff;
   font-size: 10px;
   font-weight: 700;
@@ -2156,6 +2153,12 @@ details > summary {
   color: var(--ink);
   cursor: pointer;
   user-select: none;
+  transition: all 0.15s ease;
+}
+.check-chip:has(input:checked) {
+  background: var(--paper);
+  border-color: var(--ink);
+  font-weight: 500;
 }
 .check-chip input {
   margin: 0;
