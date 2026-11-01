@@ -555,6 +555,7 @@ describe('キャンセル期限前警告と終了', () => {
     handleWebhook(t.ctx, { events: [imageEvent(BOOKER)] });
     handleWebhook(t.ctx, { events: [postback(BOOKER, `a=confirm&d=${[...t.kv.data.keys()][0].replace('draft:', '')}`)] });
     t.line.pushes = [];
+    t.line.groupNames = { [G1]: 'チームA' };
 
     t.clock.now = new Date('2026-10-17T00:59:00Z'); // 10/17 9:59 JST
     hourlyJob(t.ctx);
@@ -564,7 +565,11 @@ describe('キャンセル期限前警告と終了', () => {
     hourlyJob(t.ctx);
     expect(t.line.pushes).toHaveLength(1);
     expect(t.line.pushes[0].to).toBe(BOOKER);
-    expect(JSON.stringify(t.line.pushes[0])).toContain('現在1人です（最低人数3人）'); // 登録者が自動で「行く」
+    const card = JSON.stringify(t.line.pushes[0]);
+    expect(card).toContain('現在1人です（最低人数3人）'); // 登録者が自動で「行く」
+    // 募集していなくても、ふだんの送り先にもう一度募集できる
+    expect(card).toContain('チームAにもう一度募集');
+    expect(card).toContain(`a=remind&p=${encodeURIComponent(t.store.p[0].id)}&g=${G1}`);
     hourlyJob(t.ctx);
     expect(t.line.pushes).toHaveLength(1);
 
@@ -584,6 +589,111 @@ describe('キャンセル期限前警告と終了', () => {
     hourlyJob(t.ctx);
     expect(t.line.pushes).toHaveLength(0);
     expect(t.store.p[0].warned).toBe(true);
+  });
+});
+
+describe('もう一度募集', () => {
+  const G2 = 'Cgroup2';
+  const remind = (t: ReturnType<typeof setup>, userId: string, id: string, g = G1) =>
+    handleWebhook(t.ctx, { events: [postback(userId, `a=remind&p=${id}&g=${g}`)] });
+  const make = (t: ReturnType<typeof setup>, groups: string[]) => {
+    handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [{ ...reservation, max: null, min: null, memo: '' }], groups });
+    t.line.pushes = [];
+    return t.store.p[0].id;
+  };
+
+  it('お知らせのボタンは募集済のグループを出し、押すと人数の一文と募集カードをもう一度送る', () => {
+    const t = setup();
+    t.store.s.groups.push({ id: G2, name: 'チームB' });
+    t.line.groupNames = { [G1]: 'チームA', [G2]: 'チームB' };
+    const id = make(t, [G2]);
+    t.clock.now = new Date('2026-10-17T01:00:00Z');
+    hourlyJob(t.ctx);
+    const card = JSON.stringify(t.line.pushes[0]);
+    expect(card).toContain('チームBにもう一度募集');
+    expect(card).not.toContain('チームAにもう一度募集');
+    t.line.pushes = [];
+
+    remind(t, BOOKER, id, G2);
+    expect(t.line.pushes).toHaveLength(1);
+    expect(t.line.pushes[0].to).toBe(G2);
+    expect(t.line.pushes[0].messages[0]).toEqual({ type: 'text', text: 'まだ参加者を募集しています。参加は現在1人です（最低人数3人）。' });
+    expect(JSON.stringify(t.line.pushes[0].messages[1])).toContain('参加者募集');
+    expect(t.line.lastReplyText()).toContain('チームBにもう一度募集を送りました。');
+  });
+
+  it('続けて押しても10分は送らない。ふだんの送り先に初めて送ったら募集済にする', () => {
+    const t = setup();
+    const id = make(t, []);
+    remind(t, BOOKER, id);
+    remind(t, BOOKER, id);
+    expect(t.line.pushes).toHaveLength(1);
+    expect(t.line.lastReplyText()).toContain('少し前に募集を送りました');
+    expect(t.store.p[0].groups).toEqual([G1]);
+  });
+
+  it('送れなかったときは、すぐに押し直せる', () => {
+    const t = setup();
+    const id = make(t, []);
+    t.line.failPushTo = [G1];
+    remind(t, BOOKER, id);
+    expect(t.line.lastReplyText()).toContain('募集を送れませんでした');
+    expect(t.kv.data.has(`remind:${id}:${G1}`)).toBe(false);
+    t.line.failPushTo = [];
+    remind(t, BOOKER, id);
+    expect(t.line.pushes).toHaveLength(1);
+  });
+
+  it('予約者と管理者だけが送れる。削除・終了した予約情報、Bot のいないグループには送らない', () => {
+    const t = setup();
+    inG1(t, 'Uother', '他の人');
+    const id = make(t, []);
+    remind(t, 'Uother', id);
+    expect(t.line.lastReplyText()).toContain('予約者か管理者だけ');
+    remind(t, BOOKER, id, 'Cgone');
+    expect(t.line.lastReplyText()).toContain('Bot がグループにいません');
+    t.clock.now = new Date('2026-10-22T00:00:00Z');
+    remind(t, BOOKER, id);
+    expect(t.line.lastReplyText()).toContain('終了した予約情報');
+    remind(t, BOOKER, 'nope');
+    expect(t.line.lastReplyText()).toContain('削除されています');
+    expect(t.line.pushes).toHaveLength(0);
+    t.clock.now = new Date('2026-10-20T00:00:00Z');
+    remind(t, ADMIN, id);
+    expect(t.line.pushes).toHaveLength(1);
+  });
+
+  it('満員の予約情報には送らない', () => {
+    const t = setup();
+    const id = make(t, []);
+    t.store.p[0].status = '満員';
+    remind(t, BOOKER, id);
+    expect(t.line.lastReplyText()).toContain('満員なので');
+    expect(t.line.pushes).toHaveLength(0);
+  });
+
+  it('送る前に失敗しても、すぐに押し直せる', () => {
+    const t = setup();
+    const id = make(t, []);
+    const attendance = t.store.attendance.bind(t.store);
+    t.store.attendance = () => {
+      throw new Error('sheet error');
+    };
+    remind(t, BOOKER, id);
+    expect(t.kv.data.has(`remind:${id}:${G1}`)).toBe(false);
+    t.store.attendance = attendance;
+    remind(t, BOOKER, id);
+    expect(t.line.pushes).toHaveLength(1);
+  });
+
+  it('返事の期限が切れていたら、個別に送る', () => {
+    const t = setup();
+    const id = make(t, []);
+    t.line.reply = () => {
+      throw new Error('invalid reply token');
+    };
+    remind(t, BOOKER, id);
+    expect(t.line.pushes.map((p) => p.to)).toEqual([G1, BOOKER]);
   });
 });
 
@@ -733,14 +843,28 @@ describe('ルーター', () => {
 describe('リッチメニュー', () => {
   it('全面が1つのボタンで、アプリのトップを開く', async () => {
     const { richMenuDefinition } = await import('../src/app/richmenu');
-    const def = richMenuDefinition('https://liff.line.me/APP');
+    const def = richMenuDefinition('https://example.com/app');
     expect(def.size).toEqual({ width: 2500, height: 843 });
+    expect(def.selected).toBe(false);
+    expect(def.chatBarText).toBe('アプリ起動');
     expect(def.areas).toEqual([
-      { bounds: { x: 0, y: 0, width: 2500, height: 843 }, action: { type: 'uri', label: 'アプリを開く', uri: 'https://liff.line.me/APP' } },
+      { bounds: { x: 0, y: 0, width: 2500, height: 843 }, action: { type: 'uri', label: 'アプリ起動', uri: 'https://example.com/app/?openExternalBrowser=1' } },
     ]);
     // LINEの上限（バーの文字は14文字、ボタンのラベルは20文字まで）
     expect(def.chatBarText.length).toBeLessThanOrEqual(14);
     expect(def.areas.every((a) => a.action.label.length <= 20)).toBe(true);
+  });
+
+  it('URL形式に応じた openExternalBrowser=1 の補完を正しく行う', async () => {
+    const { richMenuDefinition } = await import('../src/app/richmenu');
+    // 末尾スラッシュなし
+    expect(richMenuDefinition('https://example.com/app').areas[0].action.uri).toBe('https://example.com/app/?openExternalBrowser=1');
+    // 末尾スラッシュあり
+    expect(richMenuDefinition('https://example.com/app/').areas[0].action.uri).toBe('https://example.com/app/?openExternalBrowser=1');
+    // 既存クエリあり
+    expect(richMenuDefinition('https://example.com/app?tab=1').areas[0].action.uri).toBe('https://example.com/app?tab=1&openExternalBrowser=1');
+    // 既に openExternalBrowser=1 が付与されている場合は二重付与しない
+    expect(richMenuDefinition('https://example.com/app/?openExternalBrowser=1').areas[0].action.uri).toBe('https://example.com/app/?openExternalBrowser=1');
   });
 });
 

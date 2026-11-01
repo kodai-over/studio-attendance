@@ -84,7 +84,11 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
       {load === 'error' ? null : found.length === 0 ? (
         <div class="empty">予約情報が見つかりません（終了した・削除された・見られない予約情報です）</div>
       ) : (
-        found.map((v) => <PracticeCard key={v.practice.id} v={v} busy={!fresh || sending} onAnswer={(a) => answer(v.practice.id, a)} />)
+        <div class="ticket-grid">
+          {found.map((v) => (
+            <PracticeCard key={v.practice.id} v={v} busy={!fresh || sending} onAnswer={(a) => answer(v.practice.id, a)} />
+          ))}
+        </div>
       )}
       {found.length > 0 && found.length < ids.length && <p class="note">終了した・削除された・見られない予約情報は表示していません</p>}
 

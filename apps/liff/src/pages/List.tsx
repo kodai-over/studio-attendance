@@ -2,7 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { labelDate, nextStatus, type Answer, type PracticeView } from '@studio-attendance/shared';
 import { api } from '../api';
 import { pressedAt, sending, wanted } from '../answering';
-import { AvatarStack, FRESH_MS, Fee, Icon, RsvpButtons, Spinner, StatusBadge, Stub, Syncing, Tabs, go, place, useApp, useRunner } from '../ui';
+import { AvatarStack, CancelDeadlineBadge, FRESH_MS, Fee, Icon, RsvpButtons, Spinner, StatusBadge, Stub, Syncing, Tabs, go, place, useApp, useRunner } from '../ui';
 
 type Tab = 'all' | 'mine' | 'todo';
 const TAB_KEY = 'pb:tab';
@@ -75,7 +75,11 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
           {tab === 'all' && <p class="note">スタジオの予約は「募集」の右上の＋から登録できます</p>}
         </div>
       ) : (
-        shown.map((v) => <PracticeCard key={v.practice.id} v={v} onAnswer={(a) => answer(v.practice.id, a)} />)
+        <div class="ticket-grid">
+          {shown.map((v) => (
+            <PracticeCard key={v.practice.id} v={v} onAnswer={(a) => answer(v.practice.id, a)} />
+          ))}
+        </div>
       )}
     </>
   );
@@ -158,14 +162,22 @@ export function PracticeCard({ v, onAnswer, busy }: { v: PracticeView; onAnswer:
         <div class="time">
           {p.start}–{p.end}
           <StatusBadge v={v} />
+          {v.bookerName && (
+            <span class="booker" title={`予約者: ${v.bookerName}`}>
+              <Icon name="user" size={11} />
+              <span>{v.bookerName}</span>
+            </span>
+          )}
         </div>
         <div class="place">{place(p)}</div>
+        <CancelDeadlineBadge date={p.date} studio={p.studio} />
         <div class="ticket-foot">
           <AvatarStack names={v.going.map((a) => ({ name: a.name, guest: a.kind === 'ゲスト' }))} />
           <span class="count">
-            <Icon name="people" size={16} />
+            <Icon name="people" size={14} />
             {v.goingCount}
             {p.max ? <small>/{p.max}</small> : null}
+            {p.status === '満員' && <span class="badge-full">FULL</span>}
           </span>
           <Fee v={v} />
         </div>

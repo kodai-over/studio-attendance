@@ -1,4 +1,5 @@
 import {
+  canEditPractice,
   canExtendPractice,
   canRegister,
   canonicalizeStudio,
@@ -17,8 +18,10 @@ import {
   type CreateResult,
   type Draft,
   type DraftItem,
+  type Group,
   type Member,
   type NewPracticeInput,
+  type LineMessage,
   type Practice,
   type Reservation,
   type Settings,
@@ -335,15 +338,18 @@ export function createPractices(ctx: Ctx, booker: Member, inputs: NewPracticeInp
   return result;
 }
 
-/** 練習の募集をグループに流す（1グループにつき1メッセージ）。送れたグループを返す */
-export function sendRecruit(ctx: Ctx, practices: Practice[], groups: string[], bookerName: string): string[] {
+/** 練習の募集をグループに流す（1グループにつき1メッセージ）。送れたグループを返す。lead はカードの前に送る文 */
+export function sendRecruit(ctx: Ctx, practices: Practice[], groups: string[], bookerName: string, lead?: string): string[] {
   if (practices.length === 0 || groups.length === 0) return [];
   const items = practices.map((practice) => ({ practice, bookerName }));
   const sent: string[] = [];
   for (const g of groups) {
     try {
       // カードのリンクに送り先のグループと合言葉を入れるので、グループごとに作る
-      const messages = recruitMessages(items, ctx.config.appUrl, groupLink(ctx, g) ?? undefined);
+      const messages: LineMessage[] = [
+        ...(lead ? [{ type: 'text' as const, text: lead }] : []),
+        ...recruitMessages(items, ctx.config.appUrl, groupLink(ctx, g) ?? undefined),
+      ];
       // 1回に送れるのは5通まで。練習が多くてカードが増えたときは分けて送る
       for (let i = 0; i < messages.length; i += 5) {
         try {
@@ -439,4 +445,63 @@ export function refreshStatus(ctx: Ctx, p: Practice): void {
   const going = goingList(ctx.store.attendance(p.id), p.id).length;
   const status = nextStatus(p, going);
   if (status !== p.status) ctx.store.savePractice({ ...p, status });
+}
+
+/** キャンセル期限前のお知らせで「もう一度募集」を出すグループ。募集済のグループ、まだなければ予約者のふだんの送り先 */
+export function remindGroups(ctx: Ctx, p: Practice, allGroups?: Group[]): Group[] {
+  const groups = allGroups ?? ctx.store.settings().groups;
+  const sent = groups.filter((g) => p.groups.includes(g.id));
+  if (sent.length > 0) return sent;
+  const booker = ctx.store.getMember(p.booker);
+  if (!booker) return [];
+  const ids = defaultGroupsFor(booker, groups.map((g) => g.id));
+  return groups.filter((g) => ids.includes(g.id));
+}
+
+/** 続けて押しても二重に流さないよう、同じグループへのもう一度募集はこの時間あける */
+const REMIND_GAP = 10 * 60;
+export const remindKey = (practiceId: string, groupId: string) => `remind:${practiceId}:${groupId}`;
+
+/**
+ * お知らせの「もう一度募集」。募集済でも、そのグループに募集カードをもう一度送る。
+ * 送れたらグループ名を返す。送れないときは理由を UserError で返す
+ */
+export function remindRecruit(ctx: Ctx, userId: string, practiceId: string, groupId: string): string {
+  const p = ctx.store.getPractice(practiceId);
+  if (!p) throw new UserError('この予約情報は削除されています。');
+  if (!canEditPractice(ctx.store.getMember(userId), p)) throw new UserError('この予約情報の予約者か管理者だけが募集を送れます。');
+  if (!isActive(p) || p.date < toJstDate(ctx.now())) throw new UserError('終了した予約情報には募集を送れません。');
+  if (p.status === '満員') throw new UserError('満員なので、募集は送れません。');
+  const group = ctx.store.settings().groups.find((g) => g.id === groupId);
+  if (!group) throw new UserError('このグループには今は送れません（Bot がグループにいません）。');
+  const key = remindKey(p.id, group.id);
+  const fresh = ctx.withLock(() => {
+    if (ctx.kv.get(key)) return false;
+    ctx.kv.put(key, '1', REMIND_GAP);
+    return true;
+  });
+  if (!fresh) throw new UserError(`${group.name}には少し前に募集を送りました。続けて送るときは10分ほどあけてください。`);
+  let sent;
+  try {
+    const going = goingList(ctx.store.attendance(p.id), p.id).length;
+    const min = p.min ?? ctx.store.settings().minDefault;
+    const lead = `まだ参加者を募集しています。参加は現在${going}人です（最低人数${min}人）。`;
+    sent = sendRecruit(ctx, [p], [group.id], ctx.store.getMember(p.booker)?.name ?? '（不明）', lead).length > 0;
+  } catch (e) {
+    // 送る前に失敗したときも、すぐ押し直せるようにする
+    ctx.kv.remove(key);
+    throw e;
+  }
+  if (!sent) {
+    ctx.kv.remove(key);
+    throw new UserError('募集を送れませんでした。時間をおいてもう一度お試しください。');
+  }
+  // ふだんの送り先に初めて送ったときは、募集済にする
+  if (!p.groups.includes(group.id)) {
+    ctx.withLock(() => {
+      const cur = ctx.store.getPractice(p.id);
+      if (cur && !cur.groups.includes(group.id)) ctx.store.savePractice({ ...cur, groups: [...cur.groups, group.id] });
+    });
+  }
+  return group.name;
 }

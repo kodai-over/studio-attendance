@@ -1,6 +1,7 @@
 import { createContext, type ComponentChildren } from 'preact';
 import { useCallback, useContext, useEffect, useState } from 'preact/hooks';
-import { canRegister, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
+import { canRegister, computeCancelDeadline, isHoliday, labelDate, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
+import { applyTheme, getTheme, type ThemeMode } from './theme';
 
 // ---------------------------------------------------------------- ルーティング（ハッシュ）
 
@@ -108,6 +109,7 @@ const ICONS = {
   text: 'M5 6h14M5 10h14M5 14h9M5 18h6',
   x: 'M6 6l12 12M18 6 6 18',
   calendar: 'M4 6.5A1.5 1.5 0 0 1 5.5 5h13A1.5 1.5 0 0 1 20 6.5v12a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5zM4 10h16M8 3v4M16 3v4',
+  clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2',
   people: 'M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 19.5c.8-3 3.3-4.5 6.5-4.5s5.7 1.5 6.5 4.5M16 4.3a3.5 3.5 0 0 1 0 6.4M18 15.2c1.7.6 3 2 3.5 4.3',
   edit: 'M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4',
   pin: 'M12 21s7-6.2 7-11.5a7 7 0 0 0-14 0C5 14.8 12 21 12 21zM12 12a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
@@ -116,6 +118,13 @@ const ICONS = {
   gear: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6a7 7 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z',
   check: 'M5 12.5 10 17.5 19 7',
   trash: 'M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 12.5h9l1-12.5M10 10.5v6M14 10.5v6',
+  share: 'M12 14.5V3.5M8 7.5l4-4 4 4M6 11H5v9.5h14V11h-1',
+  logout: 'M14 4.5H5.5v15H14M10 12h10M16.5 8.5 20 12l-3.5 3.5',
+  refresh: 'M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4v4h-4',
+  home: 'M4 11 12 4l8 7M6.5 9.5V20h11V9.5',
+  sun: 'M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10z',
+  moon: 'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z',
+  device: 'M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM12 17h.01',
 } as const;
 export type IconName = keyof typeof ICONS;
 
@@ -132,7 +141,30 @@ export const Spinner = () => <div class="spinner" aria-label="読み込み中" /
 /** 裏で最新に入れ替えている間、画面上端に細い線を流す */
 export const Syncing = () => <div class="syncing" role="progressbar" aria-label="更新中" />;
 
-export function TopBar({ title, back, children }: { title?: string; back?: boolean; children?: ComponentChildren }) {
+/** ヘッダー右上に配置する外観（ライト/ダーク）切り替えボタン */
+export function ThemeToggle() {
+  const [theme, setTheme] = useState<ThemeMode>(() => getTheme());
+  const toggle = () => {
+    const isDark =
+      document.documentElement.dataset.theme === 'dark' ||
+      (!document.documentElement.dataset.theme && typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
+    const next: ThemeMode = isDark ? 'light' : 'dark';
+    setTheme(next);
+    applyTheme(next);
+  };
+  const isDark =
+    theme === 'dark' ||
+    (theme === 'system' && typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
+
+  return (
+    <button class="icon-btn theme-toggle-btn" aria-label={`外観テーマ切り替え（現在: ${isDark ? 'ダーク' : 'ライト'}）`} onClick={toggle} title="外観切り替え">
+      <Icon name={isDark ? 'sun' : 'moon'} size={19} />
+    </button>
+  );
+}
+
+export function TopBar({ title, back, children, showTheme }: { title?: string; back?: boolean; children?: ComponentChildren; showTheme?: boolean }) {
+  if (!title && !back && children === undefined && !showTheme) return null;
   return (
     <header class="topbar">
       {back && (
@@ -141,7 +173,10 @@ export function TopBar({ title, back, children }: { title?: string; back?: boole
         </button>
       )}
       <h1>{title}</h1>
-      {children}
+      <div class="topbar-actions">
+        {showTheme && <ThemeToggle />}
+        {children}
+      </div>
     </header>
   );
 }
@@ -170,7 +205,7 @@ export function NavBar() {
     { to: '/', key: '', icon: 'ticket', label: '予定' },
     ...(canRegister(me.member) ? ([{ to: '/recruit', key: 'recruit', icon: 'send', label: '募集' }] as const) : []),
     { to: '/feedback', key: 'feedback', icon: 'chat', label: '要望' },
-    { to: '/settings', key: 'settings', icon: 'user', label: '自分' },
+    { to: '/settings', key: 'settings', icon: 'user', label: 'アカウント' },
   ];
   const active = here === 'admin' ? 'settings' : here;
   return (
@@ -185,17 +220,17 @@ export function NavBar() {
   );
 }
 
-const DAY_EN = { 日: 'SUN', 月: 'MON', 火: 'TUE', 水: 'WED', 木: 'THU', 金: 'FRI', 土: 'SAT' } as Record<string, string>;
-
 /** チケットの半券。日付を大きく。行くと決めた練習は黒く反転する */
 export function Stub({ date, onClick }: { date: string; onClick?: () => void }) {
   const [, m, d] = date.split('-').map(Number);
   const w = weekday(date);
+  const hol = isHoliday(date);
+  const dayClass = hol || w === '日' ? 'sun' : w === '土' ? 'sat' : 'weekday';
   return (
-    <div class="stub" aria-hidden="true" onClick={onClick}>
+    <div class={`stub ${dayClass}`} aria-hidden="true" onClick={onClick}>
       <span class="m">{String(m).padStart(2, '0')}</span>
       <span class="d">{String(d).padStart(2, '0')}</span>
-      <span class={`w${w === '土' ? ' sat' : w === '日' ? ' sun' : ''}`}>{DAY_EN[w]}</span>
+      <span class={`w ${dayClass}`}>{w}</span>
     </div>
   );
 }
@@ -203,7 +238,6 @@ export function Stub({ date, onClick }: { date: string; onClick?: () => void }) 
 export function StatusBadge({ v }: { v: { practice: { status: string } } | PracticeView }) {
   const s = v.practice.status;
   if (s === '中止') return <span class="stamp cancel">中止</span>;
-  if (s === '満員') return <span class="stamp full">満員</span>;
   return null;
 }
 
@@ -280,12 +314,15 @@ export function Pass({
   fields: { label: string; value: ComponentChildren; note?: string | null; wide?: boolean; jp?: boolean }[];
 }) {
   const [, m, d] = date.split('-').map(Number);
+  const w = weekday(date);
+  const hol = isHoliday(date);
+  const dayClass = hol || w === '日' ? 'sun' : w === '土' ? 'sat' : 'weekday';
   return (
     <section class="pass" data-status={status}>
       <div class="pass-head">
-        <div class="pass-date">
+        <div class={`pass-date ${dayClass}`}>
           {String(m).padStart(2, '0')}.{String(d).padStart(2, '0')}
-          <span class="w">{DAY_EN[weekday(date)]}</span>
+          <span class={`w ${dayClass}`}>{w}</span>
         </div>
         <StatusBadge v={{ practice: { status } }} />
       </div>
@@ -323,3 +360,24 @@ export const Fee = ({ v }: { v: PracticeView }) => (
 );
 
 export const place = (p: { studio: string; room: string }) => `${p.studio}${p.room ? ' ' + p.room : ''}`;
+
+/** 共有の画面に渡す文。日時と場所を先に書き、参加リンクから回答できると添える */
+export const shareData = (v: PracticeView, url: string) => ({
+  title: 'スタジオ練出欠管理',
+  text: `${labelDate(v.practice.date)} ${v.practice.start}–${v.practice.end} ${place(v.practice)}\n参加リンクから回答できます`,
+  url,
+});
+
+/** チケットに表示するキャンセル期限バッジ */
+export function CancelDeadlineBadge({ date, studio }: { date: string; studio: string }) {
+  const { me } = useApp();
+  const deadline = computeCancelDeadline(date, studio, me?.settings?.cancelRules ?? []);
+  if (!deadline) return null;
+
+  return (
+    <div class={`ticket-deadline${deadline.isSoon ? ' is-soon' : ''}${deadline.isPast ? ' is-past' : ''}`}>
+      <Icon name="clock" size={10} />
+      <span>{deadline.isPast ? 'キャンセル期限超過' : `キャンセル期限: ${deadline.formatted}`}</span>
+    </div>
+  );
+}

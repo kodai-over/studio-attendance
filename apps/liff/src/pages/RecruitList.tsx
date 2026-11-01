@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { isAdmin, labelDate, type PracticeView } from '@studio-attendance/shared';
 import { deleteMessage } from './Detail';
 import { api } from '../api';
-import { Icon, Spinner, Stub, TopBar, go, place, useApp, useRunner } from '../ui';
+import { CancelDeadlineBadge, Icon, Spinner, Stub, TopBar, go, place, useApp, useRunner } from '../ui';
 
 /**
  * 「募集」。自分が登録した練習（管理者はすべての練習）を並べ、押すと募集・編集の画面へ。
@@ -47,48 +47,65 @@ export function RecruitListPage() {
       ) : list.length === 0 ? (
         <div class="empty">登録されている予約情報はありません。</div>
       ) : (
-        list.map((v) => (
-          <SwipeRow
-            key={v.practice.id}
-            open={opened === v.practice.id}
-            anyOpen={opened != null}
-            onOpen={(o) => setOpened(o ? v.practice.id : null)}
-            onDelete={() => remove(v)}
-          >
-            <RecruitTicket v={v} showBooker={admin && v.practice.booker !== me.member.userId} />
-          </SwipeRow>
-        ))
+        <div class="ticket-grid">
+          {list.map((v) => (
+            <SwipeRow
+              key={v.practice.id}
+              open={opened === v.practice.id}
+              anyOpen={opened != null}
+              onOpen={(o) => setOpened(o ? v.practice.id : null)}
+              onDelete={() => remove(v)}
+            >
+              <RecruitTicket v={v} />
+            </SwipeRow>
+          ))}
+        </div>
       )}
     </>
   );
 }
 
-function RecruitTicket({ v, showBooker }: { v: PracticeView; showBooker: boolean }) {
+function RecruitTicket({ v }: { v: PracticeView }) {
   const { me } = useApp();
   const p = v.practice;
   const open = () => go(`/recruit/${encodeURIComponent(p.id)}`);
-  const sent = v.groupNames.length > 0;
+  const targetGroups =
+    v.groupNames.length > 0
+      ? v.groupNames
+      : p.groups.map((gid) => me.groups.find((g) => g.id === gid)?.name ?? gid);
+  const hasGroups = targetGroups.length > 0;
+
   return (
-    <article class="ticket" data-answer={sent ? 'sent' : 'none'} data-status={p.status}>
+    <article class="ticket" data-answer={hasGroups ? 'sent' : 'none'} data-status={p.status}>
       <Stub date={p.date} onClick={open} />
       <button class="ticket-main" onClick={open}>
         <span class="sr">{labelDate(p.date)}</span>
         <div class="time">
-          {p.start}–{p.end}
-          {p.status === '中止' ? <span class="stamp cancel">中止</span> : <span class={`stamp ${sent ? 'ok' : 'todo'}`}>{sent ? '募集済' : '未募集'}</span>}
+          <span>{p.start}–{p.end}</span>
+          {v.bookerName && (
+            <span class="booker" title={`予約者: ${v.bookerName}`}>
+              <Icon name="user" size={11} />
+              <span>{v.bookerName}</span>
+            </span>
+          )}
         </div>
-        <div class="place">
-          {place(p)}
-          {showBooker && <span class="muted">　{v.bookerName}</span>}
-        </div>
+        <div class="place">{place(p)}</div>
+        <CancelDeadlineBadge date={p.date} studio={p.studio} />
         <div class="ticket-foot">
-          <span class="toggles">
-            {me.groups.map((g) => (
-              <span class={`tag${p.groups.includes(g.id) ? '' : ' soft'}`}>{g.name}</span>
-            ))}
-          </span>
+          <div class={`recruit-groups${hasGroups ? ' has-groups' : ''}`}>
+            <Icon name="send" size={12} />
+            {hasGroups ? (
+              targetGroups.map((name) => (
+                <span class="tag" key={name}>
+                  {name}
+                </span>
+              ))
+            ) : (
+              <span class="no-groups">No groups</span>
+            )}
+          </div>
           <span class="fee">
-            <Icon name="chevron" size={18} />
+            <Icon name="chevron" size={15} />
           </span>
         </div>
       </button>
@@ -97,7 +114,7 @@ function RecruitTicket({ v, showBooker }: { v: PracticeView; showBooker: boolean
 }
 
 /** 削除ボタンの幅。これより左に引くと開いたままになる */
-const DELETE_WIDTH = 88;
+const DELETE_WIDTH = 82;
 
 /**
  * iPhone のメールのように、左にスワイプすると右端に削除ボタンが出る行。

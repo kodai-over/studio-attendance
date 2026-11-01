@@ -1,7 +1,8 @@
 import { useState } from 'preact/hooks';
 import type { AttendeeView, PracticeView } from '@studio-attendance/shared';
 import { api } from '../api';
-import { Avatar, Icon, Spinner, Syncing, TopBar, go, useApp } from '../ui';
+import { shareLink } from '../liff';
+import { Avatar, Icon, Spinner, Syncing, TopBar, go, shareData, useApp } from '../ui';
 import { EditForm, PracticePass, usePractice } from './Detail';
 
 /** 「募集」から開く練習の画面。募集先のグループ・ゲストの追加・参加リンク・（予約者と管理者は）編集と削除 */
@@ -15,55 +16,66 @@ export function RecruitDetailPage({ id }: { id: string }) {
   return (
     <>
       <TopBar back>{loading && <Syncing />}</TopBar>
-      <PracticePass v={v} />
 
-      {(v.practice.status === '募集中' || v.practice.status === '満員') && (
-        <RecruitForm v={v} busy={busy} onSend={async (groups) => {
-            if (me.actAs === 'test' && !confirm('確認用アカウント「admin」として、グループに募集を送ります。よろしいですか？')) return;
-            await update(() => api('recruitPractice', { id, groups }), 'グループに募集を送りました');
-          }} />
-      )}
+      <div class="detail-layout">
+        <div class="detail-primary">
+          <PracticePass v={v} />
 
-      <section>
-        <div class="sec-head">
-          <Icon name="people" size={18} />
-          ゲスト
-          {guests.length > 0 && <span class="n">{guests.length}</span>}
+          {(v.practice.status === '募集中' || v.practice.status === '満員') && (
+            <RecruitForm
+              v={v}
+              busy={busy}
+              onSend={async (groups) => {
+                if (me.actAs === 'test' && !confirm('確認用アカウント「admin」として、グループに募集を送ります。よろしいですか？')) return;
+                await update(() => api('recruitPractice', { id, groups }), 'グループに募集を送りました');
+              }}
+            />
+          )}
         </div>
-        {guests.length > 0 && (
-          <div class="people" style={{ marginBottom: 10 }}>
-            {guests.map((a) => (
-              <span class="person">
-                <Avatar name={a.name} guest />
-                <span>{a.name}</span>
-                {a.canRemove && (
-                  <button class="x" aria-label={`${a.name}さんを削除`} onClick={() => confirm(`${a.name}さんを削除しますか？`) && remove(a)}>
-                    <Icon name="x" size={14} />
-                  </button>
-                )}
-              </span>
-            ))}
-          </div>
-        )}
-        <GuestForm onAdd={(name) => update(() => api('addGuest', { id, name }), `${name}さんを追加しました`)} busy={busy} />
-      </section>
 
-      {v.joinUrl && <JoinLink url={v.joinUrl} />}
+        <div class="detail-side">
+          <section>
+            <div class="sec-head">
+              <Icon name="people" size={18} />
+              ゲスト
+              {guests.length > 0 && <span class="n">{guests.length}</span>}
+            </div>
+            {guests.length > 0 && (
+              <div class="people" style={{ marginBottom: 10 }}>
+                {guests.map((a) => (
+                  <span class="person">
+                    <Avatar name={a.name} guest />
+                    <span>{a.name}</span>
+                    {a.canRemove && (
+                      <button class="x" aria-label={`${a.name}さんを削除`} onClick={() => confirm(`${a.name}さんを削除しますか？`) && remove(a)}>
+                        <Icon name="x" size={14} />
+                      </button>
+                    )}
+                  </span>
+                ))}
+              </div>
+            )}
+            <GuestForm onAdd={(name) => update(() => api('addGuest', { id, name }), `${name}さんを追加しました`)} busy={busy} />
+          </section>
 
-      {v.canEdit && (
-        <EditForm
-          v={v}
-          busy={busy}
-          onSave={(patch) => update(() => api('updatePractice', { id, patch }), '保存しました')}
-          onDelete={async () => {
-            // サーバーの返事を待たずに「募集」に戻る（失敗したら一覧に戻して知らせる）
-            // 一覧から来たときは戻る（履歴に削除した練習の画面を残さない）。お知らせのリンクから来たときは「募集」へ
-            if (history.length > 1) history.back();
-            else go('/recruit');
-            await deletePractice(v);
-          }}
-        />
-      )}
+          {v.joinUrl && <JoinLink v={v} />}
+
+          {v.canEdit && (
+            <EditForm
+              v={v}
+              busy={busy}
+              onSave={(patch) => update(() => api('updatePractice', { id, patch }), '保存しました')}
+              onDelete={async () => {
+                // サーバーの返事を待たずに「募集」に戻る（失敗したら一覧に戻して知らせる）
+                // 一覧から来たときは戻る（履歴に削除した練習の画面を残さない）。お知らせのリンクから来たときは「募集」へ
+                if (history.length > 1) history.back();
+                else go('/recruit');
+                await deletePractice(v);
+              }}
+            />
+          )}
+        </div>
+      </div>
     </>
   );
 }
@@ -140,8 +152,9 @@ function RecruitForm({ v, onSend, busy }: { v: PracticeView; onSend: (groups: st
   );
 }
 
-function JoinLink({ url }: { url: string }) {
+function JoinLink({ v }: { v: PracticeView }) {
   const { toast } = useApp();
+  const url = v.joinUrl!;
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(url);
@@ -149,6 +162,10 @@ function JoinLink({ url }: { url: string }) {
     } catch {
       prompt('参加リンク', url);
     }
+  };
+  const share = async () => {
+    const r = await shareLink(shareData(v, url));
+    if (r === 'copied') toast('参加リンクをコピーしました');
   };
   return (
     <section>
@@ -160,10 +177,12 @@ function JoinLink({ url }: { url: string }) {
       <div class="copy-row">
         <code>{url.replace(/^https?:\/\//, '')}</code>
         <button class="icon-btn" aria-label="参加リンクをコピー" onClick={copy}>
-          <Icon name="copy" size={20} />
+          <Icon name="copy" size={18} />
+        </button>
+        <button class="icon-btn" aria-label="参加リンクを共有" onClick={share}>
+          <Icon name="share" size={18} />
         </button>
       </div>
     </section>
   );
 }
-

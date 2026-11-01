@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { HomeView, MeView, PracticeView } from '@studio-attendance/shared';
 import { api } from './api';
 import { isAnswering } from './answering';
-import { initLiff } from './liff';
+import { initLiff, loginApp } from './liff';
 import { AnswerPage } from './pages/Answer';
 import { DetailPage } from './pages/Detail';
 import { FeedbackPage } from './pages/Feedback';
@@ -13,7 +13,10 @@ import { RecruitListPage } from './pages/RecruitList';
 import { RegisterPage } from './pages/Register';
 import { AdminPage, SettingsPage } from './pages/Settings';
 import './styles.css';
-import { AppContext, NavBar, Spinner, go, useRoute, useToast } from './ui';
+import { initTheme } from './theme';
+import { AppContext, FRESH_MS, NavBar, Spinner, go, useRoute, useToast } from './ui';
+
+initTheme();
 
 function Router() {
   const { path, query } = useRoute();
@@ -33,6 +36,7 @@ const CACHE_KEY = 'pb:home';
 /** 前回開いたときの表示。開いた瞬間に出し、裏で最新に入れ替える */
 function loadCache(): HomeView | null {
   try {
+    if (localStorage.getItem('pb:loggedOut') === '1') return null;
     const raw = localStorage.getItem(CACHE_KEY);
     return raw ? (JSON.parse(raw) as HomeView) : null;
   } catch {
@@ -42,6 +46,8 @@ function loadCache(): HomeView | null {
 
 function saveCache(h: HomeView) {
   try {
+    // 別アカウント（一般・admin）として見ている内容は、キャッシュに保存しない
+    if (h.me.actAs && h.me.actAs !== 'self') return;
     localStorage.setItem(CACHE_KEY, JSON.stringify(h));
   } catch {
     /* 保存できなくても動く */
@@ -54,6 +60,7 @@ function App() {
   const [practices, setPracticesState] = useState<{ list: PracticeView[]; at: number } | null>(cached ? { list: cached.practices, at: 0 } : null);
   const [error, setError] = useState<string | null>(null);
   const [startupFailed, setStartupFailed] = useState(false);
+  const [loggedOut, setLoggedOut] = useState(false);
   const [toast, toastNode] = useToast();
   // 起動中に出欠などで差し替えた練習。あとから届いた起動時の一覧（それより前の状態）で戻さない
   const touched = useRef<Set<string> | null>(new Set());
@@ -80,6 +87,10 @@ function App() {
   useEffect(() => {
     (async () => {
       const params = await initLiff();
+      if (!params) {
+        setLoggedOut(true);
+        return;
+      }
       // 募集カードや確認カードのリンク（?p= / ?cal= / ?draft=）を画面に振り分ける
       // ?view= は以前のメニュー（4つのボタン）のリンク。古いリンクから開かれても困らないよう残す
       const p = params.get('p');
@@ -115,6 +126,34 @@ function App() {
       if (cached) toast(msg, true);
       else setError(msg);
     });
+  }, []);
+
+  // 別のアプリやタブから戻ってきたとき、一覧を取ってから時間がたっていれば裏で最新にする
+  // （ホーム画面のアプリやブラウザのタブは、開いたまま何時間も置かれることがある）
+  const fetchedAt = useRef(0);
+  fetchedAt.current = practices?.at ?? 0;
+  useEffect(() => {
+    let syncing = false;
+    const onReturn = () => {
+      if (document.visibilityState !== 'visible' || syncing) return;
+      // 起動時のまとめ取得がまだ（失敗した）なら、起動の処理に任せる
+      if (fetchedAt.current === 0 || Date.now() - fetchedAt.current < FRESH_MS) return;
+      syncing = true;
+      loadHome()
+        .catch(() => {
+          /* 戻ったときの取り直しは、失敗しても今の表示のままにする */
+        })
+        .finally(() => {
+          syncing = false;
+        });
+    };
+    document.addEventListener('visibilitychange', onReturn);
+    // 戻るボタンでページごと戻ってきたとき（bfcache）
+    window.addEventListener('pageshow', onReturn);
+    return () => {
+      document.removeEventListener('visibilitychange', onReturn);
+      window.removeEventListener('pageshow', onReturn);
+    };
   }, []);
 
   // fresh でないときは取った時刻を変えない（前回の表示を「最新」と取り違えないように）
@@ -171,7 +210,15 @@ function App() {
 
   return (
     <div class="app">
-      {error ? (
+      {loggedOut ? (
+        <div class="empty signed-out">
+          <strong>ログアウトしました</strong>
+          <div>もう一度使うときは、LINEでログインしてください</div>
+          <button class="btn primary" onClick={loginApp}>
+            LINEでログイン
+          </button>
+        </div>
+      ) : error ? (
         <div class="empty">{error}</div>
       ) : me ? (
         <AppContext.Provider value={{ me, setMe, toast, practices: practices?.list ?? null, practicesAt: practices?.at ?? 0, startupFailed, setPractices, updatePractice, deletePractice, loadHome }}>

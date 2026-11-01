@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { endAfterStart, labelDate, roomInfo, yen, type Answer, type AttendeeView, type PracticePatch, type PracticeView } from '@studio-attendance/shared';
+import { computeCancelDeadline, endAfterStart, labelDate, roomInfo, yen, type Answer, type AttendeeView, type PracticePatch, type PracticeView } from '@studio-attendance/shared';
 import { api } from '../api';
 import { RoomSelect } from '../components/StudioRoom';
-import { openExternal } from '../liff';
-import { Avatar, FRESH_MS, Icon, Pass, RsvpButtons, Spinner, Syncing, TopBar, useApp, useRunner } from '../ui';
+import { openCalendar, prefersIcs, shareLink } from '../liff';
+import { Avatar, FRESH_MS, Icon, Pass, RsvpButtons, Spinner, Syncing, TopBar, shareData, useApp, useRunner } from '../ui';
 import { isAnswering } from '../answering';
 import { useAnswer } from './List';
 
@@ -58,6 +58,7 @@ export function usePractice(id: string) {
 export function PracticePass({ v }: { v: PracticeView }) {
   const { me } = useApp();
   const p = v.practice;
+  const deadline = computeCancelDeadline(p.date, p.studio, me?.settings?.cancelRules ?? []);
   return (
     <Pass
       date={p.date}
@@ -66,9 +67,23 @@ export function PracticePass({ v }: { v: PracticeView }) {
         { label: '時間', value: `${p.start}–${p.end}`, wide: true },
         { label: 'スタジオ', value: p.studio, jp: true, wide: !p.room },
         ...(p.room ? [{ label: '部屋', value: p.room, note: roomInfo(me.settings.studios, p.studio, p.room), jp: true }] : []),
+        ...(deadline
+          ? [
+              {
+                label: 'キャンセル期限',
+                value: (
+                  <span class={`deadline-text${deadline.isSoon ? ' is-soon' : ''}${deadline.isPast ? ' is-past' : ''}`}>
+                    {deadline.isPast ? 'キャンセル期限超過' : deadline.formatted}
+                  </span>
+                ),
+                jp: true,
+                wide: true,
+              },
+            ]
+          : []),
         { label: '1人あたり', value: v.perPerson != null ? yen(v.perPerson) : '—', note: p.feeOverride ? '調整済み' : null },
         { label: 'スタジオ代', value: yen(p.fee) },
-        { label: '参加人数', value: <>{v.goingCount}{p.max ? <small class="of">/{p.max}</small> : null}</>, note: p.min ? `最低人数 ${p.min}人` : null },
+        { label: '参加人数', value: <>{v.goingCount}{p.max ? <small class="of">/{p.max}</small> : null} {p.status === '満員' && <span class="badge-full">FULL</span>}</>, note: p.min ? `最低人数 ${p.min}人` : null },
         { label: '予約者', value: v.bookerName, jp: true },
         ...(p.memo ? [{ label: 'メモ', value: p.memo, jp: true, wide: true }] : []),
       ]}
@@ -80,81 +95,134 @@ export function PracticePass({ v }: { v: PracticeView }) {
 export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null }) {
   const { v, inList, loading, busy, update } = usePractice(id);
   const { answer } = useAnswer();
+  const { toast } = useApp();
   const calRef = useRef<HTMLDivElement>(null);
+  const going = v ? v.myAnswer === '行く' && v.practice.status !== '中止' : false;
 
   useEffect(() => {
-    if (v && focus === 'calendar') calRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, [v != null, focus]);
+    if (v && focus === 'calendar') calRef.current?.scrollIntoView({ behavior: 'smooth', block: going ? 'nearest' : 'start' });
+  }, [v != null, focus, going]);
 
   if (!v) return <><TopBar back />{loading ? <Spinner /> : <div class="empty">予約情報が見つかりません</div>}</>;
   const p = v.practice;
+  // 行くと答えたら、カレンダーに追加をボタンのすぐ下に出す（答えてそのまま追加できるように）
+  const calendar = <CalendarButtons v={v} highlight={going} compact={going} />;
 
   return (
     <>
-      <TopBar back>{loading && <Syncing />}</TopBar>
+      <TopBar back>
+        {loading && <Syncing />}
+        {v.joinUrl && (
+          <button
+            class="icon-btn"
+            style={{ marginLeft: 'auto' }}
+            aria-label="参加リンクを共有"
+            onClick={async () => {
+              if ((await shareLink(shareData(v, v.joinUrl!))) === 'copied') toast('参加リンクをコピーしました');
+            }}
+          >
+            <Icon name="share" size={20} />
+          </button>
+        )}
+      </TopBar>
 
-      <PracticePass v={v} />
+      <div class="detail-layout">
+        <div class="detail-primary">
+          <PracticePass v={v} />
 
-      <RsvpButtons
-        solo
-        value={v.myAnswer}
-        status={p.status}
-        busy={busy && !inList}
-        onAnswer={(a: Answer) => {
-          // 一覧にある練習は、待たずに切り替える（結果は一覧に入り、この画面もそれに合わせる）
-          if (inList) answer(id, a);
-          else update(() => api('rsvp', { id, answer: a }));
-        }}
-      />
+          <RsvpButtons
+            solo
+            value={v.myAnswer}
+            status={p.status}
+            busy={busy && !inList}
+            onAnswer={(a: Answer) => {
+              // 一覧にある練習は、待たずに切り替える（結果は一覧に入り、この画面もそれに合わせる）
+              if (inList) answer(id, a);
+              else update(() => api('rsvp', { id, answer: a }));
+            }}
+          />
 
-      <Attendees v={v} onRemove={(a) => update(() => api('removeAttendance', { id, participant: a.participant }), '削除しました')} />
+          {going && (
+            <div ref={calRef} class="cal-inline">
+              {calendar}
+            </div>
+          )}
+        </div>
 
-      <div class="sec-head" ref={calRef}>
-        <Icon name="calendar" size={18} />
-        カレンダー
+        <div class="detail-side">
+          <Attendees v={v} onRemove={(a) => update(() => api('removeAttendance', { id, participant: a.participant }), '削除しました')} />
+        </div>
+
+        <div class="detail-extra">
+          {!going && (
+            <>
+              <div class="sec-head" ref={calRef}>
+                <Icon name="calendar" size={18} />
+                カレンダーに追加
+              </div>
+              {calendar}
+            </>
+          )}
+
+          {/* 古いお知らせのリンクなどから開いた予約者が、直す・消す場所に迷わないように */}
+          {v.canEdit && (
+            <p class="note" style={{ marginTop: 16 }}>
+              編集・削除は{' '}
+              <a href={`#/recruit/${encodeURIComponent(p.id)}`}>「募集」のこの予約情報</a>
+              から
+            </p>
+          )}
+        </div>
       </div>
-      <div class="grid2">
-        <button class="btn ghost" onClick={() => openExternal(v.googleCalendarUrl)}>
-          Google
-        </button>
-        <button class="btn ghost" onClick={() => openExternal(v.icsUrl)}>
-          iPhone
-        </button>
-      </div>
-
-      {/* 古いお知らせのリンクなどから開いた予約者が、直す・消す場所に迷わないように */}
-      {v.canEdit && (
-        <p class="note" style={{ marginTop: 16 }}>
-          編集・削除は{' '}
-          <a href={`#/recruit/${encodeURIComponent(p.id)}`}>「募集」のこの予約情報</a>
-          から
-        </p>
-      )}
     </>
+  );
+}
+
+/** カレンダーに追加。iPhone・Mac なら iPhone のカレンダーを、それ以外なら Google を大きく出す */
+function CalendarButtons({ v, highlight, compact = false }: { v: PracticeView; highlight: boolean; compact?: boolean }) {
+  const ics = { label: 'iPhone', open: () => openCalendar(v.icsUrl, 'ics') };
+  const google = { label: 'Google', open: () => openCalendar(v.googleCalendarUrl, 'google') };
+  const [first, second] = prefersIcs() ? [ics, google] : [google, ics];
+  return (
+    <div class={`grid2${compact ? ' compact' : ''}`}>
+      <button class={`btn ${compact ? 'small ' : ''}${highlight ? 'primary' : 'ghost'}`} onClick={first.open}>
+        <Icon name="calendar" size={compact ? 13 : 16} />
+        {first.label}
+      </button>
+      <button class={`btn ${compact ? 'small ' : ''}ghost`} onClick={second.open}>
+        {second.label}
+      </button>
+    </div>
   );
 }
 
 /** 参加メンバーの一覧。行く・保留・行かないの順に名前を出す。自分が足したゲスト（予約者と管理者はすべてのゲスト）は取り消せる */
 function Attendees({ v, onRemove }: { v: PracticeView; onRemove: (a: AttendeeView) => void }) {
-  const lists = [
-    { label: '○ 行く', people: v.going },
-    { label: '△ 未定', people: v.maybe },
-    { label: '✕ 行かない', people: v.notGoing },
+  const groups = [
+    { key: 'going' as const, mark: '○', label: '行く', people: v.going },
+    { key: 'maybe' as const, mark: '△', label: '未定', people: v.maybe },
+    { key: 'notGoing' as const, mark: '✕', label: '行かない', people: v.notGoing },
   ];
+  const total = v.going.length + v.maybe.length + v.notGoing.length;
+
   return (
-    <>
+    <div class="attendees-section">
       <div class="sec-head">
         <Icon name="people" size={18} />
         参加者
-        <span class="n">{v.going.length + v.maybe.length + v.notGoing.length}</span>
+        <span class="n">{total}</span>
       </div>
-      {lists.map(({ label, people }) =>
+      {groups.map(({ key, mark, label, people }) =>
         people.length === 0 ? null : (
-          <div key={label} style={{ marginBottom: 10 }}>
-            <div class="muted" style={{ marginBottom: 4 }}>
-              {label}（{people.length}）
+          <div key={key} class={`attendee-group status-${key}`}>
+            <div class="attendee-head">
+              <span class="attendee-mark" aria-hidden="true">
+                {mark}
+              </span>
+              <span class="attendee-label">{label}</span>
+              <span class="attendee-count">{people.length}</span>
             </div>
-            <div class="people">
+            <div class={`people${key === 'notGoing' ? ' dim' : ''}`}>
               {people.map((a) => (
                 <span class="person" key={a.participant}>
                   <Avatar name={a.name} guest={a.kind === 'ゲスト'} />
@@ -170,8 +238,8 @@ function Attendees({ v, onRemove }: { v: PracticeView; onRemove: (a: AttendeeVie
           </div>
         ),
       )}
-      {v.going.length + v.maybe.length + v.notGoing.length === 0 && <div class="muted">まだ誰も回答していません</div>}
-    </>
+      {total === 0 && <div class="muted">まだ誰も回答していません</div>}
+    </div>
   );
 }
 

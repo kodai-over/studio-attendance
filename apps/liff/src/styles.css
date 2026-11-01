@@ -6,22 +6,36 @@
   --bg: #ffffff;
   --paper: #f3f3ef;
   --ink: #000000;
-  --sub: #8c8c8a;
+  --sub: #6f6f6b;
   --faint: #b9b9b6;
   --line: #e4e4e0;
   --field: #ffffff;
   --danger: #d23b2a;
   --sat: #2d5fd3;
   --sun: #d23b2a;
+  --brand-green: #059669;
   --nav: rgb(128 128 128 / 62%);
   --nav-on: rgb(70 70 70 / 70%);
-  --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
-  --sans: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  --pad-x: 14px;
+  --nav-w: 0px;
+  --mono: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+  --sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Hiragino Sans', 'Noto Sans JP', 'Segoe UI', sans-serif;
+
+  --ink-sat: #93b7ff;
+  --ink-sat-bg: rgba(147, 183, 255, 0.25);
+  --ink-sun: #ff8577;
+  --ink-sun-bg: rgba(255, 133, 119, 0.25);
+  --maybe-accent: #f59e0b;
+  --maybe-stub-bg: color-mix(in srgb, #f59e0b 8%, var(--paper));
+  --maybe-btn-color: #ffffff;
+  --badge-full-c: var(--danger);
+  --badge-full-bg: color-mix(in srgb, var(--danger) 13%, transparent);
+
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     --bg: #000000;
     --paper: #171717;
     --ink: #ffffff;
@@ -32,10 +46,50 @@
     --danger: #ff6a55;
     --sat: #7aa2ff;
     --sun: #ff6a55;
+    --brand-green: #34d399;
     --nav: rgb(70 70 70 / 70%);
     --nav-on: rgb(150 150 150 / 45%);
+
+    --ink-sat: #1d4ed8;
+    --ink-sat-bg: rgba(29, 78, 216, 0.15);
+    --ink-sun: #dc2626;
+    --ink-sun-bg: rgba(220, 38, 38, 0.15);
+    --maybe-accent: #fbbf24;
+    --maybe-stub-bg: color-mix(in srgb, #fbbf24 10%, var(--paper));
+    --maybe-btn-color: #000000;
+    --badge-full-c: #ff8577;
+    --badge-full-bg: rgba(255, 133, 119, 0.2);
+
     color-scheme: dark;
   }
+}
+
+:root[data-theme='dark'] {
+  --bg: #000000;
+  --paper: #171717;
+  --ink: #ffffff;
+  --sub: #8f8f8c;
+  --faint: #5c5c5a;
+  --line: #2a2a28;
+  --field: #0d0d0d;
+  --danger: #ff6a55;
+  --sat: #7aa2ff;
+  --sun: #ff6a55;
+  --brand-green: #34d399;
+  --nav: rgb(70 70 70 / 70%);
+  --nav-on: rgb(150 150 150 / 45%);
+
+  --ink-sat: #1d4ed8;
+  --ink-sat-bg: rgba(29, 78, 216, 0.15);
+  --ink-sun: #dc2626;
+  --ink-sun-bg: rgba(220, 38, 38, 0.15);
+  --maybe-accent: #fbbf24;
+  --maybe-stub-bg: color-mix(in srgb, #fbbf24 10%, var(--paper));
+  --maybe-btn-color: #000000;
+  --badge-full-c: #ff8577;
+  --badge-full-bg: rgba(255, 133, 119, 0.2);
+
+  color-scheme: dark;
 }
 
 * {
@@ -48,8 +102,9 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--sans);
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.5;
+  font-variant-numeric: tabular-nums;
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
 }
@@ -76,8 +131,8 @@ a {
 .app {
   max-width: 560px;
   margin: 0 auto;
-  /* 下の浮いたナビに最後の行が隠れないよう、下に余白をとる */
-  padding: 0 16px calc(104px + env(safe-area-inset-bottom));
+  /* 下のスリムなナビに最後の行が隠れないよう、下に余白をとる */
+  padding: 0 var(--pad-x) calc(64px + env(safe-area-inset-bottom));
 }
 
 .icon {
@@ -93,26 +148,39 @@ a {
   display: flex;
   align-items: center;
   gap: 4px;
-  min-height: 52px;
-  margin: 0 -16px 8px;
-  padding: 4px 8px;
+  min-height: 44px;
+  margin: 0 calc(var(--pad-x) * -1) 6px;
+  padding: calc(3px + env(safe-area-inset-top)) calc(var(--pad-x) - 6px) 3px;
   background: color-mix(in srgb, var(--bg) 90%, transparent);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
 .topbar h1 {
   flex: 1;
-  margin: 0 8px;
-  font-size: 17px;
-  font-weight: 600;
+  margin: 0 6px;
+  font-size: 15px;
+  font-weight: 500;
   letter-spacing: 0.02em;
+}
+.topbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+.theme-toggle-btn {
+  color: var(--ink);
+  transition: transform 0.15s ease;
+}
+.theme-toggle-btn:active {
+  transform: scale(0.92);
 }
 .icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border: 0;
   border-radius: 50%;
   background: transparent;
@@ -127,7 +195,7 @@ a {
   position: sticky;
   top: 0;
   z-index: 5;
-  margin: 0 -16px 16px;
+  margin: 0 calc(var(--pad-x) * -1) 10px;
   padding-top: env(safe-area-inset-top);
   background: color-mix(in srgb, var(--bg) 92%, transparent);
   backdrop-filter: blur(10px);
@@ -141,29 +209,29 @@ a {
   flex: 1;
   position: relative;
   border: 0;
-  padding: 16px 4px 14px;
+  padding: 9px 4px 8px;
   background: transparent;
   color: var(--faint);
-  font-size: 15px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 400;
 }
 .tabs button + button::before {
   content: '';
   position: absolute;
   left: 0;
-  top: 12px;
-  bottom: 12px;
+  top: 8px;
+  bottom: 8px;
   border-left: 1px solid var(--line);
 }
 .tabs button[aria-selected='true'] {
   color: var(--ink);
-  font-weight: 600;
+  font-weight: 500;
 }
 .tabs .count {
-  margin-left: 6px;
+  margin-left: 5px;
   font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 11px;
+  font-weight: 400;
 }
 .syncing {
   position: absolute;
@@ -190,53 +258,105 @@ a {
   }
 }
 
-/* ---------- 下の浮いたナビ ---------- */
+/* ---------- ナビ（ブラウザ縦画面では下端スリム固定、LINE内・ホーム画面のアプリの縦画面では浮遊カプセル、横画面・広い画面では左サイドバー） ---------- */
 .navbar {
   position: fixed;
-  left: 50%;
-  bottom: calc(14px + env(safe-area-inset-bottom));
+  inset-inline: 0;
+  bottom: 0;
   z-index: 10;
-  transform: translateX(-50%);
   display: flex;
-  gap: 2px;
-  width: min(calc(100% - 32px), 420px);
-  padding: 5px;
-  border-radius: 999px;
-  background: var(--nav);
-  backdrop-filter: blur(18px) saturate(1.4);
-  -webkit-backdrop-filter: blur(18px) saturate(1.4);
-  box-shadow: 0 8px 28px rgb(0 0 0 / 18%);
+  gap: 4px;
+  padding: 5px max(12px, env(safe-area-inset-left)) calc(5px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-right));
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
 }
 .navbar button {
   flex: 1;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 2px;
-  padding: 8px 0 6px;
+  justify-content: center;
+  gap: 5px;
+  height: 34px;
+  padding: 0 6px;
   border: 0;
-  border-radius: 999px;
+  border-radius: 8px;
   background: transparent;
-  color: rgb(255 255 255 / 82%);
-  font-size: 11px;
+  color: var(--sub);
+  font-size: 13px;
   font-weight: 500;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.navbar button .icon {
+  width: 17px;
+  height: 17px;
 }
 .navbar button[aria-current='page'] {
-  background: var(--nav-on);
-  color: #fff;
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+@media (max-width: 639.98px) and (orientation: portrait) {
+  :root:is([data-client='line'], [data-client='app']) .app {
+    padding-bottom: calc(104px + env(safe-area-inset-bottom));
+  }
+  :root:is([data-client='line'], [data-client='app']) .navbar {
+    inset-inline: auto;
+    left: 50%;
+    bottom: calc(14px + env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    gap: 2px;
+    width: min(calc(100% - 32px), 420px);
+    padding: 5px;
+    border-top: 0;
+    border-radius: 999px;
+    background: var(--nav);
+    backdrop-filter: blur(18px) saturate(1.4);
+    -webkit-backdrop-filter: blur(18px) saturate(1.4);
+    box-shadow: 0 8px 28px rgb(0 0 0 / 18%);
+  }
+  :root:is([data-client='line'], [data-client='app']) .navbar button {
+    flex-direction: column;
+    gap: 2px;
+    height: auto;
+    padding: 8px 0 6px;
+    border-radius: 999px;
+    color: rgb(255 255 255 / 82%);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+  }
+  :root:is([data-client='line'], [data-client='app']) .navbar button .icon {
+    width: 22px;
+    height: 22px;
+  }
+  :root:is([data-client='line'], [data-client='app']) .navbar button[aria-current='page'] {
+    background: var(--nav-on);
+    color: #fff;
+    font-weight: 500;
+  }
+  :root:is([data-client='line'], [data-client='app']) .toast {
+    bottom: calc(96px + env(safe-area-inset-bottom));
+  }
 }
 
 /* ---------- 左にスワイプして削除する行（募集） ---------- */
 .swipe {
   position: relative;
-  margin-bottom: 10px;
-  border-radius: 14px;
+  height: 100%;
+  margin-bottom: 9px;
+  border-radius: 12px;
   overflow: hidden;
 }
 .swipe-body {
   position: relative;
   z-index: 1;
+  height: 100%;
   /* 縦のスクロールはブラウザに任せ、横の動きだけ受け取る */
   touch-action: pan-y;
   /* 中止の練習（半透明）の下から赤が透けないように */
@@ -255,14 +375,14 @@ a {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  width: 88px;
+  gap: 3px;
+  width: 82px;
   border: 0;
-  border-radius: 0 14px 14px 0;
+  border-radius: 0 12px 12px 0;
   background: var(--danger);
   color: #fff;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
 }
 /* 閉じているときは、チケットの角から赤がのぞかないよう隠す */
 .swipe:not(.open):not(.dragging) .swipe-delete {
@@ -273,30 +393,77 @@ a {
 }
 
 /* ---------- チケット（練習） ---------- */
+.ticket-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 9px;
+  container-type: inline-size;
+}
+.ticket-grid > .ticket,
+.ticket-grid > .swipe {
+  margin-bottom: 0;
+}
 .ticket {
+  --stub-w: 58px;
   position: relative;
   display: grid;
-  grid-template-columns: 84px 1fr;
-  margin-bottom: 10px;
-  border-radius: 14px;
+  grid-template-columns: var(--stub-w) 1fr;
+  grid-template-rows: 1fr auto;
+  height: 100%;
+  margin-bottom: 9px;
+  border-radius: 12px;
   background: var(--paper);
   /* 半券と本体のあいだの切り込み */
-  -webkit-mask: radial-gradient(circle 9px at 84px 0, transparent 8.5px, #000 9px) top / 100% 51% no-repeat,
-    radial-gradient(circle 9px at 84px 100%, transparent 8.5px, #000 9px) bottom / 100% 51% no-repeat;
-  mask: radial-gradient(circle 9px at 84px 0, transparent 8.5px, #000 9px) top / 100% 51% no-repeat,
-    radial-gradient(circle 9px at 84px 100%, transparent 8.5px, #000 9px) bottom / 100% 51% no-repeat;
+  -webkit-mask: radial-gradient(circle 7px at var(--stub-w) 0, transparent 6.5px, #000 7px) top / 100% 51% no-repeat,
+    radial-gradient(circle 7px at var(--stub-w) 100%, transparent 6.5px, #000 7px) bottom / 100% 51% no-repeat;
+  mask: radial-gradient(circle 7px at var(--stub-w) 0, transparent 6.5px, #000 7px) top / 100% 51% no-repeat,
+    radial-gradient(circle 7px at var(--stub-w) 100%, transparent 6.5px, #000 7px) bottom / 100% 51% no-repeat;
+}
+@container (inline-size < 310px) {
+  .ticket {
+    --stub-w: 52px;
+  }
+  .ticket-main {
+    padding: 8px 10px 7px 10px;
+  }
+  .stub .d {
+    font-size: 18px;
+  }
+  .time {
+    font-size: 13px;
+  }
+  .ticket-deadline {
+    font-size: 10px;
+  }
+}
+@media (min-width: 640px) {
+  @container (inline-size < 620px) {
+    .ticket {
+      --stub-w: 52px;
+    }
+    .ticket-main {
+      padding: 8px 10px 7px 10px;
+    }
+    .stub .d {
+      font-size: 18px;
+    }
+    .time {
+      font-size: 13px;
+    }
+  }
 }
 .ticket > .stub {
   grid-row: span 2;
   cursor: pointer;
-  border-radius: 14px 0 0 14px;
+  border-radius: 12px 0 0 12px;
 }
 .ticket-main {
   all: unset;
   box-sizing: border-box;
-  display: block;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
-  padding: 10px 14px 8px 16px;
+  padding: 9px 14px 8px 14px;
   cursor: pointer;
 }
 .ticket-main:focus-visible,
@@ -318,33 +485,63 @@ a {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 10px 0;
+  padding: 8px 0;
   border-right: 1.5px dashed var(--faint);
   font-family: var(--mono);
   line-height: 1;
   transition: background 0.25s, color 0.25s;
 }
 .stub .m {
-  font-size: 12px;
+  font-size: 10px;
+  font-weight: 400;
   color: var(--sub);
 }
 .stub .d {
-  margin: 4px 0 5px;
-  font-size: 26px;
-  font-weight: 600;
+  margin: 2px 0 3px;
+  font-size: 20px;
+  font-weight: 500;
   letter-spacing: -0.02em;
 }
 .stub .w {
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.12em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
   color: var(--sub);
+  background: transparent;
+}
+/* 土曜日：半券全体が淡いブルーティント、曜日は文字色のみ */
+.stub.sat {
+  background: color-mix(in srgb, var(--sat) 6%, var(--paper));
+  border-right-color: color-mix(in srgb, var(--sat) 22%, transparent);
+}
+.stub.sat .m {
+  color: color-mix(in srgb, var(--sat) 70%, var(--sub));
+}
+.stub.sat .d {
+  color: var(--sat);
 }
 .stub .w.sat {
   color: var(--sat);
+  background: transparent;
+}
+/* 日曜・祝日：半券全体が淡いレッドティント、曜日は文字色のみ */
+.stub.sun {
+  background: color-mix(in srgb, var(--sun) 6%, var(--paper));
+  border-right-color: color-mix(in srgb, var(--sun) 22%, transparent);
+}
+.stub.sun .m {
+  color: color-mix(in srgb, var(--sun) 70%, var(--sub));
+}
+.stub.sun .d {
+  color: var(--sun);
 }
 .stub .w.sun {
   color: var(--sun);
+  background: transparent;
 }
 .ticket[data-answer='行く'] .stub {
   background: var(--ink);
@@ -352,12 +549,31 @@ a {
   border-right-color: transparent;
   animation: stamp 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.3);
 }
-.ticket[data-answer='行く'] .stub .m,
-.ticket[data-answer='行く'] .stub .w {
+.ticket[data-answer='行く'] .stub .m {
   color: color-mix(in srgb, var(--bg) 70%, transparent);
 }
-.ticket[data-answer='保留'] .stub {
-  background: repeating-linear-gradient(-45deg, transparent 0 5px, color-mix(in srgb, var(--ink) 9%, transparent) 5px 6px);
+.ticket[data-answer='行く'] .stub .w:not(.sat):not(.sun) {
+  color: color-mix(in srgb, var(--bg) 70%, transparent);
+}
+.ticket[data-answer='行く'] .stub.sat .m,
+.ticket[data-answer='行く'] .stub.sat .d {
+  color: var(--ink-sat);
+}
+.ticket[data-answer='行く'] .stub .w.sat {
+  color: var(--ink-sat);
+  background: transparent;
+}
+.ticket[data-answer='行く'] .stub.sun .m,
+.ticket[data-answer='行く'] .stub.sun .d {
+  color: var(--ink-sun);
+}
+.ticket[data-answer='行く'] .stub .w.sun {
+  color: var(--ink-sun);
+  background: transparent;
+}
+.ticket[data-answer='保留'] > .stub {
+  background: var(--maybe-stub-bg);
+  box-shadow: inset 3px 0 0 var(--maybe-accent);
 }
 @keyframes stamp {
   from {
@@ -367,7 +583,7 @@ a {
 .ticket[data-answer='行かない'],
 .ticket[data-status='中止'],
 .ticket[data-status='終了'] {
-  opacity: 0.5;
+  opacity: 0.45;
 }
 .ticket[data-status='中止'] .time {
   text-decoration: line-through;
@@ -375,39 +591,120 @@ a {
 .time {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
   font-family: var(--mono);
-  font-size: 17px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.25;
   letter-spacing: -0.01em;
+}
+.time .booker {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 105px;
+  min-width: 0;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--sub);
+}
+.time .booker > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.time .booker .icon {
+  flex-shrink: 0;
+  opacity: 0.65;
 }
 .place {
   margin-top: 2px;
   overflow: hidden;
-  font-size: 14px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.35;
   color: var(--sub);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+.ticket-deadline {
+  display: inline-flex;
+  align-items: center;
+  gap: 3.5px;
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--sub);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.ticket-deadline .icon {
+  flex-shrink: 0;
+  color: currentColor;
+  opacity: 0.85;
+}
+.ticket-deadline.is-soon {
+  color: var(--maybe-accent);
+  font-weight: 600;
+  background: color-mix(in srgb, var(--maybe-accent) 12%, transparent);
+  padding: 1px 5px 1px 4px;
+  border-radius: 4px;
+  width: fit-content;
+}
+.ticket-deadline.is-soon .icon {
+  opacity: 1;
+}
+.ticket-deadline.is-past {
+  color: var(--faint);
+}
+.ticket-deadline.is-past .icon {
+  opacity: 0.55;
+}
+.deadline-text.is-soon {
+  color: var(--maybe-accent);
+}
+.deadline-text.is-past {
+  color: var(--faint);
+}
 .ticket-foot {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-top: 6px;
-  min-height: 22px;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 5px;
+  min-height: 18px;
 }
 .count {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   font-family: var(--mono);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 400;
 }
 .count small {
   color: var(--sub);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 400;
+}
+.badge-full {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 3px;
+  padding: 0 4px;
+  height: 14px;
+  border-radius: 3px;
+  font-family: var(--sans);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: var(--badge-full-c);
+  background: var(--badge-full-bg);
 }
 .fee {
   display: inline-flex;
@@ -416,22 +713,21 @@ a {
   margin-left: auto;
   white-space: nowrap;
   font-family: var(--mono);
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 400;
 }
 .stamp {
   display: inline-block;
-  padding: 1px 6px;
-  border: 1.5px solid currentColor;
+  padding: 0 5px;
+  border: 1px solid currentColor;
   border-radius: 4px;
   font-family: var(--sans);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  line-height: 1.4;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  line-height: 1.35;
   transform: rotate(-4deg);
 }
-.stamp.full,
 .stamp.cancel {
   color: var(--danger);
 }
@@ -447,13 +743,13 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: var(--ink);
   color: var(--bg);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 400;
   line-height: 1;
 }
 .avatar.guest {
@@ -465,19 +761,20 @@ a {
   background: var(--line);
   color: var(--ink);
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 9px;
 }
 .stack {
   display: inline-flex;
 }
 .stack .avatar {
-  width: 22px;
-  height: 22px;
-  font-size: 11px;
-  box-shadow: 0 0 0 2px var(--paper);
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+  font-weight: 400;
+  box-shadow: 0 0 0 1.5px var(--paper);
 }
 .stack .avatar + .avatar {
-  margin-left: -7px;
+  margin-left: -6px;
 }
 
 /* ---------- 出欠 ○ △ ✕（記号だけ） ---------- */
@@ -490,7 +787,7 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 38px;
+  min-height: 30px;
   border: 0;
   background: transparent;
   color: var(--faint);
@@ -502,11 +799,11 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 21px;
+  height: 21px;
   border-radius: 50%;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 400;
   line-height: 1;
   transition: background 0.2s, color 0.2s, transform 0.2s;
 }
@@ -514,40 +811,77 @@ a {
   color: var(--ink);
 }
 .rsvp button[aria-checked='true'] .mark {
+  transform: scale(1.06);
+}
+.rsvp button.yes[aria-checked='true'] .mark {
   background: var(--ink);
   color: var(--bg);
-  transform: scale(1.06);
+}
+.rsvp button.maybe[aria-checked='true'] {
+  color: var(--maybe-accent);
+}
+.rsvp button.maybe[aria-checked='true'] .mark {
+  background: #f59e0b;
+  color: var(--maybe-btn-color);
+  font-weight: 600;
+}
+.rsvp button.no[aria-checked='true'] {
+  color: var(--sub);
+}
+.rsvp button.no[aria-checked='true'] .mark {
+  background: var(--sub);
+  color: var(--bg);
+  font-weight: 600;
 }
 .rsvp button:disabled {
   opacity: 0.35;
   cursor: default;
 }
-/* チケットの外（詳細・参加リンク）では、大きな丸いボタン3つにする */
+/* チケットの外（詳細・参加リンク）では、丸いボタン3つにする（スリム化） */
 .rsvp.solo {
   justify-content: center;
-  gap: 20px;
-  padding: 6px 0 4px;
+  gap: 12px;
+  padding: 2px 0 0;
   border: 0;
 }
 .rsvp.solo button {
+  position: relative;
   flex: none;
-  width: 52px;
-  height: 52px;
-  border: 1.5px solid var(--line);
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
   border-radius: 50%;
 }
+.rsvp.solo button::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  left: -4px;
+  right: -4px;
+}
 .rsvp.solo button + button {
-  border-left: 1.5px solid var(--line);
+  border-left: 1px solid var(--line);
 }
 .rsvp.solo .mark {
   width: auto;
   height: auto;
-  font-size: 19px;
+  font-size: 14px;
   background: transparent;
 }
 .rsvp.solo button[aria-checked='true'] {
   border-color: var(--ink);
   background: var(--ink);
+  color: var(--bg);
+}
+.rsvp.solo button.maybe[aria-checked='true'] {
+  border-color: var(--maybe-accent);
+  background: #f59e0b;
+  color: var(--maybe-btn-color);
+}
+.rsvp.solo button.no[aria-checked='true'] {
+  border-color: var(--sub);
+  background: var(--sub);
   color: var(--bg);
 }
 .rsvp.solo button[aria-checked='true'] .mark {
@@ -558,32 +892,52 @@ a {
 /* ---------- パス（練習の詳細） ---------- */
 .pass {
   position: relative;
-  margin: 4px 0 14px;
-  padding: 18px 18px 14px;
-  border-radius: 16px;
+  margin: 2px 0 10px;
+  padding: 13px 15px 11px;
+  border-radius: 14px;
   background: var(--paper);
-  box-shadow: 0 1px 0 var(--line), 0 10px 30px rgb(0 0 0 / 6%);
+  box-shadow: 0 1px 0 var(--line), 0 8px 24px rgb(0 0 0 / 5%);
 }
 .pass-head {
   display: flex;
   align-items: baseline;
-  gap: 10px;
-  padding-bottom: 14px;
+  gap: 8px;
+  padding-bottom: 10px;
   border-bottom: 1.5px dashed var(--faint);
 }
 .pass-date {
   font-family: var(--mono);
-  font-size: 30px;
-  font-weight: 600;
+  font-size: 22px;
+  font-weight: 500;
   letter-spacing: -0.02em;
   line-height: 1;
 }
+.pass-date.sat {
+  color: var(--sat);
+}
+.pass-date.sun {
+  color: var(--sun);
+}
 .pass-date .w {
-  margin-left: 8px;
+  margin-left: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--sans);
   font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.12em;
+  font-weight: 600;
+  line-height: 1;
+  vertical-align: 1px;
   color: var(--sub);
+  background: transparent;
+}
+.pass-date .w.sat {
+  color: var(--sat);
+  background: transparent;
+}
+.pass-date .w.sun {
+  color: var(--sun);
+  background: transparent;
 }
 .pass-head .stamp {
   margin-left: auto;
@@ -591,8 +945,8 @@ a {
 .pass-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px 16px;
-  padding: 14px 0;
+  gap: 10px 14px;
+  padding: 10px 0 2px;
 }
 .pass-grid .wide {
   grid-column: 1 / -1;
@@ -602,41 +956,43 @@ a {
 }
 .fld > span {
   display: block;
-  margin-bottom: 3px;
+  margin-bottom: 2px;
   font-family: var(--sans);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 500;
   letter-spacing: 0.04em;
   color: var(--sub);
 }
 .fld > b {
   display: block;
   font-family: var(--mono);
-  font-size: 17px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 400;
   overflow-wrap: anywhere;
 }
 .fld > b.jp {
   font-family: var(--sans);
-  font-size: 16px;
+  font-size: 14px;
 }
 .fld > small {
   display: block;
-  margin-top: 2px;
-  font-size: 12px;
+  margin-top: 1px;
+  font-size: 11px;
   color: var(--sub);
 }
 /* ---------- 区切りと見出し ---------- */
 .sec-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 26px 0 10px;
-  font-size: 13px;
-  font-weight: 600;
+  gap: 6px;
+  margin: 18px 0 10px;
+  scroll-margin-top: calc(52px + env(safe-area-inset-top));
+  font-size: 12px;
+  font-weight: 500;
 }
 .sec-head .n {
-  font-family: var(--mono);
+  font-family: var(--sans);
+  font-variant-numeric: tabular-nums;
   color: var(--sub);
   font-weight: 500;
 }
@@ -644,34 +1000,97 @@ a {
   flex: 1;
 }
 .section-title {
-  margin: 26px 0 10px;
+  margin: 18px 0 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+/* 参加メンバー一覧（詳細画面） */
+.attendees-section {
+  display: flex;
+  flex-direction: column;
+}
+.attendee-group {
+  margin-bottom: 18px;
+}
+.attendee-group:last-child {
+  margin-bottom: 0;
+}
+.attendee-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+.attendee-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+.attendee-label {
   font-size: 13px;
   font-weight: 600;
   color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.attendee-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  color: var(--sub);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--sans);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.status-going .attendee-mark {
+  color: var(--ink);
+}
+.status-maybe .attendee-mark {
+  color: var(--maybe-accent);
+}
+.status-notGoing .attendee-mark {
+  color: var(--sub);
+}
+.status-notGoing .attendee-label {
+  color: var(--sub);
+  font-weight: 500;
 }
 
 /* 出欠の名前 */
 .people {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 8px 6px;
 }
 .person {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 4px 3px 3px;
+  gap: 5px;
+  padding: 2px 3px 2px 2px;
   border-radius: 999px;
   background: var(--paper);
-  font-size: 14px;
+  font-size: 12px;
 }
 .person > span:not(.avatar) {
   padding-right: 6px;
 }
 .person .x {
   display: inline-flex;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   align-items: center;
   justify-content: center;
   margin-left: -4px;
@@ -704,8 +1123,8 @@ a {
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
   border: 0;
   border-radius: 50%;
   background: var(--ink);
@@ -719,11 +1138,11 @@ a {
 
 /* 一覧の行（設定画面など） */
 .menu {
-  margin: 0 0 12px;
+  margin: 0 0 10px;
   padding: 0;
   list-style: none;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 12px;
   overflow: hidden;
 }
 .menu > li + li {
@@ -734,12 +1153,12 @@ a {
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
-  min-height: 52px;
-  padding: 12px 16px;
+  min-height: 44px;
+  padding: 9px 14px;
   cursor: pointer;
-  font-size: 15px;
+  font-size: 14px;
 }
 .menu-row .grow {
   flex: 1;
@@ -748,7 +1167,7 @@ a {
 .menu-row .val {
   color: var(--sub);
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 12px;
 }
 .menu-row:focus-visible {
   outline: 2px solid var(--ink);
@@ -772,8 +1191,8 @@ details[open] > summary.menu-row .icon:last-child {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 6px 6px 14px;
-  border-radius: 12px;
+  padding: 5px 5px 5px 12px;
+  border-radius: 10px;
   background: var(--paper);
 }
 .copy-row code {
@@ -781,32 +1200,32 @@ details[open] > summary.menu-row .icon:last-child {
   min-width: 0;
   overflow: hidden;
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 12px;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 .copy-row .icon-btn {
   background: var(--bg);
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 /* 切り替えできる丸いチップ（グループ選択など） */
 .toggles {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 .toggle {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-height: 38px;
-  padding: 6px 14px;
+  gap: 5px;
+  min-height: 34px;
+  padding: 4px 12px;
   border: 1.5px solid var(--line);
   border-radius: 999px;
   background: transparent;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 400;
 }
 .toggle[aria-pressed='true'] {
   border-color: var(--ink);
@@ -828,37 +1247,38 @@ details[open] > summary.menu-row .icon:last-child {
 .profile {
   display: flex;
   align-items: center;
-  gap: 18px;
-  margin: 12px 0 24px;
+  gap: 14px;
+  margin: 8px 0 16px;
+  padding-top: env(safe-area-inset-top);
 }
 .profile .avatar {
-  width: 72px;
-  height: 72px;
-  font-size: 30px;
-  font-weight: 500;
+  width: 54px;
+  height: 54px;
+  font-size: 22px;
+  font-weight: 400;
   background: radial-gradient(circle at 30% 25%, #ffffff, #d9f5e6 60%, #c7ece0);
   color: #1a1a1a;
 }
 .profile .name {
-  font-size: 26px;
+  font-size: 20px;
   font-weight: 500;
   line-height: 1.2;
 }
 .pill {
   display: inline-block;
-  margin-top: 6px;
-  padding: 2px 10px;
-  border: 1.5px solid var(--ink);
+  margin-top: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--ink);
   border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 500;
 }
 
 /* ---------- 汎用 ---------- */
 .card {
-  margin-bottom: 12px;
-  padding: 16px;
-  border-radius: 14px;
+  margin-bottom: 10px;
+  padding: 13px 14px;
+  border-radius: 12px;
   background: var(--paper);
 }
 .btn {
@@ -866,14 +1286,14 @@ details[open] > summary.menu-row .icon:last-child {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 44px;
-  padding: 10px 18px;
+  min-height: 38px;
+  padding: 7px 16px;
   border: 1.5px solid var(--ink);
   border-radius: 999px;
   background: transparent;
   color: var(--ink);
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 500;
   text-decoration: none;
 }
 .btn.primary {
@@ -888,9 +1308,9 @@ details[open] > summary.menu-row .icon:last-child {
   border-color: var(--line);
 }
 .btn.small {
-  min-height: 34px;
-  padding: 5px 12px;
-  font-size: 13px;
+  min-height: 30px;
+  padding: 4px 10px;
+  font-size: 12px;
 }
 .btn.block {
   width: 100%;
@@ -912,16 +1332,16 @@ details[open] > summary.menu-row .icon:last-child {
 }
 .muted {
   color: var(--sub);
-  font-size: 13px;
+  font-size: 12px;
 }
 .empty {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
-  padding: 72px 16px;
+  gap: 12px;
+  padding: 56px 16px;
   color: var(--sub);
-  font-size: 14px;
+  font-size: 13px;
   letter-spacing: 0.04em;
   text-align: center;
 }
@@ -934,27 +1354,27 @@ details[open] > summary.menu-row .icon:last-child {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 0;
+  padding: 6px 0;
   border-bottom: 1px solid var(--line);
 }
 .list li:last-child {
   border-bottom: 0;
 }
 .room-info {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--sub);
 }
 .memo {
   white-space: pre-wrap;
-  font-size: 15px;
+  font-size: 14px;
 }
 .badge {
   display: inline-block;
-  padding: 1px 8px;
+  padding: 1px 7px;
   border: 1px solid currentColor;
   border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 500;
 }
 .badge.todo {
   color: var(--sub);
@@ -970,15 +1390,15 @@ details[open] > summary.menu-row .icon:last-child {
 label.field,
 div.field {
   display: block;
-  margin-bottom: 12px;
+  margin-bottom: 9px;
 }
 label.field > span,
 div.field > span {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 5px;
-  font-size: 12px;
+  margin-bottom: 3px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--sub);
 }
@@ -992,10 +1412,10 @@ textarea {
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  min-height: 46px;
-  padding: 10px 12px;
+  min-height: 40px;
+  padding: 7px 10px;
   border: 1.5px solid var(--line);
-  border-radius: 12px;
+  border-radius: 10px;
   background-color: var(--field);
   /* iPhone では16px未満だと入力時に画面が拡大されてレイアウトが崩れる */
   font-size: 16px;
@@ -1098,23 +1518,23 @@ details > summary {
 .sources {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 .source {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 56px;
-  padding: 0 12px;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 10px;
   border: 0;
-  border-radius: 16px;
+  border-radius: 12px;
   background: var(--paper);
   color: var(--ink);
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
 }
 .source.primary {
@@ -1133,19 +1553,28 @@ details > summary {
 }
 .draft {
   position: relative;
-  margin-bottom: 12px;
-  padding: 14px 16px 6px;
-  border-radius: 16px;
+  margin-bottom: 10px;
+  padding: 12px 14px 4px;
+  border-radius: 14px;
   background: var(--paper);
+  container-type: inline-size;
+}
+@container (inline-size > 480px) {
+  .draft-pair {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+  }
 }
 .draft-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: -2px -6px 12px 0;
+  margin: -2px -6px 8px 0;
   font-family: var(--mono);
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 500;
 }
 .draft[data-kind='duplicate'] {
   opacity: 0.5;
@@ -1181,10 +1610,10 @@ details > summary {
 /* ---------- 通知 ---------- */
 .toast {
   position: fixed;
-  left: 50%;
-  bottom: calc(96px + env(safe-area-inset-bottom));
+  left: calc(50% + var(--nav-w) / 2);
+  bottom: calc(56px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
-  max-width: calc(100% - 32px);
+  max-width: calc(100% - var(--nav-w) - 32px);
   padding: 11px 18px;
   border-radius: 999px;
   background: var(--ink);
@@ -1257,23 +1686,54 @@ details > summary {
 }
 .fld .of {
   color: var(--sub);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 11px;
+  font-weight: 400;
 }
 .menu-row.name-row {
   border: 1.5px solid var(--ink);
   border-radius: 12px;
-  font-size: 18px;
+  font-size: 15px;
 }
-.ticket-foot .toggles {
-  gap: 4px;
+.ticket-foot .recruit-groups {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.ticket-foot .recruit-groups .icon {
+  flex: none;
+  color: var(--sub);
+  opacity: 0.8;
+}
+.ticket-foot .recruit-groups.has-groups .icon {
+  color: var(--ink);
+  opacity: 0.9;
+}
+.ticket-foot .recruit-groups .tag {
+  padding: 0 6px;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-width: 140px;
+}
+.ticket-foot .recruit-groups .no-groups {
+  font-size: 11px;
+  color: var(--sub);
+  letter-spacing: 0.02em;
+  font-weight: 400;
+  white-space: nowrap;
 }
 .menu.edit {
-  margin-top: 28px;
+  margin-top: 20px;
 }
 .sec-mark {
-  font-size: 17px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 500;
   line-height: 1;
 }
 
@@ -1282,8 +1742,8 @@ details > summary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
   margin-left: 4px;
   border: 0;
   border-radius: 50%;
@@ -1305,16 +1765,16 @@ details > summary {
   justify-content: center;
   gap: 6px;
   width: 100%;
-  min-height: 48px;
+  min-height: 40px;
   border: 1.5px dashed var(--faint);
-  border-radius: 14px;
+  border-radius: 12px;
   background: transparent;
   color: var(--sub);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
 }
 .btn.submit {
-  margin-top: 24px;
+  margin-top: 16px;
 }
 
 .feedback-form textarea {
@@ -1353,11 +1813,409 @@ details > summary {
 /* 管理者が別のアカウントとして見ているときの帯 */
 .acting-banner {
   display: block;
-  width: 100%;
+  width: calc(100% + var(--pad-x) * 2);
+  margin: 0 calc(var(--pad-x) * -1) 8px;
   padding: 8px 16px;
   border: 0;
   background: var(--ink);
   color: var(--bg);
   font-size: 13px;
   text-align: center;
+}
+
+/* ---------- 横画面・広い画面：左サイドバー ---------- */
+@media (min-width: 640px), (orientation: landscape) {
+  :root:has(.navbar) {
+    --nav-w: calc(72px + env(safe-area-inset-left));
+  }
+  body:has(.navbar) {
+    padding-left: var(--nav-w);
+    padding-right: env(safe-area-inset-right);
+  }
+  .app:has(.navbar) {
+    padding-bottom: calc(32px + env(safe-area-inset-bottom));
+  }
+  .navbar {
+    inset: 0 auto 0 0;
+    width: var(--nav-w);
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 6px;
+    padding: max(12px, env(safe-area-inset-top)) 8px max(12px, env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left));
+    border-top: 0;
+    border-right: 1px solid var(--line);
+    overflow-y: auto;
+  }
+  .navbar button {
+    flex: none;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    height: auto;
+    padding: 9px 4px 7px;
+    border-radius: 12px;
+    font-size: 11px;
+  }
+  .navbar button .icon {
+    width: 22px;
+    height: 22px;
+  }
+  .toast {
+    bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ---------- 広い画面（インナー画面・タブレット・PC）：2カラム ---------- */
+@media (min-width: 640px) {
+  :root {
+    --pad-x: 20px;
+  }
+  :root:has(.navbar) {
+    --nav-w: calc(76px + env(safe-area-inset-left));
+  }
+  .app:has(.navbar) {
+    max-width: 960px;
+  }
+  .ticket-grid,
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 12px;
+  }
+  .card-grid > .card {
+    margin-bottom: 0;
+  }
+  .draft-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    align-items: start;
+    margin-bottom: 12px;
+  }
+  .draft-grid > .draft {
+    margin-bottom: 0;
+  }
+  .draft-grid > .draft:only-child {
+    grid-column: 1 / -1;
+  }
+  .detail-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      'primary side'
+      'extra   side';
+    column-gap: 24px;
+    align-items: start;
+  }
+  .detail-primary {
+    grid-area: primary;
+  }
+  .detail-side {
+    grid-area: side;
+  }
+  .detail-extra {
+    grid-area: extra;
+  }
+  .detail-side > .sec-head:first-child,
+  .detail-side > section:first-child > .sec-head:first-child {
+    margin-top: 4px;
+  }
+}
+
+@media (min-width: 960px) {
+  :root {
+    --pad-x: 28px;
+  }
+  :root:has(.navbar) {
+    --nav-w: calc(168px + env(safe-area-inset-left));
+  }
+  .app:has(.navbar) {
+    max-width: 1080px;
+  }
+  .navbar {
+    padding-inline: calc(12px + env(safe-area-inset-left)) 12px;
+  }
+  .navbar button {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 11px 14px;
+    font-size: 14px;
+  }
+  .ticket-grid,
+  .card-grid {
+    gap: 16px;
+  }
+  .detail-layout {
+    column-gap: 32px;
+  }
+}
+
+/* ---------- LINEの外で使うときの部品 ---------- */
+/* 行くと答えた予約情報の、回答ボタンのすぐ下のカレンダーに追加 */
+.cal-inline {
+  max-width: 260px;
+  margin: 8px auto 0;
+  scroll-margin-top: calc(52px + env(safe-area-inset-top));
+}
+.cal-inline .grid2 {
+  gap: 6px;
+}
+.cal-inline .btn {
+  min-height: 28px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  border-width: 1px;
+}
+.copy-row .icon-btn + .icon-btn {
+  margin-left: -2px;
+}
+.add-home {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.add-home b {
+  font-weight: 500;
+}
+.add-home .muted .icon {
+  display: inline-block;
+  vertical-align: -2px;
+}
+.menu-row:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.signed-out strong {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+/* ---------- アカウントページ ---------- */
+.account-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 12px 0 20px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.account-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.account-avatar-img {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  border: 1.5px solid var(--line);
+}
+.account-avatar-fallback {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 24px;
+  font-weight: 500;
+  border: 1.5px solid var(--line);
+}
+.account-details {
+  flex: 1;
+  min-width: 0;
+}
+.account-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.account-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-edit-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 0;
+  background: var(--line);
+  color: var(--ink);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: opacity 0.15s ease;
+}
+.account-edit-trigger:active {
+  opacity: 0.7;
+}
+.account-edit-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.account-edit-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  font-size: 14px;
+  border-radius: 8px;
+  border: 1.5px solid var(--ink);
+  background: var(--bg);
+  color: var(--ink);
+}
+.account-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.account-icon-btn.check {
+  background: var(--ink);
+  color: var(--bg);
+}
+.account-icon-btn.cancel {
+  background: var(--line);
+  color: var(--sub);
+}
+.account-status-badge {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--brand-green);
+}
+.account-status-badge .check-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--brand-green);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+.account-status-badge .role-pill {
+  margin-left: 4px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--line);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 600;
+}
+.account-logout-section {
+  margin-top: 36px;
+  padding-bottom: 24px;
+}
+.account-logout-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: #ef4444;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.account-logout-btn:active {
+  background: var(--line);
+}
+
+/* ---------- 管理画面の整理スタイル ---------- */
+.admin-tab-pane {
+  margin-top: 14px;
+}
+.admin-groups-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.admin-group-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--ink);
+}
+.admin-member-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.check-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.check-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+.check-chip:has(input:checked) {
+  background: var(--paper);
+  border-color: var(--ink);
+  font-weight: 500;
+}
+.check-chip input {
+  margin: 0;
+  width: 14px;
+  height: 14px;
+  accent-color: var(--ink);
+}
+.fee-rule-card {
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  margin-bottom: 10px;
+}
+.studio-details summary {
+  cursor: pointer;
+  padding: 6px 0;
 }

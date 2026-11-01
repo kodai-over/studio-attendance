@@ -6,11 +6,13 @@ import {
   roomInfo,
   buildIcs,
   cancelWarningAt,
+  computeCancelDeadline,
   classifyReservations,
   confirmCard,
   defaultFee,
   DEFAULT_FEES,
   formatFeeValue,
+  isHoliday,
   isHolidayOrWeekend,
   jpHolidays,
   parseFeeValue,
@@ -28,7 +30,7 @@ import {
   practiceListMessage,
   recruitMessages,
   answerReport,
-  warningText,
+  warningCard,
   toJstDate,
   yen,
   type Practice,
@@ -139,6 +141,8 @@ describe('設定', () => {
     const h = jpHolidays(2026);
     for (const d of ['2026-01-12', '2026-03-20', '2026-05-06', '2026-07-20', '2026-09-21', '2026-09-22', '2026-09-23', '2026-10-12', '2026-11-23']) expect(h.has(d)).toBe(true);
     expect(h.has('2026-10-26')).toBe(false);
+    expect(isHoliday('2026-11-03')).toBe(true); // 文化の日（火）
+    expect(isHoliday('2026-11-04')).toBe(false);
     expect(isHolidayOrWeekend('2026-10-25')).toBe(true);
     expect(isHolidayOrWeekend('2026-10-26')).toBe(false);
   });
@@ -151,6 +155,28 @@ describe('設定', () => {
   it('キャンセル期限は前方一致', () => {
     expect(findCancelRule(settings.cancelRules, 'BUZZ横浜東口')?.daysBefore).toBe(1);
     expect(findCancelRule(settings.cancelRules, 'その他')).toBeNull();
+  });
+  it('キャンセル期限の計算', () => {
+    // 2026-11-02(月) の worcle(4日前 10:00 JST = 2026-10-29T01:00:00Z)
+    // 期限より25時間前 -> isPast: false, isSoon: false
+    const far = computeCancelDeadline('2026-11-02', 'studio worcle 横浜', settings.cancelRules, new Date('2026-10-27T23:59:00.000Z'));
+    expect(far).not.toBeNull();
+    expect(far?.formatted).toBe('10/29(木) 10:00');
+    expect(far?.isPast).toBe(false);
+    expect(far?.isSoon).toBe(false);
+
+    // 期限より20時間前（24時間以内） -> isPast: false, isSoon: true (強調対象)
+    const soon = computeCancelDeadline('2026-11-02', 'studio worcle 横浜', settings.cancelRules, new Date('2026-10-28T05:00:00.000Z'));
+    expect(soon?.isPast).toBe(false);
+    expect(soon?.isSoon).toBe(true);
+
+    // 期限後 -> isPast: true, isSoon: false (期限切れ)
+    const past = computeCancelDeadline('2026-11-02', 'studio worcle 横浜', settings.cancelRules, new Date('2026-10-29T01:01:00.000Z'));
+    expect(past?.isPast).toBe(true);
+    expect(past?.isSoon).toBe(false);
+
+    // ルール未設定のスタジオ
+    expect(computeCancelDeadline('2026-11-02', '不明なスタジオ', settings.cancelRules)).toBeNull();
   });
   it('警告時刻', () => {
     expect(cancelWarningAt('2026-10-21', { studio: 'worcle', daysBefore: 4, time: '10:00' }).toISOString()).toBe(
@@ -365,10 +391,23 @@ describe('Flex Message', () => {
     expect(answerReport([{ practice: at('2026-11-01', '13:00'), answer: null }])).toBeNull();
   });
 
-  it('キャンセル期限前のお知らせは「募集」の練習の画面を開く', () => {
-    const text = warningText(practice({ id: 'p1' }), 1, 3, appUrl);
-    expect(text).toContain(`${appUrl}?manage=p1`);
-    expect(text).not.toContain('?p=');
+  it('キャンセル期限前のお知らせは「募集」の練習の画面を開き、グループごとにもう一度募集できる', () => {
+    const groups = [{ id: 'C1', name: 'チームA' }, { id: 'C2', name: 'あ'.repeat(30) }];
+    const json = JSON.stringify(warningCard({ practice: practice({ id: 'p1' }), going: 1, min: 3, groups, appUrl }));
+    expect(json).toContain(`${appUrl}?manage=p1`);
+    expect(json).not.toContain('?p=');
+    expect(json).toContain('もう一度募集するか、キャンセルするか');
+    expect(json).toContain('"data":"a=remind&p=p1&g=C1"');
+    // ボタンの文字は40文字まで
+    for (const m of json.matchAll(/"label":"([^"]*)"/g)) expect([...m[1]].length).toBeLessThanOrEqual(40);
+  });
+
+  it('キャンセル期限前のお知らせ: ボタンに入りきらない・送れるグループがないときは、もう一度募集を出さない', () => {
+    const long = practice({ id: 'スタジオペンタ渋谷センター街店ダンス練習スタジオ-20261021-1900-Aスタジオ大' });
+    const json = JSON.stringify(warningCard({ practice: long, going: 1, min: 3, groups: [{ id: 'C'.padEnd(33, '0'), name: 'チームA' }], appUrl }));
+    expect(json).not.toContain('a=remind');
+    expect(json).toContain('予約情報を開く');
+    expect(json).not.toContain('もう一度募集するか');
   });
 
   it('確認カード: 「登録して募集」「登録のみ」「やめる」', () => {

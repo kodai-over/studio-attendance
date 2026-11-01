@@ -128,8 +128,16 @@ export function jpHolidays(y: number): Set<string> {
   return set;
 }
 
+/** 日本の祝日（振替休日・国民の休日を含む）なら true */
+export function isHoliday(date: string): boolean {
+  if (!date || date.length < 10) return false;
+  const y = Number(date.slice(0, 4));
+  if (isNaN(y)) return false;
+  return jpHolidays(y).has(date);
+}
+
 /** 土日・祝日なら true */
 export function isHolidayOrWeekend(date: string): boolean {
   const w = weekday(date);
-  return w === '土' || w === '日' || jpHolidays(Number(date.slice(0, 4))).has(date);
+  return w === '土' || w === '日' || isHoliday(date);
 }

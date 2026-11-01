@@ -1,4 +1,4 @@
-import { addDays, isHolidayOrWeekend, isValidDate, jstDateTime, minutes, normalizeTime } from './dates';
+import { addDays, isHolidayOrWeekend, isValidDate, jstDateTime, labelDate, minutes, normalizeTime } from './dates';
 import type {
   Attendance,
   CancelRule,
@@ -99,6 +99,45 @@ export function findCancelRule(rules: CancelRule[], studio: string): CancelRule 
 /** キャンセル期限前警告を出す時刻 */
 export function cancelWarningAt(date: string, rule: CancelRule): Date {
   return jstDateTime(addDays(date, -rule.daysBefore), rule.time);
+}
+
+export interface CancelDeadline {
+  /** 'YYYY-MM-DD' */
+  date: string;
+  /** 'HH:mm' */
+  time: string;
+  /** 'M/D(曜) HH:mm' (例: '10/29(木) 10:00') */
+  formatted: string;
+  /** 現在時刻を過ぎているか（期限切れ） */
+  isPast: boolean;
+  /** 期限まで24時間以内か（強調対象） */
+  isSoon: boolean;
+}
+
+/**
+ * 練習日・スタジオ名・キャンセルルールからキャンセル期限を計算する。
+ * ルールが見つからない場合は null を返す。
+ */
+export function computeCancelDeadline(
+  practiceDate: string,
+  studio: string,
+  rules: CancelRule[],
+  now: Date = new Date(),
+): CancelDeadline | null {
+  const rule = findCancelRule(rules, studio);
+  if (!rule) return null;
+  const deadlineDate = addDays(practiceDate, -rule.daysBefore);
+  const deadlineDateTime = cancelWarningAt(practiceDate, rule);
+  const diffMs = deadlineDateTime.getTime() - now.getTime();
+  const isPast = diffMs <= 0;
+  const isSoon = !isPast && diffMs <= 24 * 60 * 60 * 1000;
+  return {
+    date: deadlineDate,
+    time: rule.time,
+    formatted: `${labelDate(deadlineDate)} ${rule.time}`,
+    isPast,
+    isSoon,
+  };
 }
 
 export function isActive(p: Pick<Practice, 'status'>): boolean {
