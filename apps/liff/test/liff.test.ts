@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { checkLiffRedirect, decideLiffInitAction } from '../src/liff';
+import { resolveInitialHash } from '../src/route';
 
 describe('LIFF 初期化 & 画面遷移ロジック', () => {
   describe('checkLiffRedirect', () => {
@@ -111,6 +112,47 @@ describe('LIFF 初期化 & 画面遷移ロジック', () => {
         isLoggedOut: false,
       });
       expect(action).toEqual({ action: 'ready' });
+    });
+  });
+
+  describe('resolveInitialHash (ルーティング振り分け)', () => {
+    it('リッチメニュー「予約登録」の ?view=register で /register に振り分ける', () => {
+      const hash = resolveInitialHash(new URLSearchParams('view=register'));
+      expect(hash).toBe('/register');
+    });
+
+    it('パラメータがない通常起動時は undefined（トップ＝予定タブ）になる', () => {
+      const hash = resolveInitialHash(new URLSearchParams(''));
+      expect(hash).toBeUndefined();
+    });
+
+    it('過去の ?view= パラメータも互換性を保って振り分けられる', () => {
+      expect(resolveInitialHash(new URLSearchParams('view=recruit'))).toBe('/recruit');
+      expect(resolveInitialHash(new URLSearchParams('view=mine'))).toBe('/?tab=mine');
+      expect(resolveInitialHash(new URLSearchParams('view=feedback'))).toBe('/feedback');
+    });
+
+    it('予約詳細や募集カードのリンクが優先して振り分けられる', () => {
+      expect(resolveInitialHash(new URLSearchParams('p=p123'))).toBe('/p/p123');
+      expect(resolveInitialHash(new URLSearchParams('p=p123&cal=1'))).toBe('/p/p123?cal=1');
+      expect(resolveInitialHash(new URLSearchParams('manage=p123'))).toBe('/recruit/p123');
+      expect(resolveInitialHash(new URLSearchParams('r=p1&r=p2'))).toBe('/answer?r=p1&r=p2');
+    });
+
+    it('draft パラメータおよび recruit=1 の組み合わせを正しく振り分ける', () => {
+      expect(resolveInitialHash(new URLSearchParams('draft=d1'))).toBe('/register?draft=d1');
+      expect(resolveInitialHash(new URLSearchParams('draft=d1&recruit=1'))).toBe('/register?draft=d1&recruit=1');
+    });
+
+    it('パラメータが重複した場合の優先順位（回答 > 募集管理 > 予約詳細 > 下書き > メニュー）を守る', () => {
+      // p と view が同時 -> p が優先
+      expect(resolveInitialHash(new URLSearchParams('p=p123&view=register'))).toBe('/p/p123');
+      // manage と p が同時 -> manage が優先
+      expect(resolveInitialHash(new URLSearchParams('manage=m1&p=p123'))).toBe('/recruit/m1');
+      // r と manage が同時 -> r が優先
+      expect(resolveInitialHash(new URLSearchParams('r=r1&manage=m1'))).toBe('/answer?r=r1');
+      // draft と view が同時 -> draft が優先
+      expect(resolveInitialHash(new URLSearchParams('draft=d1&view=register'))).toBe('/register?draft=d1');
     });
   });
 });

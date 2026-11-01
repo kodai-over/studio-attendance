@@ -231,7 +231,7 @@ export function setupRichMenu() {
 
   const image = UrlFetchApp.fetch(`${p.PAGES_URL.replace(/\/$/, '')}/richmenu.png`).getBlob().setContentType('image/png');
   const old = call('get', 'https://api.line.me/v2/bot/richmenu/list').richmenus as { richMenuId: string }[];
-  const { richMenuId } = call('post', 'https://api.line.me/v2/bot/richmenu', { json: richMenuDefinition(p.PAGES_URL) });
+  const { richMenuId } = call('post', 'https://api.line.me/v2/bot/richmenu', { json: richMenuDefinition(p.PAGES_URL, p.LIFF_ID) });
   call('post', `https://api-data.line.me/v2/bot/richmenu/${richMenuId}/content`, { blob: image });
   call('post', `https://api.line.me/v2/bot/user/all/richmenu/${richMenuId}`);
   for (const m of old) call('delete', `https://api.line.me/v2/bot/richmenu/${m.richMenuId}`);
