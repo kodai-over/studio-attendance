@@ -73,7 +73,7 @@ export function PracticePass({ v }: { v: PracticeView }) {
                 label: 'キャンセル期限',
                 value: (
                   <span class={`deadline-text${deadline.isSoon ? ' is-soon' : ''}${deadline.isPast ? ' is-past' : ''}`}>
-                    {deadline.isPast ? '期限切れ' : deadline.formatted}
+                    {deadline.isPast ? 'キャンセル期限超過' : deadline.formatted}
                   </span>
                 ),
                 jp: true,
