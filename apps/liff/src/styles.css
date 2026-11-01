@@ -626,27 +626,36 @@ a {
   opacity: 0.35;
   cursor: default;
 }
-/* チケットの外（詳細・参加リンク）では、大きな丸いボタン3つにする */
+/* チケットの外（詳細・参加リンク）では、丸いボタン3つにする（スリム化） */
 .rsvp.solo {
   justify-content: center;
-  gap: 16px;
-  padding: 4px 0 2px;
+  gap: 12px;
+  padding: 2px 0 0;
   border: 0;
 }
 .rsvp.solo button {
+  position: relative;
   flex: none;
-  width: 44px;
-  height: 44px;
-  border: 1.5px solid var(--line);
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
   border-radius: 50%;
 }
+.rsvp.solo button::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  left: -4px;
+  right: -4px;
+}
 .rsvp.solo button + button {
-  border-left: 1.5px solid var(--line);
+  border-left: 1px solid var(--line);
 }
 .rsvp.solo .mark {
   width: auto;
   height: auto;
-  font-size: 16px;
+  font-size: 14px;
   background: transparent;
 }
 .rsvp.solo button[aria-checked='true'] {
@@ -1616,8 +1625,19 @@ details > summary {
 /* ---------- LINEの外で使うときの部品 ---------- */
 /* 行くと答えた予約情報の、回答ボタンのすぐ下のカレンダーに追加 */
 .cal-inline {
-  margin-top: 12px;
+  max-width: 260px;
+  margin: 8px auto 0;
   scroll-margin-top: calc(52px + env(safe-area-inset-top));
+}
+.cal-inline .grid2 {
+  gap: 6px;
+}
+.cal-inline .btn {
+  min-height: 28px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  border-width: 1px;
 }
 .copy-row .icon-btn + .icon-btn {
   margin-left: -2px;

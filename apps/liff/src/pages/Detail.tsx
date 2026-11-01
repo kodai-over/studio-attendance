@@ -91,7 +91,7 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
   if (!v) return <><TopBar back />{loading ? <Spinner /> : <div class="empty">予約情報が見つかりません</div>}</>;
   const p = v.practice;
   // 行くと答えたら、カレンダーに追加をボタンのすぐ下に出す（答えてそのまま追加できるように）
-  const calendar = <CalendarButtons v={v} highlight={going} />;
+  const calendar = <CalendarButtons v={v} highlight={going} compact={going} />;
 
   return (
     <>
@@ -164,17 +164,17 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
 }
 
 /** カレンダーに追加。iPhone・Mac なら iPhone のカレンダーを、それ以外なら Google を大きく出す */
-function CalendarButtons({ v, highlight }: { v: PracticeView; highlight: boolean }) {
+function CalendarButtons({ v, highlight, compact = false }: { v: PracticeView; highlight: boolean; compact?: boolean }) {
   const ics = { label: 'iPhone', open: () => openCalendar(v.icsUrl, 'ics') };
   const google = { label: 'Google', open: () => openCalendar(v.googleCalendarUrl, 'google') };
   const [first, second] = prefersIcs() ? [ics, google] : [google, ics];
   return (
-    <div class="grid2">
-      <button class={`btn ${highlight ? 'primary' : 'ghost'}`} onClick={first.open}>
-        <Icon name="calendar" size={16} />
+    <div class={`grid2${compact ? ' compact' : ''}`}>
+      <button class={`btn ${compact ? 'small ' : ''}${highlight ? 'primary' : 'ghost'}`} onClick={first.open}>
+        <Icon name="calendar" size={compact ? 13 : 16} />
         {first.label}
       </button>
-      <button class="btn ghost" onClick={second.open}>
+      <button class={`btn ${compact ? 'small ' : ''}ghost`} onClick={second.open}>
         {second.label}
       </button>
     </div>
