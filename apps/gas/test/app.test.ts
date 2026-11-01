@@ -843,12 +843,12 @@ describe('ルーター', () => {
 describe('リッチメニュー', () => {
   it('全面が1つのボタンで、アプリのトップを開く', async () => {
     const { richMenuDefinition } = await import('../src/app/richmenu');
-    const def = richMenuDefinition('https://liff.line.me/APP');
+    const def = richMenuDefinition('https://example.com/app');
     expect(def.size).toEqual({ width: 2500, height: 843 });
     expect(def.selected).toBe(false);
     expect(def.chatBarText).toBe('アプリ起動');
     expect(def.areas).toEqual([
-      { bounds: { x: 0, y: 0, width: 2500, height: 843 }, action: { type: 'uri', label: 'アプリ起動', uri: 'https://liff.line.me/APP?openExternalBrowser=1' } },
+      { bounds: { x: 0, y: 0, width: 2500, height: 843 }, action: { type: 'uri', label: 'アプリ起動', uri: 'https://example.com/app/?openExternalBrowser=1' } },
     ]);
     // LINEの上限（バーの文字は14文字、ボタンのラベルは20文字まで）
     expect(def.chatBarText.length).toBeLessThanOrEqual(14);

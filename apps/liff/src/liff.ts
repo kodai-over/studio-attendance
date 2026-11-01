@@ -66,6 +66,17 @@ export async function initLiff(): Promise<URLSearchParams | null> {
   } else {
     await liff.init({ liffId: LIFF_ID });
     setClientMode(liff.isInClient());
+    if (liff.isInClient()) {
+      const sp = new URLSearchParams(location.search);
+      if (sp.get('openExternalBrowser') === '1') {
+        sp.delete('openExternalBrowser');
+        const qs = sp.toString();
+        const dest = `${location.origin}${location.pathname}${qs ? `?${qs}` : ''}${location.hash}`;
+        liff.openWindow({ url: dest, external: true });
+        liff.closeWindow();
+        return null;
+      }
+    }
     if (!liff.isLoggedIn()) {
       if (loggedOut() && !liff.isInClient()) return null;
       liff.login({ redirectUri: location.href });

@@ -7,7 +7,9 @@ export const RICH_MENU_SIZE = { width: 2500, height: 843 };
  * トーク画面を邪魔しないよう初期状態は閉じた状態（バーのみ表示）にする。
  */
 export function richMenuDefinition(appUrl: string) {
-  const uri = appUrl.includes('openExternalBrowser=1') ? appUrl : `${appUrl}${appUrl.includes('?') ? '&' : '?'}openExternalBrowser=1`;
+  // パス形式でスラッシュもクエリもハッシュもない場合は末尾スラッシュを補完してリダイレクト時のクエリ脱落を防ぐ
+  const base = !appUrl.includes('?') && !appUrl.includes('#') && !appUrl.endsWith('/') ? `${appUrl}/` : appUrl;
+  const uri = base.includes('openExternalBrowser=1') ? base : `${base}${base.includes('?') ? '&' : '?'}openExternalBrowser=1`;
   return {
     size: RICH_MENU_SIZE,
     selected: false,
