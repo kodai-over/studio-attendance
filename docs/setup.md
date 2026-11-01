@@ -183,8 +183,8 @@ Apps Script エディタ → プロジェクトの設定 → スクリプトプ�
 
 ### メニュー（リッチメニュー）
 Botとの個別トークの下に、3つのカード型ボタン「予定確認」「予約登録」「ブラウザで開く」を出します（2500×843。初期状態はトーク画面を邪魔しないよう閉じたバー表示、予定確認・予約登録はLINE内アプリ、ブラウザで開くはSafari等の外部ブラウザで開きます）。
-アプリを GitHub Pages に公開し、スクリプトプロパティを設定したあと、Apps Script エディタで **`setupRichMenu`** を1回実行してください（メニューを変えたときも同様に実行して反映します。古いメニューは自動で消えます）。
-- メニュー画像は `node scripts/richmenu.mjs` で作り直せます（`apps/liff/public/richmenu.png`。macOSではヒラギノ角ゴシック、なければIPA/Notoのゴシックを使用）。画像を変えたら公開後に `setupRichMenu` をもう一度実行すると反映されます
+アプリを GitHub Pages に公開し、スクリプトプロパティを設定したあと、GitHub Pages のデプロイ完了を確認してから、Apps Script エディタで **`setupRichMenu`** を1回実行してください（メニューを変えたときも同様にデプロイ完了後に実行して反映します。古いメニューは自動で消えます）。
+- メニュー画像は `node scripts/richmenu.mjs` で作り直せます（`apps/liff/public/richmenu.png`。macOSではヒラギノ角ゴシック、なければIPA/Notoのゴシックを使用）。画像を変えたら GitHub Pages のデプロイ完了を確認してから `setupRichMenu` をもう一度実行すると反映されます
 - リッチメニューはBotとの個別トークにだけ出ます（グループには出ません）
 
 ### スタジオと部屋

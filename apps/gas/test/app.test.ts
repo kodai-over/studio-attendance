@@ -849,12 +849,28 @@ describe('リッチメニュー', () => {
     expect(def.chatBarText).toBe('メニュー');
     expect(def.areas).toEqual([
       { bounds: { x: 0, y: 0, width: 833, height: 843 }, action: { type: 'uri', label: '予定確認', uri: 'https://liff.line.me/1234567890-abcdefgh' } },
+      // apps/liff/src/main.tsx の views.register (/register) に対応
       { bounds: { x: 833, y: 0, width: 834, height: 843 }, action: { type: 'uri', label: '予約登録', uri: 'https://liff.line.me/1234567890-abcdefgh?view=register' } },
       { bounds: { x: 1667, y: 0, width: 833, height: 843 }, action: { type: 'uri', label: 'ブラウザで開く', uri: 'https://example.com/app/?openExternalBrowser=1' } },
     ]);
     // LINEの上限（バーの文字は14文字、ボタンのラベルは20文字まで）
     expect(def.chatBarText.length).toBeLessThanOrEqual(14);
     expect(def.areas.every((a) => a.action.label.length <= 20)).toBe(true);
+
+    // タップ領域が 2500 幅 × 843 高さを隙間・重複なく完全に覆っていることを検証
+    expect(def.areas[0].bounds.x).toBe(0);
+    expect(def.areas[1].bounds.x).toBe(def.areas[0].bounds.width);
+    expect(def.areas[2].bounds.x).toBe(def.areas[1].bounds.x + def.areas[1].bounds.width);
+    expect(def.areas[2].bounds.x + def.areas[2].bounds.width).toBe(2500);
+    expect(def.areas.every((a) => a.bounds.y === 0 && a.bounds.height === 843)).toBe(true);
+  });
+
+  it('liffId 省略時は appUrl をベースに URL を構築する', async () => {
+    const { richMenuDefinition } = await import('../src/app/richmenu');
+    const def = richMenuDefinition('https://example.com/app');
+    expect(def.areas[0].action.uri).toBe('https://example.com/app');
+    expect(def.areas[1].action.uri).toBe('https://example.com/app?view=register');
+    expect(def.areas[2].action.uri).toBe('https://example.com/app/?openExternalBrowser=1');
   });
 
   it('URL形式に応じた openExternalBrowser=1 の補完を正しく行う', async () => {

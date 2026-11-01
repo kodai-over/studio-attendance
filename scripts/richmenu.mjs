@@ -35,7 +35,6 @@ const cards = [
     w: cardW,
     title: '予定確認',
     sub: '参加予定・回答の確認',
-    badge: 'CHECK ▶',
     isSpecial: false,
     // チェックマーク付きカレンダー（参考画像のテイスト）
     icon: `
@@ -61,7 +60,6 @@ const cards = [
     w: cardW,
     title: '予約登録',
     sub: 'スタジオ予約を追加',
-    badge: 'ADD ▶',
     isSpecial: false,
     // カレンダー＋プラスアイコン
     icon: `
@@ -82,7 +80,6 @@ const cards = [
     w: W - (padX + (cardW + gap) * 2) - padX, // 788
     title: 'ブラウザで開く',
     sub: 'Safari・Chromeで起動',
-    badge: 'WEB ▶',
     isSpecial: true,
     // 外部ブラウザ飛び出しアイコン
     icon: `
@@ -100,39 +97,27 @@ const renderCard = (c) => {
   const bg = c.isSpecial ? CARD_BG_EMERALD : CARD_BG_LIGHT;
   const stroke = c.isSpecial ? CARD_STROKE_EMERALD : CARD_STROKE_LIGHT;
   const titleColor = c.isSpecial ? '#FFFFFF' : '#111827';
-  const subColor = c.isSpecial ? 'rgba(255, 255, 255, 0.85)' : '#4B5563';
+  const subColor = c.isSpecial ? 'rgba(255, 255, 255, 0.88)' : '#4B5563';
   const iconCircleBg = c.isSpecial ? 'rgba(255, 255, 255, 0.2)' : '#F3F4F6';
-  const badgeBg = c.isSpecial ? '#FFFFFF' : '#111827';
-  const badgeColor = c.isSpecial ? '#065F46' : '#FFFFFF';
   const centerX = c.x + c.w / 2;
-
-  // 右下の三角タグ
-  const tagSize = 130;
-  const tagPath = `M ${c.x + c.w - tagSize} ${padY + cardH} L ${c.x + c.w} ${padY + cardH - tagSize} L ${c.x + c.w} ${padY + cardH - 36} A 36 36 0 0 1 ${c.x + c.w - 36} ${padY + cardH} Z`;
 
   return `
     <!-- カード背景 -->
     <rect x="${c.x}" y="${padY}" width="${c.w}" height="${cardH}" rx="36" fill="${bg}" stroke="${stroke}" stroke-width="4"/>
 
-    <!-- 右下の三角形タグ（BUZZ風アクセント） -->
-    <path d="${tagPath}" fill="${badgeBg}"/>
-    <g transform="translate(${c.x + c.w - 38} ${padY + cardH - 38}) rotate(-45)">
-      <text x="0" y="0" text-anchor="middle" dominant-baseline="central" font-family="${font.family}" font-weight="700" font-size="20" fill="${badgeColor}" letter-spacing="1">${c.badge}</text>
-    </g>
-
     <!-- タイトル -->
-    <text x="${centerX}" y="${padY + 135}" text-anchor="middle" dominant-baseline="central" font-family="${font.family}" font-weight="700" font-size="64" fill="${titleColor}" letter-spacing="2">${c.title}</text>
+    <text x="${centerX}" y="${padY + 150}" text-anchor="middle" dominant-baseline="central" font-family="${font.family}" font-weight="700" font-size="68" fill="${titleColor}" letter-spacing="2">${c.title}</text>
 
     <!-- 丸アイコンバッジ -->
-    <g transform="translate(${centerX} ${padY + 360})">
-      <circle cx="0" cy="0" r="110" fill="${iconCircleBg}"/>
-      <g transform="scale(1.2)">
+    <g transform="translate(${centerX} ${padY + 380})">
+      <circle cx="0" cy="0" r="115" fill="${iconCircleBg}"/>
+      <g transform="scale(1.25)">
         ${c.icon}
       </g>
     </g>
 
     <!-- サブテキスト（説明） -->
-    <text x="${centerX}" y="${padY + 565}" text-anchor="middle" dominant-baseline="central" font-family="${font.family}" font-weight="500" font-size="34" fill="${subColor}" letter-spacing="1">${c.sub}</text>
+    <text x="${centerX}" y="${padY + 610}" text-anchor="middle" dominant-baseline="central" font-family="${font.family}" font-weight="500" font-size="36" fill="${subColor}" letter-spacing="1">${c.sub}</text>
   `;
 };
 
