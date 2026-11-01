@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { endAfterStart, labelDate, roomInfo, yen, type Answer, type AttendeeView, type PracticePatch, type PracticeView } from '@studio-attendance/shared';
+import { computeCancelDeadline, endAfterStart, labelDate, roomInfo, yen, type Answer, type AttendeeView, type PracticePatch, type PracticeView } from '@studio-attendance/shared';
 import { api } from '../api';
 import { RoomSelect } from '../components/StudioRoom';
 import { openCalendar, prefersIcs, shareLink } from '../liff';
@@ -58,6 +58,7 @@ export function usePractice(id: string) {
 export function PracticePass({ v }: { v: PracticeView }) {
   const { me } = useApp();
   const p = v.practice;
+  const deadline = computeCancelDeadline(p.date, p.studio, me?.settings?.cancelRules ?? []);
   return (
     <Pass
       date={p.date}
@@ -66,6 +67,7 @@ export function PracticePass({ v }: { v: PracticeView }) {
         { label: '時間', value: `${p.start}–${p.end}`, wide: true },
         { label: 'スタジオ', value: p.studio, jp: true, wide: !p.room },
         ...(p.room ? [{ label: '部屋', value: p.room, note: roomInfo(me.settings.studios, p.studio, p.room), jp: true }] : []),
+        ...(deadline ? [{ label: 'キャンセル期限', value: `${deadline.formatted}${deadline.isPast ? '（締切）' : ''}`, jp: true, wide: true }] : []),
         { label: '1人あたり', value: v.perPerson != null ? yen(v.perPerson) : '—', note: p.feeOverride ? '調整済み' : null },
         { label: 'スタジオ代', value: yen(p.fee) },
         { label: '参加人数', value: <>{v.goingCount}{p.max ? <small class="of">/{p.max}</small> : null} {p.status === '満員' && <span class="badge-full">FULL</span>}</>, note: p.min ? `最低人数 ${p.min}人` : null },

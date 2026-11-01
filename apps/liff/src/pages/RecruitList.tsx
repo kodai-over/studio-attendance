@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { isAdmin, labelDate, type PracticeView } from '@studio-attendance/shared';
 import { deleteMessage } from './Detail';
 import { api } from '../api';
-import { Icon, Spinner, Stub, TopBar, go, place, useApp, useRunner } from '../ui';
+import { CancelDeadlineBadge, Icon, Spinner, Stub, TopBar, go, place, useApp, useRunner } from '../ui';
 
 /**
  * 「募集」。自分が登録した練習（管理者はすべての練習）を並べ、押すと募集・編集の画面へ。
@@ -90,6 +90,7 @@ function RecruitTicket({ v }: { v: PracticeView }) {
           )}
         </div>
         <div class="place">{place(p)}</div>
+        <CancelDeadlineBadge date={p.date} studio={p.studio} />
         <div class="ticket-foot">
           <div class={`recruit-groups${hasGroups ? ' has-groups' : ''}`}>
             <Icon name="send" size={12} />

@@ -432,6 +432,9 @@ a {
   .time {
     font-size: 13px;
   }
+  .ticket-deadline {
+    font-size: 10px;
+  }
 }
 @media (min-width: 640px) {
   @container (inline-size < 620px) {
@@ -627,6 +630,28 @@ a {
   color: var(--sub);
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+.ticket-deadline {
+  display: inline-flex;
+  align-items: center;
+  gap: 3.5px;
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--sub);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.ticket-deadline .icon {
+  flex-shrink: 0;
+  color: var(--sub);
+  opacity: 0.85;
+}
+.ticket-deadline.is-past {
+  color: var(--faint);
+}
+.ticket-deadline.is-past .icon {
+  opacity: 0.5;
 }
 .ticket-foot {
   display: flex;

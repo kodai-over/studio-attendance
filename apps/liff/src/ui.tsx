@@ -1,6 +1,6 @@
 import { createContext, type ComponentChildren } from 'preact';
 import { useCallback, useContext, useEffect, useState } from 'preact/hooks';
-import { canRegister, isHoliday, labelDate, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
+import { canRegister, computeCancelDeadline, isHoliday, labelDate, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
 import { applyTheme, getTheme, type ThemeMode } from './theme';
 
 // ---------------------------------------------------------------- ルーティング（ハッシュ）
@@ -109,6 +109,7 @@ const ICONS = {
   text: 'M5 6h14M5 10h14M5 14h9M5 18h6',
   x: 'M6 6l12 12M18 6 6 18',
   calendar: 'M4 6.5A1.5 1.5 0 0 1 5.5 5h13A1.5 1.5 0 0 1 20 6.5v12a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5zM4 10h16M8 3v4M16 3v4',
+  clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2',
   people: 'M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 19.5c.8-3 3.3-4.5 6.5-4.5s5.7 1.5 6.5 4.5M16 4.3a3.5 3.5 0 0 1 0 6.4M18 15.2c1.7.6 3 2 3.5 4.3',
   edit: 'M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4',
   pin: 'M12 21s7-6.2 7-11.5a7 7 0 0 0-14 0C5 14.8 12 21 12 21zM12 12a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
@@ -366,3 +367,17 @@ export const shareData = (v: PracticeView, url: string) => ({
   text: `${labelDate(v.practice.date)} ${v.practice.start}–${v.practice.end} ${place(v.practice)}\n参加リンクから回答できます`,
   url,
 });
+
+/** チケットに表示するキャンセル期限バッジ */
+export function CancelDeadlineBadge({ date, studio }: { date: string; studio: string }) {
+  const { me } = useApp();
+  const deadline = computeCancelDeadline(date, studio, me?.settings?.cancelRules ?? []);
+  if (!deadline) return null;
+
+  return (
+    <div class={`ticket-deadline${deadline.isPast ? ' is-past' : ''}`}>
+      <Icon name="clock" size={10} />
+      <span>キャンセル期限: {deadline.formatted}{deadline.isPast ? ' (締切)' : ''}</span>
+    </div>
+  );
+}

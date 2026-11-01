@@ -2,7 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { labelDate, nextStatus, type Answer, type PracticeView } from '@studio-attendance/shared';
 import { api } from '../api';
 import { pressedAt, sending, wanted } from '../answering';
-import { AvatarStack, FRESH_MS, Fee, Icon, RsvpButtons, Spinner, StatusBadge, Stub, Syncing, Tabs, go, place, useApp, useRunner } from '../ui';
+import { AvatarStack, CancelDeadlineBadge, FRESH_MS, Fee, Icon, RsvpButtons, Spinner, StatusBadge, Stub, Syncing, Tabs, go, place, useApp, useRunner } from '../ui';
 
 type Tab = 'all' | 'mine' | 'todo';
 const TAB_KEY = 'pb:tab';
@@ -170,6 +170,7 @@ export function PracticeCard({ v, onAnswer, busy }: { v: PracticeView; onAnswer:
           )}
         </div>
         <div class="place">{place(p)}</div>
+        <CancelDeadlineBadge date={p.date} studio={p.studio} />
         <div class="ticket-foot">
           <AvatarStack names={v.going.map((a) => ({ name: a.name, guest: a.kind === 'ゲスト' }))} />
           <span class="count">

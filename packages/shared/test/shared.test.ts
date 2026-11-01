@@ -6,6 +6,7 @@ import {
   roomInfo,
   buildIcs,
   cancelWarningAt,
+  computeCancelDeadline,
   classifyReservations,
   confirmCard,
   defaultFee,
@@ -154,6 +155,22 @@ describe('設定', () => {
   it('キャンセル期限は前方一致', () => {
     expect(findCancelRule(settings.cancelRules, 'BUZZ横浜東口')?.daysBefore).toBe(1);
     expect(findCancelRule(settings.cancelRules, 'その他')).toBeNull();
+  });
+  it('キャンセル期限の計算', () => {
+    // 2026-11-02(月) の worcle(4日前 10:00) -> 2026-10-29(木) 10:00
+    const deadline = computeCancelDeadline('2026-11-02', 'studio worcle 横浜', settings.cancelRules, new Date('2026-10-29T00:59:00.000Z'));
+    expect(deadline).not.toBeNull();
+    expect(deadline?.date).toBe('2026-10-29');
+    expect(deadline?.time).toBe('10:00');
+    expect(deadline?.formatted).toBe('10/29(木) 10:00');
+    expect(deadline?.isPast).toBe(false);
+
+    // 期限後
+    const past = computeCancelDeadline('2026-11-02', 'studio worcle 横浜', settings.cancelRules, new Date('2026-10-29T01:01:00.000Z'));
+    expect(past?.isPast).toBe(true);
+
+    // ルール未設定のスタジオ
+    expect(computeCancelDeadline('2026-11-02', '不明なスタジオ', settings.cancelRules)).toBeNull();
   });
   it('警告時刻', () => {
     expect(cancelWarningAt('2026-10-21', { studio: 'worcle', daysBefore: 4, time: '10:00' }).toISOString()).toBe(
