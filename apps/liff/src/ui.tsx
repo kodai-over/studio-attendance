@@ -190,8 +190,6 @@ export function NavBar() {
   );
 }
 
-const DAY_EN = { 日: 'SUN', 月: 'MON', 火: 'TUE', 水: 'WED', 木: 'THU', 金: 'FRI', 土: 'SAT' } as Record<string, string>;
-
 /** チケットの半券。日付を大きく。行くと決めた練習は黒く反転する */
 export function Stub({ date, onClick }: { date: string; onClick?: () => void }) {
   const [, m, d] = date.split('-').map(Number);
@@ -200,7 +198,7 @@ export function Stub({ date, onClick }: { date: string; onClick?: () => void }) 
     <div class="stub" aria-hidden="true" onClick={onClick}>
       <span class="m">{String(m).padStart(2, '0')}</span>
       <span class="d">{String(d).padStart(2, '0')}</span>
-      <span class={`w${w === '土' ? ' sat' : w === '日' ? ' sun' : ''}`}>{DAY_EN[w]}</span>
+      <span class={`w${w === '土' ? ' sat' : w === '日' ? ' sun' : ''}`}>{w}</span>
     </div>
   );
 }
@@ -290,7 +288,7 @@ export function Pass({
       <div class="pass-head">
         <div class="pass-date">
           {String(m).padStart(2, '0')}.{String(d).padStart(2, '0')}
-          <span class="w">{DAY_EN[weekday(date)]}</span>
+          <span class={`w${weekday(date) === '土' ? ' sat' : weekday(date) === '日' ? ' sun' : ''}`}>{weekday(date)}</span>
         </div>
         <StatusBadge v={{ practice: { status } }} />
       </div>

@@ -162,6 +162,12 @@ export function PracticeCard({ v, onAnswer, busy }: { v: PracticeView; onAnswer:
         <div class="time">
           {p.start}–{p.end}
           <StatusBadge v={v} />
+          {v.bookerName && (
+            <span class="booker" title={`予約者: ${v.bookerName}`}>
+              <Icon name="user" size={11} />
+              <span>{v.bookerName}</span>
+            </span>
+          )}
         </div>
         <div class="place">{place(p)}</div>
         <div class="ticket-foot">

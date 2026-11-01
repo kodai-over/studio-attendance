@@ -338,7 +338,7 @@ a {
   margin-bottom: 0;
 }
 .ticket {
-  --stub-w: 70px;
+  --stub-w: 58px;
   position: relative;
   display: grid;
   grid-template-columns: var(--stub-w) 1fr;
@@ -355,10 +355,10 @@ a {
 }
 @container (inline-size < 310px) {
   .ticket {
-    --stub-w: 62px;
+    --stub-w: 52px;
   }
   .ticket-main {
-    padding: 8px 12px 7px 12px;
+    padding: 8px 10px 7px 10px;
   }
   .stub .d {
     font-size: 18px;
@@ -370,10 +370,10 @@ a {
 @media (min-width: 640px) {
   @container (inline-size < 620px) {
     .ticket {
-      --stub-w: 62px;
+      --stub-w: 52px;
     }
     .ticket-main {
-      padding: 8px 12px 7px 12px;
+      padding: 8px 10px 7px 10px;
     }
     .stub .d {
       font-size: 18px;
@@ -434,16 +434,26 @@ a {
   letter-spacing: -0.02em;
 }
 .stub .w {
-  font-size: 9px;
-  font-weight: 400;
-  letter-spacing: 0.12em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 4px;
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
   color: var(--sub);
 }
 .stub .w.sat {
   color: var(--sat);
+  background: color-mix(in srgb, var(--sat) 14%, transparent);
 }
 .stub .w.sun {
   color: var(--sun);
+  background: color-mix(in srgb, var(--sun) 14%, transparent);
 }
 .ticket[data-answer='行く'] .stub {
   background: var(--ink);
@@ -451,12 +461,23 @@ a {
   border-right-color: transparent;
   animation: stamp 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.3);
 }
-.ticket[data-answer='行く'] .stub .m,
-.ticket[data-answer='行く'] .stub .w {
+.ticket[data-answer='行く'] .stub .m {
   color: color-mix(in srgb, var(--bg) 70%, transparent);
 }
-.ticket[data-answer='保留'] .stub {
-  background: repeating-linear-gradient(-45deg, transparent 0 5px, color-mix(in srgb, var(--ink) 9%, transparent) 5px 6px);
+.ticket[data-answer='行く'] .stub .w:not(.sat):not(.sun) {
+  color: color-mix(in srgb, var(--bg) 70%, transparent);
+}
+.ticket[data-answer='行く'] .stub .w.sat {
+  color: #93b7ff;
+  background: rgba(147, 183, 255, 0.25);
+}
+.ticket[data-answer='行く'] .stub .w.sun {
+  color: #ff8577;
+  background: rgba(255, 133, 119, 0.25);
+}
+.ticket[data-answer='保留'] > .stub {
+  background: color-mix(in srgb, #f59e0b 8%, var(--paper));
+  box-shadow: inset 3px 0 0 #f59e0b;
 }
 @keyframes stamp {
   from {
@@ -466,7 +487,7 @@ a {
 .ticket[data-answer='行かない'],
 .ticket[data-status='中止'],
 .ticket[data-status='終了'] {
-  opacity: 0.5;
+  opacity: 0.45;
 }
 .ticket[data-status='中止'] .time {
   text-decoration: line-through;
@@ -475,11 +496,30 @@ a {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
   font-family: var(--mono);
   font-size: 14px;
   font-weight: 400;
   line-height: 1.25;
   letter-spacing: -0.01em;
+}
+.time .booker {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 105px;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.time .booker .icon {
+  flex-shrink: 0;
+  opacity: 0.65;
 }
 .place {
   margin-top: 2px;
@@ -618,9 +658,27 @@ a {
   color: var(--ink);
 }
 .rsvp button[aria-checked='true'] .mark {
+  transform: scale(1.06);
+}
+.rsvp button.yes[aria-checked='true'] .mark {
   background: var(--ink);
   color: var(--bg);
-  transform: scale(1.06);
+}
+.rsvp button.maybe[aria-checked='true'] {
+  color: #d97706;
+}
+.rsvp button.maybe[aria-checked='true'] .mark {
+  background: #f59e0b;
+  color: #ffffff;
+  font-weight: 600;
+}
+.rsvp button.no[aria-checked='true'] {
+  color: var(--sub);
+}
+.rsvp button.no[aria-checked='true'] .mark {
+  background: var(--sub);
+  color: var(--bg);
+  font-weight: 600;
 }
 .rsvp button:disabled {
   opacity: 0.35;
@@ -663,9 +721,38 @@ a {
   background: var(--ink);
   color: var(--bg);
 }
+.rsvp.solo button.maybe[aria-checked='true'] {
+  border-color: #f59e0b;
+  background: #f59e0b;
+  color: #ffffff;
+}
+.rsvp.solo button.no[aria-checked='true'] {
+  border-color: var(--sub);
+  background: var(--sub);
+  color: var(--bg);
+}
 .rsvp.solo button[aria-checked='true'] .mark {
   background: transparent;
   color: inherit;
+}
+
+@media (prefers-color-scheme: dark) {
+  .ticket[data-answer='保留'] > .stub {
+    background: color-mix(in srgb, #fbbf24 10%, var(--paper));
+    box-shadow: inset 3px 0 0 #fbbf24;
+  }
+  .rsvp button.maybe[aria-checked='true'] {
+    color: #fbbf24;
+  }
+  .rsvp button.maybe[aria-checked='true'] .mark {
+    background: #f59e0b;
+    color: #000000;
+  }
+  .rsvp.solo button.maybe[aria-checked='true'] {
+    border-color: #fbbf24;
+    background: #f59e0b;
+    color: #000000;
+  }
 }
 
 /* ---------- パス（練習の詳細） ---------- */
@@ -693,10 +780,27 @@ a {
 }
 .pass-date .w {
   margin-left: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 4px;
+  font-family: var(--sans);
   font-size: 11px;
-  font-weight: 400;
-  letter-spacing: 0.12em;
+  font-weight: 600;
+  line-height: 1;
+  vertical-align: 1px;
   color: var(--sub);
+}
+.pass-date .w.sat {
+  color: var(--sat);
+  background: color-mix(in srgb, var(--sat) 14%, transparent);
+}
+.pass-date .w.sun {
+  color: var(--sun);
+  background: color-mix(in srgb, var(--sun) 14%, transparent);
 }
 .pass-head .stamp {
   margin-left: auto;
