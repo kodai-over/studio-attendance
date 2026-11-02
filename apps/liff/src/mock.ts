@@ -100,8 +100,20 @@ store.p = [
   }),
 ];
 
-const att = (practiceId: string, participant: string, name: string, answer: '行く' | '保留' | '行かない', kind: 'メンバー' | 'ゲスト' = 'メンバー', addedBy = participant) =>
-  store.saveAttendance({ practiceId, participant, name, kind, via: kind === 'ゲスト' ? 'アプリ' : 'ボタン', addedBy, answer, updatedAt: new Date().toISOString() });
+let attOffsetMins = 180;
+const att = (practiceId: string, participant: string, name: string, answer: '行く' | '保留' | '行かない', kind: 'メンバー' | 'ゲスト' = 'メンバー', addedBy = participant) => {
+  attOffsetMins = Math.max(5, attOffsetMins - 7);
+  return store.saveAttendance({
+    practiceId,
+    participant,
+    name,
+    kind,
+    via: kind === 'ゲスト' ? 'アプリ' : 'ボタン',
+    addedBy,
+    answer,
+    updatedAt: new Date(Date.now() - attOffsetMins * 60_000).toISOString(),
+  });
+};
 
 // 1. 平日 worcle 横浜 (store.p[0])
 att(store.p[0].id, 'Ume', 'おおゆち', '行く');

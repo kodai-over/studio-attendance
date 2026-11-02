@@ -4,7 +4,7 @@ name: Deploy LIFF app to Pages
 on:
   push:
     branches: [main]
-    paths: ['apps/liff/**', 'packages/shared/**', 'apps/gas/src/app/**', 'package-lock.json', '.github/workflows/pages.yml']
+    paths: ['apps/liff/**', 'packages/shared/**', 'apps/gas/src/app/**', 'CHANGELOG.md', 'package-lock.json', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:

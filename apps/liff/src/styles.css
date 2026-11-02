@@ -265,8 +265,8 @@ a {
   bottom: 0;
   z-index: 10;
   display: flex;
-  gap: 4px;
-  padding: 5px max(12px, env(safe-area-inset-left)) calc(5px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-right));
+  gap: 2px;
+  padding: 5px max(8px, env(safe-area-inset-left)) calc(5px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-right));
   border-top: 1px solid var(--line);
   background: color-mix(in srgb, var(--bg) 94%, transparent);
   backdrop-filter: blur(16px) saturate(1.4);
@@ -274,26 +274,27 @@ a {
 }
 .navbar button {
   flex: 1;
+  min-width: 0;
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  height: 34px;
-  padding: 0 6px;
+  gap: 2px;
+  height: auto;
+  padding: 5px 2px 4px;
   border: 0;
   border-radius: 8px;
   background: transparent;
   color: var(--sub);
-  font-size: 13px;
+  font-size: 10.5px;
   font-weight: 500;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   white-space: nowrap;
   transition: background 0.15s, color 0.15s;
 }
 .navbar button .icon {
-  width: 17px;
-  height: 17px;
+  width: 19px;
+  height: 19px;
 }
 .navbar button[aria-current='page'] {
   background: var(--paper);
@@ -310,9 +311,9 @@ a {
     left: 50%;
     bottom: calc(14px + env(safe-area-inset-bottom));
     transform: translateX(-50%);
-    gap: 2px;
-    width: min(calc(100% - 32px), 420px);
-    padding: 5px;
+    gap: 1px;
+    width: min(calc(100% - 20px), 440px);
+    padding: 4px;
     border-top: 0;
     border-radius: 999px;
     background: var(--nav);
@@ -324,16 +325,16 @@ a {
     flex-direction: column;
     gap: 2px;
     height: auto;
-    padding: 8px 0 6px;
+    padding: 7px 0 5px;
     border-radius: 999px;
     color: rgb(255 255 255 / 82%);
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 500;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.01em;
   }
   :root:is([data-client='line'], [data-client='app']) .navbar button .icon {
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
   }
   :root:is([data-client='line'], [data-client='app']) .navbar button[aria-current='page'] {
     background: var(--nav-on);
@@ -2421,4 +2422,362 @@ button + .muted {
     color: #facc15;
   }
 }
+
+/* ---------- ホーム画面（GitHub Primer スタイル: ポータル & タイムライン） ---------- */
+.gh-flash-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  margin: 4px 0 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.gh-flash-banner:hover {
+  border-color: color-mix(in srgb, var(--ink) 30%, var(--line));
+}
+.gh-flash-banner:active {
+  background: color-mix(in srgb, var(--ink) 4%, var(--paper));
+}
+.gh-flash-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.gh-flash-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--ink);
+  color: var(--bg);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.gh-flash-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.gh-flash-text strong {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ink);
+}
+.gh-flash-text span {
+  font-size: 11.5px;
+  color: var(--sub);
+}
+.gh-flash-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--sub);
+  flex-shrink: 0;
+}
+.gh-flash-banner:hover .gh-flash-action {
+  color: var(--ink);
+}
+
+.home-section {
+  margin-top: 10px;
+}
+.home-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.gh-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--ink);
+}
+.gh-section-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--sub);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.gh-section-link:hover {
+  color: var(--ink);
+}
+
+/* GitHub Pinned Repository 風カード */
+.gh-pinned-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.gh-pinned-card:hover {
+  border-color: color-mix(in srgb, var(--ink) 30%, var(--line));
+}
+.gh-pinned-card:active {
+  background: color-mix(in srgb, var(--ink) 3%, var(--paper));
+}
+.gh-pinned-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.gh-pinned-title-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+}
+.gh-pinned-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.gh-pill-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border: 1px solid var(--line);
+  border-radius: 2em;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--sub);
+  white-space: nowrap;
+}
+.gh-pill-badge.latest {
+  border-color: var(--brand-green);
+  color: var(--brand-green);
+  font-weight: 600;
+}
+.gh-pinned-body {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  color: var(--sub);
+  line-height: 1.4;
+}
+.gh-pinned-footer {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 11.5px;
+  color: var(--sub);
+  flex-wrap: wrap;
+}
+.gh-meta-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.gh-stat-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand-green);
+  flex-shrink: 0;
+}
+
+.gh-blankslate {
+  padding: 24px 16px;
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--sub);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* GitHub Contribution Activity タイムライン風 */
+.gh-timeline {
+  position: relative;
+  margin-top: 14px;
+  padding-left: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.gh-timeline::before {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: var(--line);
+  z-index: 1;
+}
+.gh-timeline-item {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+}
+.gh-timeline-badge {
+  position: absolute;
+  left: -28px;
+  top: 1px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  color: var(--sub);
+}
+.gh-timeline-item.is-unread .gh-timeline-badge {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.gh-timeline-badge.practice_canceled {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.gh-timeline-badge.practice_changed {
+  border-color: #f59e0b;
+  color: #f59e0b;
+}
+.gh-timeline-body {
+  flex: 1;
+  min-width: 0;
+  padding: 0 0 0 6px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.gh-timeline-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.gh-timeline-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--ink);
+}
+.gh-timeline-item.is-unread .gh-timeline-title {
+  color: var(--ink);
+}
+.gh-timeline-badge.practice_canceled + .gh-timeline-body .gh-timeline-title {
+  color: var(--danger);
+}
+.gh-unread-tag {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 2em;
+  padding: 1px 6px;
+  background: var(--ink);
+  color: var(--bg);
+  vertical-align: middle;
+}
+.gh-timeline-time {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--sub);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.gh-timeline-box {
+  margin-top: 6px;
+  padding: 7px 11px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  font-size: 12px;
+  color: var(--sub);
+  line-height: 1.4;
+  word-break: break-all;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.gh-timeline-body:hover .gh-timeline-box {
+  border-color: color-mix(in srgb, var(--ink) 30%, var(--line));
+}
+
+/* タイムライン上のリリースノート */
+.gh-timeline-item.release .gh-timeline-body {
+  cursor: default;
+}
+.gh-release-title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.gh-release-version {
+  font-family: var(--mono);
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.gh-release-summary {
+  margin: 6px 0 8px;
+  font-size: 12.5px;
+  color: var(--sub);
+  line-height: 1.4;
+}
+.gh-release-content {
+  margin-top: 6px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+}
+.gh-release-sec {
+  margin-bottom: 8px;
+}
+.gh-release-sec:last-child {
+  margin-bottom: 0;
+}
+.gh-release-sec h4 {
+  margin: 0 0 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.gh-release-sec ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--sub);
+  line-height: 1.5;
+}
+
 
