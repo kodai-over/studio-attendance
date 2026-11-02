@@ -190,6 +190,43 @@ describe('ホーム画面ロジック（homeLogic）', () => {
       expect(notices[1].title).toBe('みおさんが「未定」と回答しました');
     });
 
+    it('出欠行の更新日時（updatedAt）が空文字の場合でも、practice.createdAt や nowIso に安全にフォールバックしてお知らせ時刻が空にならない', () => {
+      const me = createMockMe();
+      const p = createMockPracticeView({
+        id: 'p-empty-ts',
+        booker: 'Ume',
+        date: '2026-11-10',
+        createdAt: '2026-11-01T12:00:00.000Z',
+        going: [
+          createAttendee('U3', 'けんた', '行く', ''), // 空文字
+        ],
+      });
+
+      // 1. buildHomeNotices 時（初期表示）: updatedAt が空文字でも p.createdAt にフォールバックする
+      const notices = buildHomeNotices([p], me, '2026-11-02');
+      expect(notices).toHaveLength(1);
+      expect(notices[0].updatedAt).toBe('2026-11-01T12:00:00.000Z');
+      expect(notices[0].id).toBe('ans:p-empty-ts:U3:2026-11-01T12:00:00.000Z');
+
+      // 2. syncPracticeNotices 時（差分検知）: 回答変更時に a.updatedAt が空文字でも nowIso にフォールバックする
+      syncPracticeNotices([p], me);
+      const changed = createMockPracticeView({
+        id: 'p-empty-ts',
+        booker: 'Ume',
+        date: '2026-11-10',
+        createdAt: '2026-11-01T12:00:00.000Z',
+        maybe: [
+          createAttendee('U3', 'けんた', '保留', ''), // 空文字
+        ],
+      });
+      const nowIso = '2026-11-02T15:00:00.000Z';
+      const synced = syncPracticeNotices([changed], me, nowIso);
+      const ansNotice = synced.find((n) => n.kind === 'answer');
+      expect(ansNotice).toBeDefined();
+      expect(ansNotice?.updatedAt).toBe(nowIso);
+      expect(ansNotice?.id).toBe(`ans:p-empty-ts:U3:${nowIso}`);
+    });
+
     it('② 自分が予約者の予約情報で他メンバーが回答を変更した際、変更前→変更後の通知を生成する', () => {
       const me = createMockMe();
       const initial = createMockPracticeView({

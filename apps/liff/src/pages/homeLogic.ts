@@ -422,7 +422,7 @@ export function syncPracticeNotices(
           if (a.participant === me.member.userId) continue;
           const prevAtt = prev.answers?.[a.participant];
           if (prevAtt && prevAtt.answer !== a.answer) {
-            const ts = a.updatedAt ?? nowIso;
+            const ts = a.updatedAt || nowIso;
             newlyDetected.push({
               id: `ans:${p.id}:${a.participant}:${ts}`,
               kind: 'answer',
@@ -508,7 +508,7 @@ export function buildHomeNotices(
         const participantKey = `${p.id}\0${a.participant}`;
         if (seenParticipantAnswers.has(participantKey)) continue;
         seenParticipantAnswers.add(participantKey);
-        const ts = a.updatedAt ?? p.createdAt;
+        const ts = a.updatedAt || p.createdAt;
         const id = `ans:${p.id}:${a.participant}:${ts}`;
         if (!byId.has(id)) {
           byId.set(id, {
