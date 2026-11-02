@@ -185,8 +185,8 @@ describe('ホーム画面ロジック（homeLogic）', () => {
 
       const notices = buildHomeNotices([myBooked, otherBooked], me, '2026-11-02');
       expect(notices).toHaveLength(2);
-      expect(notices[0].title).toBe('けんたさんが「○ 行く」と回答しました');
-      expect(notices[1].title).toBe('みおさんが「△ 未定」と回答しました');
+      expect(notices[0].title).toBe('けんたさんが「行く」と回答しました');
+      expect(notices[1].title).toBe('みおさんが「未定」と回答しました');
     });
 
     it('② 自分が予約者の予約情報で他メンバーが回答を変更した際、変更前→変更後の通知を生成する', () => {
@@ -207,7 +207,7 @@ describe('ホーム画面ロジック（homeLogic）', () => {
 
       const notices = buildHomeNotices([updated], me, '2026-11-02');
       expect(notices).toHaveLength(1);
-      expect(notices[0].title).toBe('けんたさんが回答を変更しました（○ 行く → △ 未定）');
+      expect(notices[0].title).toBe('けんたさんが回答を変更しました（行く → 未定）');
     });
 
     it('③ 自分が関係する予約情報の変更（時間・部屋・スタジオ代・メモ）および中止を検知して通知する', () => {
@@ -346,7 +346,7 @@ describe('ホーム画面ロジック（homeLogic）', () => {
 
       const notices = buildHomeNotices([step3], me, '2026-11-02');
       expect(notices).toHaveLength(1);
-      expect(notices[0].title).toBe('ユウキさんが回答を変更しました（△ 未定 → ✕ 行かない）');
+      expect(notices[0].title).toBe('ユウキさんが回答を変更しました（未定 → 行かない）');
     });
 
     it('updatePracticeSnapshot を呼ぶと、自分が予約情報を編集または中止した後の次回 syncPracticeNotices で変更・中止通知が出ない', () => {

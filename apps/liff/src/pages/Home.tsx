@@ -148,32 +148,20 @@ export function HomePage() {
                 return (
                   <li key={n.id}>
                     <button
-                      class={`home-notice-item${isUnread ? ' is-unread' : ''}`}
+                      class={`home-notice-row${isUnread ? ' is-unread' : ''}`}
+                      data-kind={n.kind}
                       onClick={() => go(`/p/${encodeURIComponent(n.practiceId)}`)}
                     >
-                      <div class={`home-notice-icon ${n.kind}`}>
-                        <Icon
-                          name={
-                            n.kind === 'practice_canceled'
-                              ? 'x'
-                              : n.kind === 'practice_changed'
-                              ? 'edit'
-                              : 'check'
-                          }
-                          size={15}
-                        />
-                      </div>
-                      <div class="home-notice-body">
-                        <div class="home-notice-title-row">
+                      <span class={`home-notice-dot${isUnread ? ' is-unread' : ''}`} aria-hidden="true" />
+                      <div class="home-notice-content">
+                        <div class="home-notice-primary">
                           <span class="home-notice-title">{n.title}</span>
-                          {isUnread && <span class="home-unread-dot" aria-label="未読" />}
-                        </div>
-                        <div class="home-notice-meta">
-                          <span class="home-notice-detail">{n.detail}</span>
                           <span class="home-notice-time">{formatNoticeTime(n.updatedAt)}</span>
                         </div>
+                        <div class="home-notice-secondary">
+                          <span>{n.detail}</span>
+                        </div>
                       </div>
-                      <Icon name="chevron" size={16} />
                     </button>
                   </li>
                 );

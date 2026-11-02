@@ -151,9 +151,9 @@ const SEEN_RELEASE_KEY_PREFIX = 'pb:seenRelease:';
 const MAX_STORED_NOTICES = 40;
 
 const ANSWER_UI_TEXT: Record<Answer, string> = {
-  行く: '○ 行く',
-  保留: '△ 未定',
-  行かない: '✕ 行かない',
+  行く: '行く',
+  保留: '未定',
+  行かない: '行かない',
 };
 
 function placeText(p: { studio: string; room: string }): string {
