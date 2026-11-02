@@ -134,11 +134,11 @@ describe('LIFF 初期化 & 画面遷移ロジック', () => {
       expect(hash).toBeUndefined();
     });
 
-    it('LINE内（isInClient: true）でパラメータなし起動時は undefined（予定タブ）になり、外部ブラウザ・ホーム画面（isInClient: false）でハッシュ未指定なら /home になる', () => {
+    it('LINE内（isInClient: true）でパラメータなし起動時は undefined（予定タブ）になり、外部ブラウザ・ホーム画面（isInClient: false）でハッシュ未指定（空）なら /home になる', () => {
       expect(resolveInitialHash(new URLSearchParams(''), { currentHash: '', isInClient: true })).toBeUndefined();
       expect(resolveInitialHash(new URLSearchParams(''), { currentHash: '', isInClient: false })).toBe('/home');
-      expect(resolveInitialHash(new URLSearchParams(''), { currentHash: '#/', isInClient: false })).toBe('/home');
-      // 既存の有効なハッシュがある場合は上書きしない
+      // 既存のハッシュ（#/ や #/answer 等）が指定されている場合はブラウザでも上書きせずそのまま活かす
+      expect(resolveInitialHash(new URLSearchParams(''), { currentHash: '#/', isInClient: false })).toBeUndefined();
       expect(resolveInitialHash(new URLSearchParams(''), { currentHash: '#/answer', isInClient: false })).toBeUndefined();
     });
 

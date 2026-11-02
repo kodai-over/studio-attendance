@@ -68,10 +68,15 @@ export function parseChangelog(md: string): ReleaseNote[] {
       }
       const indent = bulletMatch[1].length;
       const rawItem = bulletMatch[2].trim();
-      const headingOnlyMatch = indent === 0 ? rawItem.match(/^\*\*(.+?)\*\*[:：]\s*$/) : null;
-      if (headingOnlyMatch) {
-        pendingHeading = headingOnlyMatch[1].trim();
-        continue;
+
+      if (indent === 0) {
+        // 親の箇条書きが来たら以前の保留中見出しはリセットする
+        pendingHeading = null;
+        const headingOnlyMatch = rawItem.match(/^\*\*(.+?)\*\*[:：]\s*$/);
+        if (headingOnlyMatch) {
+          pendingHeading = headingOnlyMatch[1].trim();
+          continue;
+        }
       }
 
       const cleanText = rawItem
@@ -80,11 +85,11 @@ export function parseChangelog(md: string): ReleaseNote[] {
         .trim();
 
       if (!cleanText) continue;
+
       if (indent >= 2 && pendingHeading) {
+        // 次の親箇条書きや ### が来るまで pendingHeading を保持し、複数の子箇条書きに引き継ぐ
         currentSec.items.push(`${pendingHeading}: ${cleanText}`);
-        pendingHeading = null;
       } else {
-        pendingHeading = null;
         currentSec.items.push(cleanText);
       }
       continue;
@@ -100,7 +105,7 @@ export function parseChangelog(md: string): ReleaseNote[] {
 }
 
 export const RELEASE_NOTES: ReleaseNote[] = parseChangelog(changelogRaw);
-export const LATEST_RELEASE_VERSION: string = RELEASE_NOTES[0]?.version ?? 'v1.0.0';
+export const LATEST_RELEASE_VERSION: string = RELEASE_NOTES[0]?.version ?? '';
 
 export type NoticeKind = 'answer' | 'practice_changed' | 'practice_canceled';
 
@@ -549,6 +554,7 @@ export function markReleaseNotesRead(
   me: Pick<MeView, 'member' | 'actAs'>,
   version = LATEST_RELEASE_VERSION,
 ): void {
+  if (!version) return;
   try {
     if (typeof localStorage === 'undefined' || typeof localStorage.setItem !== 'function') return;
     localStorage.setItem(SEEN_RELEASE_KEY_PREFIX + getDraftOwnerKey(me), version);
@@ -577,7 +583,8 @@ export function getHomeUnreadStatus(
     ? notices.filter((n) => n.updatedAt > readAt).length
     : 0;
   const seenVersion = getSeenReleaseVersion(me);
-  const hasUnreadReleaseNote = seenVersion !== LATEST_RELEASE_VERSION;
+  const hasUnreadReleaseNote =
+    RELEASE_NOTES.length > 0 && Boolean(LATEST_RELEASE_VERSION) && seenVersion !== LATEST_RELEASE_VERSION;
   const totalBadgeCount = unreadNoticesCount + (hasUnreadReleaseNote ? 1 : 0);
   return {
     unreadNoticesCount,

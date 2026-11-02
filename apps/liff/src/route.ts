@@ -44,9 +44,9 @@ export function resolveInitialHash(params: URLSearchParams, opts?: InitialRouteO
 
   if (opts) {
     const cleanHash = (opts.currentHash ?? '').replace(/^#/, '');
-    // すでに具体的なハッシュ（#/home や #/answer など）が指定されていればそのまま活かす
-    if (cleanHash && cleanHash !== '/') return undefined;
-    // LINE外のブラウザ・ホーム画面アプリでハッシュ未指定ならホーム画面を初期表示にする
+    // すでに具体的なハッシュ（#/ や #/home や #/answer など）が指定されていればそのまま活かす
+    if (cleanHash !== '') return undefined;
+    // LINE外のブラウザ・ホーム画面アプリでハッシュが空ならホーム画面を初期表示にする
     if (!opts.isInClient) return '/home';
   }
 

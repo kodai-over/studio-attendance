@@ -436,7 +436,7 @@ describe('ホーム画面ロジック（homeLogic）', () => {
       expect(statusAllRead.totalBadgeCount).toBe(0);
     });
 
-    it('CHANGELOG.md から自動生成されたリリースノートに最新バージョン v1.4.0〜v1.0.0 が含まれ、全バージョンの全セクション項目が空にならない', () => {
+    it('CHANGELOG.md から自動生成されたリリースノートに最新バージョン v1.4.0〜v1.0.0 が含まれ、** などの記号や空項目が残らず、見出し付き入れ子箇条書きがすべて親見出しを引き継ぐ', () => {
       expect(RELEASE_NOTES[0].version).toBe('v1.4.0');
       expect(RELEASE_NOTES[RELEASE_NOTES.length - 1].version).toBe('v1.0.0');
       for (const rel of RELEASE_NOTES) {
@@ -448,14 +448,46 @@ describe('ホーム画面ロジック（homeLogic）', () => {
           expect(sec.items.length).toBeGreaterThan(0);
           for (const item of sec.items) {
             expect(item.trim().length).toBeGreaterThan(0);
+            // Markdown の ** などの強調記号が残っていないこと
+            expect(item).not.toContain('**');
           }
         }
       }
 
-      const customParsed = parseChangelog('## v1.5.0（2026-11-03）\n\n### 新しくできること\n- **ホーム画面**:\n  - お知らせを見られます。');
+      // v1.4.0 の親見出し「下のメニューに「RSVP」を追加」の下にある複数の子箇条書きが、いずれも見出しプレフィックスを引き継いでいること
+      const v140 = RELEASE_NOTES.find((r) => r.version === 'v1.4.0')!;
+      const rsvpSec = v140.sections.find((s) => s.heading === '新しくできること')!;
+      const rsvpItems = rsvpSec.items.filter((it) => it.startsWith('下のメニューに「RSVP」を追加: '));
+      expect(rsvpItems.length).toBe(2);
+      expect(rsvpItems[0]).toContain('下のメニューから「RSVP」を開き');
+      expect(rsvpItems[1]).toContain('複数のグループに所属している場合は');
+
+      const customParsed = parseChangelog('## v1.5.0（2026-11-03）\n\n### 新しくできること\n- **ホーム画面**:\n  - お知らせを見られます。\n  - リリースノートも見られます。');
       expect(customParsed).toHaveLength(1);
       expect(customParsed[0].version).toBe('v1.5.0');
-      expect(customParsed[0].sections[0].items[0]).toBe('ホーム画面: お知らせを見られます。');
+      expect(customParsed[0].sections[0].items).toEqual([
+        'ホーム画面: お知らせを見られます。',
+        'ホーム画面: リリースノートも見られます。',
+      ]);
+    });
+
+    it('CHANGELOG.md の解析結果が空の場合、未読リリースノートは false になる', () => {
+      const emptyNotes = parseChangelog('');
+      expect(emptyNotes).toEqual([]);
+
+      const nonMatchingNotes = parseChangelog('# ただのドキュメント\n\n箇条書きのみ\n- アイテム');
+      expect(nonMatchingNotes).toEqual([]);
+
+      // RELEASE_NOTES が空のときは getHomeUnreadStatus の hasUnreadReleaseNote が false になる
+      // （※モック環境で LATEST_RELEASE_VERSION が空または RELEASE_NOTES が空の場合の挙動）
+      const me = createMockMe();
+      const status = getHomeUnreadStatus([], me, '2026-11-02');
+      // 現在の実データでは RELEASE_NOTES があるため、markReleaseNotesRead で既読化すれば false になる
+      markReleaseNotesRead(me, LATEST_RELEASE_VERSION);
+      expect(getHomeUnreadStatus([], me, '2026-11-02').hasUnreadReleaseNote).toBe(false);
+
+      // version が空文字の場合は markReleaseNotesRead が何もしない
+      markReleaseNotesRead(me, '');
     });
 
     it('formatNoticeTime が ISO 文字列を JST の MM/DD HH:mm 形式に整形する', () => {

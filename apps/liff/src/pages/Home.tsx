@@ -127,7 +127,7 @@ export function HomePage() {
             {
               key: 'notices',
               label: 'お知らせ',
-              count: notices.length > 0 ? notices.length : undefined,
+              count: unreadStatus.unreadNoticesCount > 0 ? unreadStatus.unreadNoticesCount : undefined,
             },
             {
               key: 'releases',
@@ -180,6 +180,10 @@ export function HomePage() {
               })}
             </ul>
           )
+        ) : RELEASE_NOTES.length === 0 ? (
+          <div class="home-empty-card" style={{ marginTop: 12 }}>
+            <span>リリースノートはありません。</span>
+          </div>
         ) : (
           <div class="home-release-list">
             {RELEASE_NOTES.map((rel) => {
