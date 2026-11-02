@@ -1,14 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { PracticeView } from '@studio-attendance/shared';
 import {
+  cleanupAfterCommit,
   clearGlobalDrafts,
   createPracticeSyncTracker,
   createRsvpNavigationGuard,
   executeStageAnswer,
   generateSpecificReport,
+  getModifiedItems,
   globalDrafts,
   mergePracticesWithKeep,
+  processCommitItems,
   recordSpecificChange,
+  stageAnswer,
   type SpecificChangeMap,
 } from '../src/pages/answerLogic';
 import { MyAnswerBadge, readTab } from '../src/pages/List';
@@ -387,6 +391,139 @@ describe('募集カード（?r= 指定）から開いたときの即時保存と
       expect(report).toContain('11/20');
     } finally {
       globalThis.location = originalLocation;
+    }
+  });
+
+  it('画面表示が「△ 未定」でも、RsvpButtons から新しい RSVP 画面（下書き→反映・タブ切替・途中失敗再試行）を通ってシート（API）に送られる値は従来どおり「保留」になる', async () => {
+    clearGlobalDrafts();
+    const practice1 = {
+      id: 'p1',
+      date: '2026-11-20',
+      start: '18:00',
+      end: '21:00',
+      studio: 'サウンドスタジオノア 渋谷1号店',
+      room: 'Ast',
+      fee: 5000,
+      status: '募集中' as const,
+      booker: 'u1',
+      groups: ['g1'],
+    };
+    const practice2 = {
+      id: 'p2',
+      date: '2026-11-21',
+      start: '19:00',
+      end: '22:00',
+      studio: 'サウンドスタジオノア 渋谷1号店',
+      room: 'Bst',
+      fee: 5000,
+      status: '募集中' as const,
+      booker: 'u1',
+      groups: ['g1'],
+    };
+    const list: PracticeView[] = [
+      { practice: practice1, myAnswer: null, attendees: [] } as unknown as PracticeView,
+      { practice: practice2, myAnswer: '行く', attendees: ['山田'] } as unknown as PracticeView,
+    ];
+
+    try {
+      // 1. 「未回答」タブで p1 の RsvpButtons「△ 未定」を押す -> 下書きに '保留' が入る
+      let subTab: 'unanswered' | 'answered' = 'unanswered';
+      const vnodeUnanswered = RsvpButtons({
+        value: list[0].myAnswer,
+        status: list[0].practice.status,
+        onAnswer: (answer) => {
+          void executeStageAnswer({
+            id: 'p1',
+            answer,
+            isSpecific: false,
+            fresh: true,
+            busy: false,
+            saving: false,
+            originalPractice: list[0],
+            apiSave: vi.fn(),
+            touchPractice: vi.fn(),
+            updatePractice: vi.fn(),
+            toast: vi.fn(),
+            onSpecificSaved: vi.fn(),
+            onDraftStaged: (orig) => {
+              globalDrafts[subTab] = stageAnswer(globalDrafts[subTab], 'p1', answer, orig);
+            },
+          });
+        },
+      });
+      const unansweredBtns = vnodeUnanswered.props.children as Array<{ props: { onClick: () => void } }>;
+      unansweredBtns[1].props.onClick(); // 中央の「△ 未定」ボタン
+      expect(globalDrafts.unanswered.get('p1')).toBe('保留');
+
+      // 2. 「回答済」タブへ切り替えて p2 の「△ 未定」を押す -> タブを切り替えても未回答タブの下書きは消えず、回答済タブにも '保留' が入る
+      subTab = 'answered';
+      const vnodeAnswered = RsvpButtons({
+        value: list[1].myAnswer,
+        status: list[1].practice.status,
+        onAnswer: (answer) => {
+          void executeStageAnswer({
+            id: 'p2',
+            answer,
+            isSpecific: false,
+            fresh: true,
+            busy: false,
+            saving: false,
+            originalPractice: list[1],
+            apiSave: vi.fn(),
+            touchPractice: vi.fn(),
+            updatePractice: vi.fn(),
+            toast: vi.fn(),
+            onSpecificSaved: vi.fn(),
+            onDraftStaged: (orig) => {
+              globalDrafts[subTab] = stageAnswer(globalDrafts[subTab], 'p2', answer, orig);
+            },
+          });
+        },
+      });
+      const answeredBtns = vnodeAnswered.props.children as Array<{ props: { onClick: () => void } }>;
+      answeredBtns[1].props.onClick(); // 中央の「△ 未定」ボタン
+      expect(globalDrafts.unanswered.get('p1')).toBe('保留'); // タブ切り替え後も保持
+      expect(globalDrafts.answered.get('p2')).toBe('保留');
+
+      // 3. まとめて反映（1回目は p2 が失敗、2回目で再試行成功）-> シート（API）へ送られる answer は両方とも '保留'
+      const allModified = [
+        ...getModifiedItems(globalDrafts.unanswered, list),
+        ...getModifiedItems(globalDrafts.answered, list),
+      ];
+      expect(allModified.map((m) => ({ id: m.id, answer: m.answer }))).toEqual([
+        { id: 'p1', answer: '保留' },
+        { id: 'p2', answer: '保留' },
+      ]);
+
+      const sentPayloads: Array<{ id: string; answer: string }> = [];
+      let failP2Once = true;
+      const firstCommit = await processCommitItems(allModified, async (item) => {
+        if (item.id === 'p2' && failP2Once) {
+          failP2Once = false;
+          throw new Error('一時的な通信エラー');
+        }
+        sentPayloads.push({ id: item.id, answer: item.answer });
+      });
+      expect(firstCommit.succeeded).toBe(1);
+      expect(firstCommit.failed).toBe(1);
+      globalDrafts.unanswered = cleanupAfterCommit(globalDrafts.unanswered, firstCommit.succeededIds);
+      globalDrafts.answered = cleanupAfterCommit(globalDrafts.answered, firstCommit.succeededIds);
+      expect(globalDrafts.unanswered.size).toBe(0);
+      expect(globalDrafts.answered.get('p2')).toBe('保留'); // 失敗した p2 は下書きに残る
+
+      // 再試行で残りの p2 も反映成功
+      const remaining = getModifiedItems(globalDrafts.answered, list);
+      const secondCommit = await processCommitItems(remaining, async (item) => {
+        sentPayloads.push({ id: item.id, answer: item.answer });
+      });
+      expect(secondCommit.succeeded).toBe(1);
+      expect(secondCommit.failed).toBe(0);
+      expect(sentPayloads).toEqual([
+        { id: 'p1', answer: '保留' },
+        { id: 'p2', answer: '保留' },
+      ]);
+    } finally {
+      clearGlobalDrafts();
     }
   });
 });

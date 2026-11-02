@@ -16,6 +16,21 @@ export interface DraftStore {
 }
 
 const DRAFTS_STORAGE_KEY = 'pb:rsvpDrafts';
+const VALID_ANSWERS = new Set<Answer>(['行く', '保留', '行かない']);
+
+export function isValidAnswer(v: unknown): v is Answer {
+  return typeof v === 'string' && VALID_ANSWERS.has(v as Answer);
+}
+
+function isValidDraftEntry(entry: unknown): entry is [string, Answer] {
+  return (
+    Array.isArray(entry) &&
+    entry.length === 2 &&
+    typeof entry[0] === 'string' &&
+    entry[0].length > 0 &&
+    isValidAnswer(entry[1])
+  );
+}
 
 let currentDraftUserId: string | undefined = undefined;
 
@@ -60,30 +75,48 @@ export function loadDraftsFromStorage(expectedUserId: string | undefined = curre
     if (typeof localStorage === 'undefined' || typeof localStorage.getItem !== 'function') return;
     const raw = localStorage.getItem(DRAFTS_STORAGE_KEY);
     if (!raw) return;
-    const parsed = JSON.parse(raw) as {
-      userId?: string;
-      unanswered?: [string, Answer][];
-      answered?: [string, Answer][];
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      localStorage.removeItem?.(DRAFTS_STORAGE_KEY);
+      return;
+    }
+    const record = parsed as {
+      userId?: unknown;
+      unanswered?: unknown;
+      answered?: unknown;
     };
-    // アカウントや「見え方の確認」モードが異なる場合は前の下書きを破棄する
-    if (expectedUserId !== undefined && parsed.userId !== expectedUserId) {
+    // アカウントや「見え方の確認」モードが異なる場合、または古い形式（userId なし）の場合は破棄する
+    if (expectedUserId !== undefined && record.userId !== expectedUserId) {
       globalDrafts.specific.clear();
       globalDrafts.unanswered.clear();
       globalDrafts.answered.clear();
       localStorage.removeItem?.(DRAFTS_STORAGE_KEY);
       return;
     }
-    if (parsed.userId !== undefined) {
-      currentDraftUserId = parsed.userId;
+    if (typeof record.userId === 'string') {
+      currentDraftUserId = record.userId;
     }
-    if (Array.isArray(parsed.unanswered)) {
-      for (const [k, v] of parsed.unanswered) globalDrafts.unanswered.set(k, v);
+    if (Array.isArray(record.unanswered)) {
+      for (const item of record.unanswered) {
+        if (isValidDraftEntry(item)) {
+          globalDrafts.unanswered.set(item[0], item[1]);
+        }
+      }
     }
-    if (Array.isArray(parsed.answered)) {
-      for (const [k, v] of parsed.answered) globalDrafts.answered.set(k, v);
+    if (Array.isArray(record.answered)) {
+      for (const item of record.answered) {
+        if (isValidDraftEntry(item)) {
+          globalDrafts.answered.set(item[0], item[1]);
+        }
+      }
     }
   } catch {
-    /* 破損データは無視 */
+    /* 破損データは無視し、壊れたキーが残らないよう安全に除去を試みる */
+    try {
+      localStorage.removeItem?.(DRAFTS_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
   }
 }
 

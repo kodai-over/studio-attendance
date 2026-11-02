@@ -598,6 +598,66 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
         globalThis.localStorage = originalLocalStorage;
       }
     });
+
+    it('古い形式・壊れた形式の pb:rsvpDrafts が localStorage に残っていても、起動や復元でエラーにならず安全に処理される', () => {
+      const store = new Map<string, string>();
+      const originalLocalStorage = globalThis.localStorage;
+      globalThis.localStorage = {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, val: string) => store.set(key, val),
+        removeItem: (key: string) => store.delete(key),
+        clear: () => store.clear(),
+        length: 0,
+        key: () => null,
+      };
+
+      try {
+        clearGlobalDrafts();
+
+        // 1. 壊れた JSON 文字列
+        store.set('pb:rsvpDrafts', '{broken-json');
+        expect(() => syncDraftsForUser('user-1')).not.toThrow();
+        expect(globalDrafts.unanswered.size).toBe(0);
+        expect(store.has('pb:rsvpDrafts')).toBe(false);
+
+        // 2. 配列やプリミティブ、null
+        for (const raw of ['null', '123', '"text"', '[1,2,3]']) {
+          store.set('pb:rsvpDrafts', raw);
+          expect(() => loadDraftsFromStorage('user-1')).not.toThrow();
+          expect(globalDrafts.unanswered.size).toBe(0);
+        }
+
+        // 3. userId がない古い形式のデータ -> expectedUserId 指定時に破棄される
+        store.set('pb:rsvpDrafts', JSON.stringify({ unanswered: [['p1', '行く']] }));
+        expect(() => syncDraftsForUser('user-1')).not.toThrow();
+        expect(globalDrafts.unanswered.size).toBe(0);
+        expect(store.has('pb:rsvpDrafts')).toBe(false);
+
+        // 4. 配列要素の一部が壊れている・不正な回答値が混ざっている場合 -> 正常なエントリのみ復元される
+        store.set(
+          'pb:rsvpDrafts',
+          JSON.stringify({
+            userId: 'user-1',
+            unanswered: [
+              null,
+              123,
+              ['p-invalid', '不正な回答'],
+              ['', '行く'],
+              ['p-valid', '保留'],
+            ],
+            answered: 'not-an-array',
+          }),
+        );
+        expect(() => syncDraftsForUser('user-1')).not.toThrow();
+        expect(globalDrafts.unanswered.size).toBe(1);
+        expect(globalDrafts.unanswered.get('p-valid')).toBe('保留');
+        expect(globalDrafts.answered.size).toBe(0);
+
+        clearGlobalDrafts();
+      } finally {
+        globalThis.localStorage = originalLocalStorage;
+      }
+    });
   });
 
   describe('getUnansweredSummary (下部メニューバッジとRSVP画面のグループ別未回答件数の一貫性)', () => {
