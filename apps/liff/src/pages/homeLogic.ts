@@ -416,10 +416,11 @@ export function syncPracticeNotices(
         }
       }
 
-      // 2. 自分が予約者の予約情報に対するメンバーの回答変更の検知
+      // 2. 自分が予約者の予約情報に対するメンバーの回答変更の検知（「未定」はお知らせ対象外）
       if (p.booker === me.member.userId) {
         for (const a of collectAttendees(v)) {
           if (a.participant === me.member.userId) continue;
+          if (a.answer === '保留') continue;
           const prevAtt = prev.answers?.[a.participant];
           if (prevAtt && prevAtt.answer !== a.answer) {
             const ts = a.updatedAt || nowIso;
@@ -480,8 +481,10 @@ export function buildHomeNotices(
   const stored = loadStoredNotices(ownerKey);
   const practiceIds = new Set(practices.map((v) => v.practice.id));
 
-  // 削除された予約情報のお知らせは除外する
-  const validStored = stored.filter((n) => practiceIds.has(n.practiceId));
+  // 削除された予約情報のお知らせ、および「未定」の回答通知は除外する
+  const validStored = stored.filter(
+    (n) => practiceIds.has(n.practiceId) && (n.kind !== 'answer' || n.answer !== '保留'),
+  );
   const byId = new Map<string, HomeNoticeItem>();
   // 同じ（practiceId + participant）の回答変更履歴が既にある場合は重複させない
   const seenParticipantAnswers = new Set<string>();
@@ -501,10 +504,11 @@ export function buildHomeNotices(
     if (isPastPractice(p, today, currentTime)) continue;
     const pLabel = `${labelDate(p.date)} ${p.start}–${p.end}`;
 
-    // 1. 自分が予約者の予約情報に対する他メンバーの回答
+    // 1. 自分が予約者の予約情報に対する他メンバーの回答（「未定」はお知らせ対象外）
     if (p.booker === me.member.userId) {
       for (const a of collectAttendees(v)) {
         if (a.participant === me.member.userId) continue;
+        if (a.answer === '保留') continue;
         const participantKey = `${p.id}\0${a.participant}`;
         if (seenParticipantAnswers.has(participantKey)) continue;
         seenParticipantAnswers.add(participantKey);

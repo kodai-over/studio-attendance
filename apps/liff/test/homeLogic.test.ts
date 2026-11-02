@@ -165,7 +165,7 @@ describe('ホーム画面ロジック（homeLogic）', () => {
   });
 
   describe('buildHomeNotices & syncPracticeNotices（お知らせの抽出・変更検知）', () => {
-    it('① 自分が「予約者」の予約情報に対する他メンバーの回答のみをお知らせに抽出し、他人が予約者の回答は出さない', () => {
+    it('① 自分が「予約者」の予約情報に対する他メンバーの回答のみをお知らせに抽出し、他人が予約者の回答や「未定」の回答は出さない', () => {
       const me = createMockMe();
       const myBooked = createMockPracticeView({
         id: 'p-mine',
@@ -175,7 +175,7 @@ describe('ホーム画面ロジック（homeLogic）', () => {
           createAttendee('Ume', 'おおゆち', '行く', '2026-11-02T09:00:00.000Z'), // 自分自身は除外
           createAttendee('U3', 'けんた', '行く', '2026-11-02T11:00:00.000Z'),
         ],
-        maybe: [createAttendee('U4', 'みお', '保留', '2026-11-02T10:30:00.000Z')],
+        maybe: [createAttendee('U4', 'みお', '保留', '2026-11-02T10:30:00.000Z')], // 未定は除外
       });
       const otherBooked = createMockPracticeView({
         id: 'p-other',
@@ -185,9 +185,9 @@ describe('ホーム画面ロジック（homeLogic）', () => {
       });
 
       const notices = buildHomeNotices([myBooked, otherBooked], me, '2026-11-02');
-      expect(notices).toHaveLength(2);
+      // 「未定」のみお、および他人が予約者の予約情報は除外され、「行く」のけんたのみ1件抽出される
+      expect(notices).toHaveLength(1);
       expect(notices[0].title).toBe('けんたさんが「行く」と回答しました');
-      expect(notices[1].title).toBe('みおさんが「未定」と回答しました');
     });
 
     it('出欠行の更新日時（updatedAt）が空文字の場合でも、practice.createdAt や nowIso に安全にフォールバックしてお知らせ時刻が空にならない', () => {
@@ -215,8 +215,8 @@ describe('ホーム画面ロジック（homeLogic）', () => {
         booker: 'Ume',
         date: '2026-11-10',
         createdAt: '2026-11-01T12:00:00.000Z',
-        maybe: [
-          createAttendee('U3', 'けんた', '保留', ''), // 空文字
+        notGoing: [
+          createAttendee('U3', 'けんた', '行かない', ''), // 空文字
         ],
       });
       const nowIso = '2026-11-02T15:00:00.000Z';
@@ -227,7 +227,7 @@ describe('ホーム画面ロジック（homeLogic）', () => {
       expect(ansNotice?.id).toBe(`ans:p-empty-ts:U3:${nowIso}`);
     });
 
-    it('② 自分が予約者の予約情報で他メンバーが回答を変更した際、変更前→変更後の通知を生成する', () => {
+    it('② 自分が予約者の予約情報で他メンバーが回答を変更した際、変更前→変更後の通知を生成する（「未定」への変更は除外）', () => {
       const me = createMockMe();
       const initial = createMockPracticeView({
         id: 'p1',
@@ -236,16 +236,28 @@ describe('ホーム画面ロジック（homeLogic）', () => {
       });
       syncPracticeNotices([initial], me, '2026-11-02T10:05:00.000Z');
 
+      // 行く → 行かない: お知らせが生成される
       const updated = createMockPracticeView({
         id: 'p1',
         booker: 'Ume',
-        maybe: [createAttendee('U3', 'けんた', '保留', '2026-11-02T12:00:00.000Z')],
+        notGoing: [createAttendee('U3', 'けんた', '行かない', '2026-11-02T12:00:00.000Z')],
       });
       syncPracticeNotices([updated], me, '2026-11-02T12:01:00.000Z');
 
       const notices = buildHomeNotices([updated], me, '2026-11-02');
       expect(notices).toHaveLength(1);
-      expect(notices[0].title).toBe('けんたさんが回答を変更しました（行く → 未定）');
+      expect(notices[0].title).toBe('けんたさんが回答を変更しました（行く → 行かない）');
+
+      // 行かない → 未定（保留）: 新回答が「未定」のためお知らせは追加されない
+      const toMaybe = createMockPracticeView({
+        id: 'p1',
+        booker: 'Ume',
+        maybe: [createAttendee('U3', 'けんた', '保留', '2026-11-02T13:00:00.000Z')],
+      });
+      const syncedMaybe = syncPracticeNotices([toMaybe], me, '2026-11-02T13:01:00.000Z');
+      const maybeNotices = buildHomeNotices([toMaybe], me, '2026-11-02');
+      // 既存の未定への変更通知は入らない
+      expect(maybeNotices.some((n) => n.answer === '保留')).toBe(false);
     });
 
     it('③ 自分が関係する予約情報の変更（時間・部屋・スタジオ代・メモ）および中止を検知して通知する', () => {
