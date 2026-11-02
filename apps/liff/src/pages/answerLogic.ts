@@ -56,6 +56,7 @@ export type SpecificChangeMap = Map<string, SpecificChange>;
  * 特定予約モード（?r=）での回答選択時に変更履歴を記録する。
  * 最初から回答変更を繰り返した場合（例: 未回答 -> 行く -> 行かない）でも、
  * 最初の元の回答（from）を保持しつつ最新の回答（to）を更新する。
+ * 元の回答と同じ値に戻った場合（例: 行く -> 未定 -> 行く）は履歴から除外する。
  */
 export function recordSpecificChange(
   current: SpecificChangeMap,
@@ -65,11 +66,16 @@ export function recordSpecificChange(
 ): SpecificChangeMap {
   const next = new Map(current);
   const existing = next.get(practice.id);
-  next.set(practice.id, {
-    practice,
-    from: existing ? existing.from : originalAnswer,
-    to: newAnswer,
-  });
+  const from = existing ? existing.from : originalAnswer;
+  if (from === newAnswer) {
+    next.delete(practice.id);
+  } else {
+    next.set(practice.id, {
+      practice,
+      from,
+      to: newAnswer,
+    });
+  }
   return next;
 }
 

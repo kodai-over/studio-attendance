@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { PracticeView } from '@studio-attendance/shared';
+import { answerReport, type PracticeView } from '@studio-attendance/shared';
 import {
   cleanupAfterCommit,
   clearGlobalDrafts,
@@ -234,6 +234,17 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
         to: '行かない',
       });
     });
+
+    it('元の回答と同じ値に戻した場合（例: 保留 -> 行く -> 保留）、履歴から除外される', () => {
+      let changes = new Map();
+      // p2 の元の回答は '保留'
+      changes = recordSpecificChange(changes, mockPractice2, '保留', '行く');
+      expect(changes.has('p2')).toBe(true);
+
+      // 元の回答と同じ '保留' に戻す
+      changes = recordSpecificChange(changes, mockPractice2, '保留', '保留');
+      expect(changes.has('p2')).toBe(false);
+    });
   });
 
   describe('pruneStaleDrafts', () => {
@@ -290,6 +301,29 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       expect(report).toContain('未定 → 行かない');
       // 送信文が空でなく、2件まとまった文面が生成されている
       expect(report.trim().length).toBeGreaterThan(0);
+    });
+
+    it('開き直して変更操作を行わなかった場合（変更履歴が空）、現在の回答からフォールバック生成される', () => {
+      // 既に回答済みのリスト（p2 が '保留'）
+      const answeredList: PracticeView[] = [
+        { practice: mockPractice2, myAnswer: '保留', attendees: [] },
+      ];
+      const changes = new Map(); // 変更なし
+
+      // Answer.tsx 内のフォールバック処理をシミュレート
+      let report = '';
+      if (changes.size > 0) {
+        report = generateSpecificReport(changes.values());
+      } else {
+        const answeredItems = answeredList.filter((v) => v.practice.status !== '中止' && v.myAnswer != null);
+        if (answeredItems.length > 0) {
+          report = answerReport(answeredItems.map((v) => ({ practice: v.practice, answer: v.myAnswer }))) ?? '';
+        }
+      }
+
+      expect(report).not.toBe('');
+      expect(report).toContain('△');
+      expect(report).toContain('未定です');
     });
   });
 
@@ -367,6 +401,46 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       // 送信失敗しても文面が復元され、空にならず再送可能
       expect(draft).toBe(body);
       expect(draft?.trim().length).toBeGreaterThan(0);
+    });
+
+    it('commitItems で一部保存に失敗した場合（failed > 0）、sendToChat へ進まず送信が中断される', async () => {
+      const sendToChatMock = vi.fn();
+      let draft: string | null = null;
+      let staged = new Map([['p1', '行く' as const], ['p2', '行かない' as const]]);
+
+      const simulateHandleTellWithPartialFailure = async () => {
+        // commitItems シミュレーション（p1 成功, p2 失敗）
+        const { succeededIds, failed } = await processCommitItems(
+          [
+            { id: 'p1', answer: '行く' as const, originalAnswer: null, practice: mockPractice1 },
+            { id: 'p2', answer: '行かない' as const, originalAnswer: '保留' as const, practice: mockPractice2 },
+          ],
+          async (item) => {
+            if (item.id === 'p2') throw new Error('API Error');
+          },
+        );
+
+        if (succeededIds.length > 0) {
+          staged = cleanupAfterCommit(staged, succeededIds);
+        }
+
+        if (failed > 0) {
+          // 失敗があった場合は送信を中断して再試行を促す
+          return;
+        }
+
+        // ここには到達しない
+        await sendToChatMock();
+      };
+
+      await simulateHandleTellWithPartialFailure();
+
+      // sendToChat は呼ばれない
+      expect(sendToChatMock).not.toHaveBeenCalled();
+
+      // p1 のみ下書きから消え、p2 は下書きに残る（再試行可能）
+      expect(staged.has('p1')).toBe(false);
+      expect(staged.has('p2')).toBe(true);
     });
   });
 });

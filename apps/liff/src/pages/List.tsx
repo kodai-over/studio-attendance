@@ -83,7 +83,7 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
             ))}
           </div>
           <p class="note list-rsvp-note">
-            ※出欠の回答や変更は、メニューの「RSVP」からまとめて行えます
+            ※回答や変更は、メニューの「RSVP」からまとめて行えます
           </p>
         </>
       )}

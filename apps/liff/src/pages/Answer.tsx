@@ -197,7 +197,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
         if (!window.confirm('回答の変更が反映されていません。破棄して移動しますか？')) {
           isRevertingHashRef.current = true;
           const oldHash = new URL(e.oldURL).hash || '#/answer';
-          window.location.hash = oldHash;
+          history.replaceState(null, '', oldHash);
           setTimeout(() => {
             isRevertingHashRef.current = false;
           }, 100);
@@ -307,7 +307,15 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   // 送信文の生成
   let report = '';
   if (isSpecific) {
-    report = generateSpecificReport(specificChanges.values());
+    if (specificChanges.size > 0) {
+      report = generateSpecificReport(specificChanges.values());
+    } else {
+      // 変更操作がない場合（既に回答済みの人が開き直した場合など）は、現在の回答から文を生成
+      const answeredItems = displayed.filter((v) => v.practice.status !== '中止' && v.myAnswer != null);
+      if (answeredItems.length > 0) {
+        report = answerReport(answeredItems.map((v) => ({ practice: v.practice, answer: v.myAnswer }))) ?? '';
+      }
+    }
   } else if (subTab === 'unanswered') {
     // 未回答タブ: 「回答しました」形式（回答が入力された項目のみ。targetModifiedItems に揃える）
     const activeUnanswered = targetModifiedItems.filter((item) => item.practice.status !== '中止');
