@@ -652,18 +652,6 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
           </p>
         </>
       )}
-
-      {!isSpecific && hasGroupAllChanges && (
-        <div class="rsvp-floating-bar" role="region" aria-label="未反映の下書き">
-          <div class="rsvp-floating-bar-text">
-            <Icon name="check" size={15} />
-            <span>未反映の下書き（{groupAllModifiedItems.length}件）</span>
-          </div>
-          <button class="btn primary" disabled={saving} onClick={handleDone}>
-            {saving ? '保存中...' : '回答を反映して完了'}
-          </button>
-        </div>
-      )}
     </>
   );
 }
