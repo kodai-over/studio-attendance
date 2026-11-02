@@ -142,7 +142,7 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}
                 >
                   <Icon name="check" size={14} />
-                  <span>{v.myAnswer == null ? 'RSVPで回答' : 'RSVPで変更'}</span>
+                  <span>{v.myAnswer == null ? '回答する' : '回答を変更'}</span>
                 </button>
               )}
             </div>

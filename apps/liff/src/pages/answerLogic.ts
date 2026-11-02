@@ -68,7 +68,22 @@ export function cleanupAfterCommit(staged: StageMap, succeededIds: string[]): St
 }
 
 /**
+ * 選択中グループに合致する予約情報を抽出する。
+ * groups が空の予約情報（登録のみ等）は全グループで表示する。
+ */
+export function filterGroupPractices(
+  practices: PracticeView[],
+  selectedGroup: string,
+): PracticeView[] {
+  if (!selectedGroup) return practices;
+  return practices.filter(
+    (v) => v.practice.groups.length === 0 || v.practice.groups.includes(selectedGroup),
+  );
+}
+
+/**
  * 表示中かつ選択中グループに合致する変更項目のみをフィルタリングする。
+ * groups が空の予約情報はどのグループ選択時にも対象に含める。
  */
 export function filterTargetModifiedItems(
   modifiedItems: ModifiedItem[],
@@ -77,7 +92,7 @@ export function filterTargetModifiedItems(
 ): ModifiedItem[] {
   return modifiedItems.filter((item) => {
     if (!displayedIds.has(item.id)) return false;
-    if (!selectedGroup) return true;
+    if (!selectedGroup || item.practice.groups.length === 0) return true;
     return item.practice.groups.includes(selectedGroup);
   });
 }

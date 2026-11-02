@@ -15,6 +15,9 @@ import { FRESH_MS, Icon, Spinner, Syncing, Tabs, TopBar, go, useApp, useRunner }
 import { answersSettled } from '../answering';
 import { PracticeCard } from './List';
 import {
+  cleanupAfterCommit,
+  filterGroupPractices,
+  filterTargetModifiedItems,
   generateSpecificReport,
   getModifiedItems,
   stageAnswer,
@@ -93,13 +96,10 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     allTargets = list.filter((v) => isRsvpTarget(v, me.member.userId, me.member.groups, today, currentTime));
   }
 
-  // 所属グループ選択によるチケット絞り込み（特定指定時以外は、選択中グループのチケットのみ表示）
-  const groupFiltered =
-    isSpecific
-      ? allTargets
-      : selectedGroup
-      ? allTargets.filter((v) => v.practice.groups.includes(selectedGroup))
-      : allTargets;
+  // 所属グループ選択によるチケット絞り込み（groupsが空の予約情報は全グループで表示）
+  const groupFiltered = isSpecific
+    ? allTargets
+    : filterGroupPractices(allTargets, selectedGroup);
 
   // 未回答・回答済の分類（タブ分類の基準は元の回答 myAnswer に固定し、回答変更してもチケットが消えないようにする）
   const todos = groupFiltered.filter((v) => v.myAnswer == null);
@@ -132,13 +132,23 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   const modifiedItems = getModifiedItems(currentStaged, list);
   const hasChanges = modifiedItems.length > 0;
 
-  // 離脱防止用に最新の hasChanges を保持
-  const hasChangesRef = useRef(false);
-  hasChangesRef.current = hasChanges;
+  // 全タブの変更項目一覧（離脱防止と一括完了保存に使用）
+  const allModifiedItems = isSpecific
+    ? modifiedItems
+    : [
+        ...getModifiedItems(unansweredStaged, list),
+        ...getModifiedItems(answeredStaged, list),
+      ];
+  const hasAnyChanges = allModifiedItems.length > 0;
+
+  // 離脱防止用に最新の hasAnyChanges を保持
+  const hasAnyChangesRef = useRef(false);
+  hasAnyChangesRef.current = hasAnyChanges;
+  const isRevertingHashRef = useRef(false);
 
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasChangesRef.current) {
+      if (hasAnyChangesRef.current) {
         e.preventDefault();
         e.returnValue = '';
       }
@@ -149,8 +159,13 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
 
   useEffect(() => {
     const onHashChange = (e: HashChangeEvent) => {
-      if (hasChangesRef.current) {
+      if (isRevertingHashRef.current) {
+        isRevertingHashRef.current = false;
+        return;
+      }
+      if (hasAnyChangesRef.current) {
         if (!window.confirm('回答の変更が反映されていません。破棄して移動しますか？')) {
+          isRevertingHashRef.current = true;
           const oldHash = new URL(e.oldURL).hash || '#/answer';
           window.location.hash = oldHash;
         }
@@ -179,17 +194,15 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     setDraft(null);
   };
 
-  // メッセージ対象の練習（選択中グループの練習）
+  // メッセージ対象の練習（選択中グループの練習。groupsが空なら全グループ対象）
   const messagePracticeFilter = (p: Pick<Practice, 'groups'>) =>
-    !selectedGroup || p.groups.includes(selectedGroup);
+    !selectedGroup || p.groups.length === 0 || p.groups.includes(selectedGroup);
 
   // 表示中かつ選択グループに該当する変更項目（メッセージと件数を完全連動させる）
   const displayedIds = new Set(displayed.map((v) => v.practice.id));
   const targetModifiedItems = isSpecific
     ? modifiedItems
-    : modifiedItems.filter(
-        (item) => displayedIds.has(item.id) && messagePracticeFilter(item.practice),
-      );
+    : filterTargetModifiedItems(modifiedItems, displayedIds, selectedGroup);
   const hasTargetChanges = targetModifiedItems.length > 0;
 
   // 複数件の回答保存処理（1件ずつ反映し、成功分は下書きから削除、失敗分は下書きに残して安全に再試行可能にする）
@@ -197,6 +210,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     if (items.length === 0) return { succeeded: 0, failed: 0 };
     let succeeded = 0;
     let failed = 0;
+    const succeededIds: string[] = [];
     let lastError: Error | null = null;
 
     for (const item of items) {
@@ -204,16 +218,18 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
         const updated = await api('rsvp', { id: item.id, answer: item.answer });
         updatePractice(updated);
         succeeded++;
-        // 成功したものを即座に下書きから消す
-        setCurrentStaged((prev) => {
-          const next = new Map(prev);
-          next.delete(item.id);
-          return next;
-        });
+        succeededIds.push(item.id);
       } catch (err) {
         failed++;
         lastError = err instanceof Error ? err : new Error(String(err));
       }
+    }
+
+    if (succeededIds.length > 0) {
+      setSpecificStaged((prev) => cleanupAfterCommit(prev, succeededIds));
+      setUnansweredStaged((prev) => cleanupAfterCommit(prev, succeededIds));
+      setAnsweredStaged((prev) => cleanupAfterCommit(prev, succeededIds));
+      setDraft(null); // 手動編集ドラフトをリセットして古い文の二重送信を防止
     }
 
     if (failed > 0) {
@@ -280,13 +296,13 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     }
   };
 
-  // 回答を反映して完了（現在のタブの変更があれば保存。予定画面へは切り替えずそのまま留まる）
+  // 回答を反映して完了（全タブの変更があれば保存。予定画面へは切り替えずそのまま留まる）
   const handleDone = async () => {
-    if (hasChanges) {
+    if (hasAnyChanges) {
       setSaving(true);
       try {
-        const count = modifiedItems.length;
-        const { succeeded, failed } = await commitItems(modifiedItems);
+        const count = allModifiedItems.length;
+        const { succeeded, failed } = await commitItems(allModifiedItems);
         if (failed === 0) {
           toast(`${count}件の回答を反映しました`);
         }
@@ -299,11 +315,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   };
 
   const handleBack = () => {
-    if (hasChanges) {
-      if (!window.confirm('回答の変更が反映されていません。破棄して戻りますか？')) {
-        return;
-      }
-    }
+    // hashchange リスナー側で未保存の確認を行うため、ここでは直接 history.back / 遷移を実行
     if (history.length > 1) {
       history.back();
     } else if (ids.length === 1) {
@@ -470,16 +482,14 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
 
       {displayed.length > 0 && (
         <button
-          class={`btn ${hasChanges ? 'primary' : 'ghost'} block rsvp-done-btn`}
+          class={`btn ${hasAnyChanges ? 'primary' : 'ghost'} block rsvp-done-btn`}
           disabled={saving}
           onClick={handleDone}
         >
           {saving
             ? '保存中...'
-            : hasChanges
-            ? modifiedItems.length > targetModifiedItems.length
-              ? `回答を反映して完了（全${modifiedItems.length}件）`
-              : `回答を反映して完了（${modifiedItems.length}件）`
+            : hasAnyChanges
+            ? `回答を反映して完了（${allModifiedItems.length}件）`
             : '完了'}
         </button>
       )}

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { PracticeView } from '@studio-attendance/shared';
 import {
   cleanupAfterCommit,
+  filterGroupPractices,
   filterTargetModifiedItems,
   generateSpecificReport,
   getModifiedItems,
@@ -103,21 +104,48 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
     });
   });
 
+  describe('filterGroupPractices', () => {
+    const practiceNoGroup = {
+      ...mockPractice1,
+      id: 'p-no-group',
+      groups: [],
+    };
+    const listWithNoGroup: PracticeView[] = [
+      ...mockList,
+      { practice: practiceNoGroup, myAnswer: null, attendees: [] },
+    ];
+
+    it('選択中グループの予約情報に加え、groupsが空（登録のみ等）の予約情報も含まれる', () => {
+      const filtered = filterGroupPractices(listWithNoGroup, 'group-a');
+      const ids = filtered.map((v) => v.practice.id);
+      expect(ids).toContain('p1');
+      expect(ids).toContain('p-no-group');
+      expect(ids).not.toContain('p2'); // group-b
+    });
+
+    it('グループが未選択（空文字）の場合は全件が返る', () => {
+      const filtered = filterGroupPractices(listWithNoGroup, '');
+      expect(filtered).toHaveLength(listWithNoGroup.length);
+    });
+  });
+
   describe('filterTargetModifiedItems', () => {
-    it('表示中かつ選択グループに該当する項目のみ抽出する', () => {
+    const mockPracticeNoGroup = { ...mockPractice1, id: 'p-none', groups: [] };
+    it('表示中かつ選択グループに該当する項目のみ抽出する（groupsが空の予約情報も含む）', () => {
       const items = [
         { id: 'p1', answer: '行く' as const, originalAnswer: null, practice: mockPractice1 }, // group-a
         { id: 'p2', answer: '行かない' as const, originalAnswer: '保留' as const, practice: mockPractice2 }, // group-b
+        { id: 'p-none', answer: '行く' as const, originalAnswer: null, practice: mockPracticeNoGroup }, // groups: []
       ];
-      const displayedIds = new Set(['p1', 'p2']);
+      const displayedIds = new Set(['p1', 'p2', 'p-none']);
 
-      // group-a のみ選択
+      // group-a のみ選択時: p1 と p-none が抽出される
       const filteredA = filterTargetModifiedItems(items, displayedIds, 'group-a');
-      expect(filteredA.map((x) => x.id)).toEqual(['p1']);
+      expect(filteredA.map((x) => x.id)).toEqual(['p1', 'p-none']);
 
-      // group-b のみ選択
+      // group-b のみ選択時: p2 と p-none が抽出される
       const filteredB = filterTargetModifiedItems(items, displayedIds, 'group-b');
-      expect(filteredB.map((x) => x.id)).toEqual(['p2']);
+      expect(filteredB.map((x) => x.id)).toEqual(['p2', 'p-none']);
 
       // 非表示の項目は除外される
       const filteredPartial = filterTargetModifiedItems(items, new Set(['p2']), 'group-b');
