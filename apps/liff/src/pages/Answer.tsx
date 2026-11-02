@@ -22,6 +22,7 @@ import {
   generateSpecificReport,
   getModifiedItems,
   globalDrafts,
+  processCommitItems,
   pruneStaleDrafts,
   recordSpecificChange,
   stageAnswer,
@@ -265,22 +266,13 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   // 複数件の回答保存処理（1件ずつ反映し、成功分は下書きから削除、失敗分は下書きに残して安全に再試行可能にする）
   const commitItems = async (items: ModifiedItem[]) => {
     if (items.length === 0) return { succeeded: 0, failed: 0 };
-    let succeeded = 0;
-    let failed = 0;
-    const succeededIds: string[] = [];
-    let lastError: Error | null = null;
-
-    for (const item of items) {
-      try {
+    const { succeeded, failed, succeededIds, lastError } = await processCommitItems(
+      items,
+      async (item) => {
         const updated = await api('rsvp', { id: item.id, answer: item.answer });
         updatePractice(updated);
-        succeeded++;
-        succeededIds.push(item.id);
-      } catch (err) {
-        failed++;
-        lastError = err instanceof Error ? err : new Error(String(err));
-      }
-    }
+      },
+    );
 
     if (succeededIds.length > 0) {
       setSpecificStaged((prev) => {
@@ -357,6 +349,8 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
         toast(isSpecific ? 'メッセージをコピーしました' : '回答を反映し、メッセージをコピーしました');
       }
     } catch (e) {
+      // 送信（またはクリップボードコピー）に失敗した場合、body を下書きとして復元して再送可能にする
+      setDraft(body);
       toast(e instanceof Error ? e.message : '送信に失敗しました', true);
     } finally {
       setSaving(false);
@@ -420,8 +414,8 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
           {userGroups.length > 1 && (
             <div class="group-filter-bar">
               {userGroups.map((g) => {
-                const gCount = allTargets.filter(
-                  (v) => (v.practice.groups.length === 0 || v.practice.groups.includes(g.id)) && v.myAnswer == null,
+                const gCount = filterGroupPractices(allTargets, g.id, me.member.userId).filter(
+                  (v) => v.myAnswer == null,
                 ).length;
                 return (
                   <button
@@ -559,8 +553,12 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
                   title="メッセージをコピー"
                   disabled={!text.trim() || saving || !fresh || (!isSpecific && subTab === 'answered' && !hasTargetChanges)}
                   onClick={async () => {
-                    await navigator.clipboard.writeText(latest.current.trim());
-                    toast('メッセージをコピーしました');
+                    try {
+                      await navigator.clipboard.writeText(latest.current.trim());
+                      toast('メッセージをコピーしました');
+                    } catch (e) {
+                      toast('メッセージのコピーに失敗しました', true);
+                    }
                   }}
                 >
                   <Icon name="copy" size={18} />

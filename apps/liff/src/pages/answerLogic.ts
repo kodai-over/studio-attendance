@@ -133,6 +133,40 @@ export function cleanupAfterCommit(staged: StageMap, succeededIds: string[]): St
   return next;
 }
 
+export interface CommitResult {
+  succeeded: number;
+  failed: number;
+  succeededIds: string[];
+  lastError: Error | null;
+}
+
+/**
+ * 複数件の回答保存処理を実行する。
+ * 各項目を順次保存し、成功数・失敗数・成功したID一覧・最後のエラーを返す。
+ */
+export async function processCommitItems(
+  items: ModifiedItem[],
+  saveItem: (item: ModifiedItem) => Promise<void>,
+): Promise<CommitResult> {
+  let succeeded = 0;
+  let failed = 0;
+  const succeededIds: string[] = [];
+  let lastError: Error | null = null;
+
+  for (const item of items) {
+    try {
+      await saveItem(item);
+      succeeded++;
+      succeededIds.push(item.id);
+    } catch (err) {
+      failed++;
+      lastError = err instanceof Error ? err : new Error(String(err));
+    }
+  }
+
+  return { succeeded, failed, succeededIds, lastError };
+}
+
 /**
  * 選択中グループに合致する予約情報を抽出する。
  * groups が空の予約情報（登録のみ等）や、自分が予約者の予約情報はどのグループ選択時にも表示する。

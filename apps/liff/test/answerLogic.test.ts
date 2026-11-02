@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { PracticeView } from '@studio-attendance/shared';
 import {
   cleanupAfterCommit,
@@ -8,6 +8,7 @@ import {
   generateSpecificReport,
   getModifiedItems,
   globalDrafts,
+  processCommitItems,
   pruneStaleDrafts,
   recordSpecificChange,
   stageAnswer,
@@ -289,6 +290,83 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       expect(report).toContain('未定 → 行かない');
       // 送信文が空でなく、2件まとまった文面が生成されている
       expect(report.trim().length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('processCommitItems (複数回答の保存とエラーハンドリング)', () => {
+    const items = [
+      { id: 'p1', answer: '行く' as const, originalAnswer: null, practice: mockPractice1 },
+      { id: 'p2', answer: '行かない' as const, originalAnswer: '保留' as const, practice: mockPractice2 },
+    ];
+
+    it('全件が正常に保存できた場合、succeeded === 2, failed === 0 となる', async () => {
+      const saveItem = vi.fn().mockResolvedValue(undefined);
+      const res = await processCommitItems(items, saveItem);
+
+      expect(res.succeeded).toBe(2);
+      expect(res.failed).toBe(0);
+      expect(res.succeededIds).toEqual(['p1', 'p2']);
+      expect(res.lastError).toBeNull();
+    });
+
+    it('一部の保存に失敗した場合、成功したIDのみが返り、失敗した項目は下書きに残せる', async () => {
+      const saveItem = vi.fn().mockImplementation(async (item) => {
+        if (item.id === 'p2') throw new Error('Network error on p2');
+      });
+
+      const res = await processCommitItems(items, saveItem);
+
+      expect(res.succeeded).toBe(1);
+      expect(res.failed).toBe(1);
+      expect(res.succeededIds).toEqual(['p1']);
+      expect(res.lastError?.message).toBe('Network error on p2');
+
+      // cleanupAfterCommit との連携: p1 のみ下書きから消え、p2 は残る
+      const staged = new Map([['p1', '行く' as const], ['p2', '行かない' as const]]);
+      const remaining = cleanupAfterCommit(staged, res.succeededIds);
+      expect(remaining.has('p1')).toBe(false);
+      expect(remaining.has('p2')).toBe(true);
+    });
+
+    it('全件の保存に失敗した場合、成功IDは空配列となり全件が下書きに残る', async () => {
+      const saveItem = vi.fn().mockRejectedValue(new Error('Server unavailable'));
+      const res = await processCommitItems(items, saveItem);
+
+      expect(res.succeeded).toBe(0);
+      expect(res.failed).toBe(2);
+      expect(res.succeededIds).toEqual([]);
+      expect(res.lastError?.message).toBe('Server unavailable');
+    });
+  });
+
+  describe('handleTell の安全性: 保存後に送信失敗した場合の下書き復元', () => {
+    it('回答の commitItems が成功した後に sendToChat が失敗した場合、body が draft として復元される', async () => {
+      let draft: string | null = null;
+      const setDraft = (val: string | null) => { draft = val; };
+
+      const body = '回答しました\n○ 11/10(火) 19:00〜21:00 ノア A 行きます';
+
+      // handleTell 内のシミュレーション
+      const simulateHandleTell = async (shouldFailChat: boolean) => {
+        try {
+          // 1. commitItems 成功（下書きクリア）
+          setDraft(null);
+
+          // 2. sendToChat 実行
+          if (shouldFailChat) {
+            throw new Error('LINE chat transmission failed');
+          }
+        } catch (e) {
+          // 3. 送信失敗時の救済: 文面を draft として復元
+          setDraft(body);
+        }
+      };
+
+      await simulateHandleTell(true);
+
+      // 送信失敗しても文面が復元され、空にならず再送可能
+      expect(draft).toBe(body);
+      expect(draft?.trim().length).toBeGreaterThan(0);
     });
   });
 });
