@@ -31,6 +31,7 @@ export function parseChangelog(md: string): ReleaseNote[] {
   const notes: ReleaseNote[] = [];
   let current: ReleaseNote | null = null;
   let currentSec: ReleaseNoteSection | null = null;
+  let pendingHeading: string | null = null;
 
   for (const rawLine of md.split(/\r?\n/)) {
     const line = rawLine.trimEnd();
@@ -43,6 +44,7 @@ export function parseChangelog(md: string): ReleaseNote[] {
       };
       notes.push(current);
       currentSec = null;
+      pendingHeading = null;
       continue;
     }
     if (!current) continue;
@@ -54,6 +56,7 @@ export function parseChangelog(md: string): ReleaseNote[] {
         items: [],
       };
       current.sections.push(currentSec);
+      pendingHeading = null;
       continue;
     }
 
@@ -64,23 +67,24 @@ export function parseChangelog(md: string): ReleaseNote[] {
         current.sections.push(currentSec);
       }
       const indent = bulletMatch[1].length;
-      const cleanText = bulletMatch[2]
-        .replace(/\*\*(.+?)\*\*:\s*$/, '$1')
+      const rawItem = bulletMatch[2].trim();
+      const headingOnlyMatch = indent === 0 ? rawItem.match(/^\*\*(.+?)\*\*[:：]\s*$/) : null;
+      if (headingOnlyMatch) {
+        pendingHeading = headingOnlyMatch[1].trim();
+        continue;
+      }
+
+      const cleanText = rawItem
         .replace(/\*\*(.+?)\*\*/g, '$1')
         .replace(/`([^`]+)`/g, '$1')
         .trim();
 
       if (!cleanText) continue;
-      if (indent >= 2 && currentSec.items.length > 0) {
-        const lastIdx = currentSec.items.length - 1;
-        const prev = currentSec.items[lastIdx];
-        // 親箇条書きが見出しのみだった場合は「見出し: 本文」として連結し、それ以外は新しい項目として追加
-        if (!prev.includes('。') && prev.length <= 28) {
-          currentSec.items[lastIdx] = `${prev}: ${cleanText}`;
-        } else {
-          currentSec.items.push(cleanText);
-        }
+      if (indent >= 2 && pendingHeading) {
+        currentSec.items.push(`${pendingHeading}: ${cleanText}`);
+        pendingHeading = null;
       } else {
+        pendingHeading = null;
         currentSec.items.push(cleanText);
       }
       continue;
@@ -292,8 +296,11 @@ function saveStoredNotices(ownerKey: string, notices: HomeNoticeItem[]): void {
  * ② 自分が予約者の予約情報に対するメンバーの回答変更通知（前回答 → 新回答）
  * を検知して保存する。
  *
- * ※設計仕様: スプレッドシートの列や構成を変えずに差分通知を実現するため、前回スナップショットと既読時刻は端末ごとの localStorage に保持する。
- * そのため、初回起動時（prevMap === null）は既存データが大量に未読通知されないよう現時点を既読基準時刻として記録する。
+ * ※設計仕様:
+ * - スプレッドシートの列や構成を変えずに差分通知を実現するため、前回スナップショットと既読時刻は端末ごとの localStorage に保持する。
+ * - 初回起動時（prevMap === null）は既存データが大量に未読通知されないよう現時点を既読基準時刻として記録する。
+ * - 予約情報の変更・中止の検知時刻には検知時の端末時刻（nowIso）を用い、回答のお知らせには出欠シートのサーバー記録時刻（a.updatedAt）を用いる。
+ *   （スプレッドシートの練習シートには更新日時列を設けていないため、軽微な端末時計のずれは許容し、`markNoticesRead` では `latestAt` と `nowIso` の大きい方を既読時刻として記録することで既読漏れを防いでいる）
  */
 export function syncPracticeNotices(
   practices: PracticeView[],
@@ -481,8 +488,8 @@ export function buildHomeNotices(
       }
     }
 
-    // 2. 自分が関係する予約情報で現在「中止」になっているもの
-    if (p.status === '中止' && isRelatedForNotice(v, me)) {
+    // 2. 自分が関係する予約情報で現在「中止」になっているもの（自分が予約者として自分で中止にした場合は除く）
+    if (p.status === '中止' && p.booker !== me.member.userId && isRelatedForNotice(v, me)) {
       const hasCancelNotice = Array.from(byId.values()).some(
         (n) => n.kind === 'practice_canceled' && n.practiceId === p.id,
       );

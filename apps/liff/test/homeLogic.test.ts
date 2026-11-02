@@ -310,7 +310,7 @@ describe('ホーム画面ロジック（homeLogic）', () => {
       expect(notices[0].title).toBe('ユウキさんが回答を変更しました（△ 未定 → ✕ 行かない）');
     });
 
-    it('updatePracticeSnapshot を呼ぶと、自分が予約情報を編集した後の次回 syncPracticeNotices で変更通知が出ない', () => {
+    it('updatePracticeSnapshot を呼ぶと、自分が予約情報を編集または中止した後の次回 syncPracticeNotices で変更・中止通知が出ない', () => {
       const me = createMockMe();
       const initial = createMockPracticeView({
         id: 'p-edit',
@@ -331,8 +331,21 @@ describe('ホーム画面ロジック（homeLogic）', () => {
 
       // 次回のまとめ取得時
       syncPracticeNotices([selfEdited], me, '2026-11-02T10:00:00.000Z');
-      const notices = buildHomeNotices([selfEdited], me, '2026-11-02');
+      let notices = buildHomeNotices([selfEdited], me, '2026-11-02');
       expect(notices.filter((n) => n.kind === 'practice_changed')).toHaveLength(0);
+
+      // さらに自分で中止にした場合
+      const selfCanceled = createMockPracticeView({
+        id: 'p-edit',
+        booker: 'Ume',
+        room: '202',
+        fee: 4500,
+        status: '中止',
+      });
+      updatePracticeSnapshot(selfCanceled, me);
+      syncPracticeNotices([selfCanceled], me, '2026-11-02T11:00:00.000Z');
+      notices = buildHomeNotices([selfCanceled], me, '2026-11-02');
+      expect(notices.filter((n) => n.kind === 'practice_canceled')).toHaveLength(0);
     });
   });
 
@@ -384,10 +397,21 @@ describe('ホーム画面ロジック（homeLogic）', () => {
       expect(statusAllRead.totalBadgeCount).toBe(0);
     });
 
-    it('CHANGELOG.md から自動生成されたリリースノートに最新バージョン v1.4.0〜v1.0.0 が含まれている', () => {
+    it('CHANGELOG.md から自動生成されたリリースノートに最新バージョン v1.4.0〜v1.0.0 が含まれ、全バージョンの全セクション項目が空にならない', () => {
       expect(RELEASE_NOTES[0].version).toBe('v1.4.0');
       expect(RELEASE_NOTES[RELEASE_NOTES.length - 1].version).toBe('v1.0.0');
-      expect(RELEASE_NOTES[0].sections.length).toBeGreaterThan(0);
+      for (const rel of RELEASE_NOTES) {
+        expect(rel.version).toMatch(/^v\d+\.\d+\.\d+$/);
+        expect(rel.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+        expect(rel.sections.length).toBeGreaterThan(0);
+        for (const sec of rel.sections) {
+          expect(sec.heading.length).toBeGreaterThan(0);
+          expect(sec.items.length).toBeGreaterThan(0);
+          for (const item of sec.items) {
+            expect(item.trim().length).toBeGreaterThan(0);
+          }
+        }
+      }
 
       const customParsed = parseChangelog('## v1.5.0（2026-11-03）\n\n### 新しくできること\n- **ホーム画面**:\n  - お知らせを見られます。');
       expect(customParsed).toHaveLength(1);

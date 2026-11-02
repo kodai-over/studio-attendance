@@ -86,7 +86,7 @@ export function HomePage() {
             <span class="home-todo-badge">{todoCount}</span>
             <div class="home-todo-text">
               <strong>未回答の予約情報が {todoCount} 件あります</strong>
-              <span>RSVP からまとめて回答できます</span>
+              <span>RSVP から回答できます</span>
             </div>
           </div>
           <Icon name="chevron" size={18} />
