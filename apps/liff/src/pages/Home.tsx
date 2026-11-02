@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { toJstDate, toJstTime } from '@studio-attendance/shared';
 import { api } from '../api';
 import { FRESH_MS, Icon, Spinner, Syncing, Tabs, TopBar, go, useApp, useRunner } from '../ui';
-import { getUnansweredSummary } from './answerLogic';
+import { getDraftOwnerKey, getUnansweredSummary } from './answerLogic';
 import {
   LATEST_RELEASE_VERSION,
   RELEASE_NOTES,
@@ -24,9 +24,18 @@ export function HomePage() {
   const [, setReadTick] = useState(0);
   const [run, busy] = useRunner();
 
+  // ホーム画面を開いた時点（またはアカウント切り替え時点）の既読時刻を保持し、
+  // この画面を見ている間に markNoticesRead で localStorage が更新されても未読ドットが即消えないようにする
+  const ownerKey = getDraftOwnerKey(me);
+  const initialReadAtRef = useRef<{ ownerKey: string; readAt: string | null } | null>(null);
+  if (!initialReadAtRef.current || initialReadAtRef.current.ownerKey !== ownerKey) {
+    initialReadAtRef.current = { ownerKey, readAt: getNoticeReadAt(me) };
+  }
+  const readAtBefore = initialReadAtRef.current.readAt;
+
   useEffect(() => {
     if (practicesAt > 0 && Date.now() - practicesAt > FRESH_MS) {
-      run(() => api('listPractices')).then((r) => r && setPractices(r, false));
+      run(() => api('listPractices')).then((r) => r && setPractices(r, true));
     }
   }, []);
 
@@ -37,15 +46,14 @@ export function HomePage() {
   const { totalCount: todoCount } = getUnansweredSummary(list, me, today, currentTime);
   const nextGoing = getNextGoingPractice(list, today, currentTime);
   const notices = buildHomeNotices(list, me, today, currentTime);
-  const readAtBefore = getNoticeReadAt(me);
   const unreadStatus = getHomeUnreadStatus(list, me, today, currentTime);
 
-  // 「お知らせ」タブ表示中かつ一覧読み込み完了時に既読更新する
+  // 「お知らせ」タブ表示中かつ最新一覧の取得完了時（practicesAt > 0）に既読更新する
   useEffect(() => {
-    if (!list || subTab !== 'notices') return;
+    if (!list || practicesAt === 0 || subTab !== 'notices') return;
     const latestAt = notices[0]?.updatedAt;
     markNoticesRead(me, latestAt);
-  }, [list, subTab, me.member.userId, me.actAs, notices[0]?.updatedAt]);
+  }, [list, practicesAt, subTab, ownerKey, notices[0]?.updatedAt]);
 
   const handleSelectSubTab = (t: HomeSubTab) => {
     setSubTab(t);

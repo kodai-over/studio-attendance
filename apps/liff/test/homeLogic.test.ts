@@ -11,6 +11,7 @@ import {
   markNoticesRead,
   markReleaseNotesRead,
   syncPracticeNotices,
+  updatePracticeSnapshot,
 } from '../src/pages/homeLogic';
 
 function createMockMe(partial?: Partial<MeView['member']>, actAs: MeView['actAs'] = 'self'): MeView {
@@ -277,6 +278,59 @@ describe('ホーム画面ロジック（homeLogic）', () => {
 
       const notices = buildHomeNotices([changedUnrelated], me, '2026-11-02');
       expect(notices).toHaveLength(0);
+    });
+
+    it('ゲスト（participant = "guest:..."）の回答変更や複数回の変更でも重複せず最新の1件に集約される', () => {
+      const me = createMockMe();
+      const step1 = createMockPracticeView({
+        id: 'p-guest',
+        booker: 'Ume',
+        going: [createAttendee('guest:abc-123', 'ユウキ', '行く', '2026-11-02T09:00:00.000Z')],
+      });
+      syncPracticeNotices([step1], me, '2026-11-02T09:05:00.000Z');
+
+      const step2 = createMockPracticeView({
+        id: 'p-guest',
+        booker: 'Ume',
+        maybe: [createAttendee('guest:abc-123', 'ユウキ', '保留', '2026-11-02T10:00:00.000Z')],
+      });
+      syncPracticeNotices([step2], me, '2026-11-02T10:05:00.000Z');
+
+      const step3 = createMockPracticeView({
+        id: 'p-guest',
+        booker: 'Ume',
+        notGoing: [createAttendee('guest:abc-123', 'ユウキ', '行かない', '2026-11-02T11:00:00.000Z')],
+      });
+      syncPracticeNotices([step3], me, '2026-11-02T11:05:00.000Z');
+
+      const notices = buildHomeNotices([step3], me, '2026-11-02');
+      expect(notices).toHaveLength(1);
+      expect(notices[0].title).toBe('ユウキさんが回答を変更しました（△ 未定 → ✕ 行かない）');
+    });
+
+    it('updatePracticeSnapshot を呼ぶと、自分が予約情報を編集した後の次回 syncPracticeNotices で変更通知が出ない', () => {
+      const me = createMockMe();
+      const initial = createMockPracticeView({
+        id: 'p-edit',
+        booker: 'Ume',
+        room: '101',
+        fee: 3000,
+      });
+      syncPracticeNotices([initial], me, '2026-11-02T09:00:00.000Z');
+
+      const selfEdited = createMockPracticeView({
+        id: 'p-edit',
+        booker: 'Ume',
+        room: '202',
+        fee: 4500,
+      });
+      // 自分の編集操作直後にスナップショットを更新
+      updatePracticeSnapshot(selfEdited, me);
+
+      // 次回のまとめ取得時
+      syncPracticeNotices([selfEdited], me, '2026-11-02T10:00:00.000Z');
+      const notices = buildHomeNotices([selfEdited], me, '2026-11-02');
+      expect(notices.filter((n) => n.kind === 'practice_changed')).toHaveLength(0);
     });
   });
 

@@ -8,7 +8,7 @@ import { AnswerPage } from './pages/Answer';
 import { DetailPage } from './pages/Detail';
 import { FeedbackPage } from './pages/Feedback';
 import { HomePage } from './pages/Home';
-import { syncPracticeNotices } from './pages/homeLogic';
+import { syncPracticeNotices, updatePracticeSnapshot } from './pages/homeLogic';
 import { ListPage } from './pages/List';
 import { RecruitDetailPage } from './pages/RecruitDetail';
 import { RecruitListPage } from './pages/RecruitList';
@@ -148,11 +148,14 @@ function App() {
   }, []);
 
   // fresh でないときは取った時刻を変えない（前回の表示を「最新」と取り違えないように）
-  const setPractices = (list: PracticeView[], fresh = false) =>
+  const setPractices = (list: PracticeView[], fresh = false) => {
+    const cleaned = clean(list);
+    if (me) syncPracticeNotices(cleaned, me);
     setPracticesState((cur) => ({
-      list: clean(list),
+      list: cleaned,
       at: fresh ? Date.now() : (cur?.at ?? 0),
     }));
+  };
 
   /** 確認したらすぐ一覧から消し、サーバーの返事は裏で待つ。失敗したらその練習だけ元に戻す */
   const deletePractice = async (v: PracticeView, opts?: { notifyGroups?: boolean }): Promise<boolean> => {
@@ -190,6 +193,7 @@ function App() {
     if (removed.current.has(v.practice.id)) return;
     // 失敗して元に戻したときは保護を外し、成功時は保存完了時刻を記録してその時刻以前に始まった取り直しから守る
     syncTracker.current.markUpdated(v.practice.id, revert);
+    if (!revert && me) updatePracticeSnapshot(v, me);
     setPracticesState((cur) => {
       if (!cur) return cur;
       const has = cur.list.some((x) => x.practice.id === v.practice.id);

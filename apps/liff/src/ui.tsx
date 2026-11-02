@@ -2,7 +2,7 @@ import { createContext, type ComponentChildren } from 'preact';
 import { useCallback, useContext, useEffect, useState } from 'preact/hooks';
 import { canRegister, computeCancelDeadline, isActive, isHoliday, isPastPractice, labelDate, shouldNotifyPracticeCancellation, toJstDate, toJstTime, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
 import { getUnansweredSummary } from './pages/answerLogic';
-import { getHomeUnreadStatus } from './pages/homeLogic';
+import { HOME_READ_EVENT, getHomeUnreadStatus } from './pages/homeLogic';
 import { applyTheme, getTheme, type ThemeMode } from './theme';
 
 // ---------------------------------------------------------------- ルーティング（ハッシュ）
@@ -265,6 +265,14 @@ export function Tabs<K extends string>({ items, value, onChange }: { items: { ke
 export function NavBar() {
   const { me, practices } = useApp();
   const { path } = useRoute();
+  const [, setReadTick] = useState(0);
+
+  useEffect(() => {
+    const onRead = () => setReadTick((x) => x + 1);
+    window.addEventListener(HOME_READ_EVENT, onRead);
+    return () => window.removeEventListener(HOME_READ_EVENT, onRead);
+  }, []);
+
   // 予約詳細（/p/:id）は「予定」、登録画面（/register）は「募集」を光らせる
   const here = path[0] === 'p' ? '' : path[0] === 'register' ? 'recruit' : (path[0] ?? '');
 

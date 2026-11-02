@@ -127,10 +127,23 @@ export interface HomeNoticeItem {
   id: string;
   kind: NoticeKind;
   practiceId: string;
+  participant?: string;
   updatedAt: string;
   title: string;
   detail: string;
   answer?: Answer;
+}
+
+export const HOME_READ_EVENT = 'pb:home-read';
+
+function dispatchHomeReadEvent(): void {
+  try {
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof Event === 'function') {
+      window.dispatchEvent(new Event(HOME_READ_EVENT));
+    }
+  } catch {
+    /* イベント発火できない環境でも動作する */
+  }
 }
 
 export interface PracticeSnapshot {
@@ -241,6 +254,21 @@ function saveSnapshots(ownerKey: string, map: Record<string, PracticeSnapshot>):
   } catch {
     /* localStorage が使えない環境でも動作する */
   }
+}
+
+/**
+ * 自分自身の操作（予約情報の編集・回答など）で 1 件の PracticeView が更新された際、
+ * 次回の syncPracticeNotices で「自分の操作が変更通知として出てしまう」のを防ぐためスナップショットを最新化する。
+ */
+export function updatePracticeSnapshot(
+  v: PracticeView,
+  me: Pick<MeView, 'member' | 'actAs'>,
+): void {
+  const ownerKey = getDraftOwnerKey(me);
+  const prevMap = loadSnapshots(ownerKey);
+  if (!prevMap) return;
+  prevMap[v.practice.id] = toSnapshot(v);
+  saveSnapshots(ownerKey, prevMap);
 }
 
 function isValidStoredNotice(x: unknown): x is HomeNoticeItem {
@@ -361,6 +389,7 @@ export function syncPracticeNotices(
             id: `ans:${p.id}:${a.participant}:${ts}`,
             kind: 'answer',
             practiceId: p.id,
+            participant: a.participant,
             updatedAt: ts,
             title: `${a.name}さんが回答を変更しました（${ANSWER_UI_TEXT[prevAtt.answer]} → ${ANSWER_UI_TEXT[a.answer]}）`,
             detail: `${pLabel} ${placeText(p)}`,
@@ -375,7 +404,13 @@ export function syncPracticeNotices(
 
   if (newlyDetected.length > 0) {
     const byId = new Map<string, HomeNoticeItem>();
+    const seenParticipantKey = new Set<string>();
     for (const item of [...newlyDetected, ...stored]) {
+      if (item.kind === 'answer' && item.participant) {
+        const pKey = `${item.practiceId}\0${item.participant}`;
+        if (seenParticipantKey.has(pKey)) continue;
+        seenParticipantKey.add(pKey);
+      }
       if (!byId.has(item.id)) byId.set(item.id, item);
     }
     const merged = Array.from(byId.values()).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -410,13 +445,12 @@ export function buildHomeNotices(
   const seenParticipantAnswers = new Set<string>();
 
   for (const item of validStored) {
-    byId.set(item.id, item);
-    if (item.kind === 'answer') {
-      const parts = item.id.split(':');
-      if (parts.length >= 3) {
-        seenParticipantAnswers.add(`${parts[1]}:${parts[2]}`);
-      }
+    if (item.kind === 'answer' && item.participant) {
+      const pKey = `${item.practiceId}\0${item.participant}`;
+      if (seenParticipantAnswers.has(pKey)) continue;
+      seenParticipantAnswers.add(pKey);
     }
+    byId.set(item.id, item);
   }
 
   for (const v of practices) {
@@ -429,8 +463,9 @@ export function buildHomeNotices(
     if (p.booker === me.member.userId) {
       for (const a of collectAttendees(v)) {
         if (a.participant === me.member.userId) continue;
-        const participantKey = `${p.id}:${a.participant}`;
+        const participantKey = `${p.id}\0${a.participant}`;
         if (seenParticipantAnswers.has(participantKey)) continue;
+        seenParticipantAnswers.add(participantKey);
         const ts = a.updatedAt ?? p.createdAt;
         const id = `ans:${p.id}:${a.participant}:${ts}`;
         if (!byId.has(id)) {
@@ -438,6 +473,7 @@ export function buildHomeNotices(
             id,
             kind: 'answer',
             practiceId: p.id,
+            participant: a.participant,
             updatedAt: ts,
             title: `${a.name}さんが「${ANSWER_UI_TEXT[a.answer]}」と回答しました`,
             detail: `${pLabel} ${placeText(p)}`,
@@ -489,6 +525,7 @@ export function markNoticesRead(
     const nowIso = new Date().toISOString();
     const stamp = latestAt && latestAt > nowIso ? latestAt : nowIso;
     localStorage.setItem(NOTICE_READ_AT_KEY_PREFIX + getDraftOwnerKey(me), stamp);
+    dispatchHomeReadEvent();
   } catch {
     /* 保存できなくても動作する */
   }
@@ -510,6 +547,7 @@ export function markReleaseNotesRead(
   try {
     if (typeof localStorage === 'undefined' || typeof localStorage.setItem !== 'function') return;
     localStorage.setItem(SEEN_RELEASE_KEY_PREFIX + getDraftOwnerKey(me), version);
+    dispatchHomeReadEvent();
   } catch {
     /* 保存できなくても動作する */
   }
