@@ -11,6 +11,7 @@ import {
   processCommitItems,
   pruneStaleDrafts,
   recordSpecificChange,
+  restoreDraftOnTellError,
   stageAnswer,
 } from '../src/pages/answerLogic';
 
@@ -121,24 +122,38 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       groups: ['group-other'],
       booker: 'user-me',
     };
+    const practiceOtherUnanswered = {
+      ...mockPractice2,
+      id: 'p-other-unanswered',
+      groups: ['group-b'],
+      booker: 'user-other',
+    };
     const listWithNoGroup: PracticeView[] = [
       ...mockList,
       { practice: practiceNoGroup, myAnswer: null, attendees: [] },
       { practice: practiceOtherGroupMine, myAnswer: null, attendees: [] },
+      { practice: practiceOtherUnanswered, myAnswer: null, attendees: [] },
     ];
 
-    it('選択中グループの予約情報に加え、groupsが空（登録のみ等）の予約情報も含まれる', () => {
+    it('選択中グループの予約情報に加え、groupsが空（登録のみ等）の予約情報も含まれる（他グループの未回答予約は除外される）', () => {
       const filtered = filterGroupPractices(listWithNoGroup, 'group-a');
       const ids = filtered.map((v) => v.practice.id);
       expect(ids).toContain('p1');
       expect(ids).toContain('p-no-group');
-      expect(ids).not.toContain('p2'); // group-b
+      expect(ids).not.toContain('p-other-unanswered'); // group-b かつ未回答なので除外される
     });
 
     it('自分が予約者の予約情報は、選択中グループに含まれなくても表示される', () => {
       const filtered = filterGroupPractices(listWithNoGroup, 'group-a', 'user-me');
       const ids = filtered.map((v) => v.practice.id);
       expect(ids).toContain('p-other-mine');
+    });
+
+    it('自分が回答済みの予約情報は、所属グループ外でも「回答済」として表示・変更できる', () => {
+      // p2 は group-b の予約情報で、myAnswer が '保留'（回答済み）
+      const filtered = filterGroupPractices(listWithNoGroup, 'group-a');
+      const ids = filtered.map((v) => v.practice.id);
+      expect(ids).toContain('p2');
     });
 
     it('グループが未選択（空文字）の場合は全件が返る', () => {
@@ -165,9 +180,9 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       ];
       const displayedIds = new Set(['p1', 'p2', 'p-none', 'p-other-mine']);
 
-      // group-a のみ選択時: p1, p-none, p-other-mine が抽出される
+      // group-a のみ選択時: p1 (group-a), p2 (回答済のため対象), p-none (groups空), p-other-mine (予約者) が抽出される
       const filteredA = filterTargetModifiedItems(items, displayedIds, 'group-a', 'user-me');
-      expect(filteredA.map((x) => x.id)).toEqual(['p1', 'p-none', 'p-other-mine']);
+      expect(filteredA.map((x) => x.id)).toEqual(['p1', 'p2', 'p-none', 'p-other-mine']);
 
       // group-b のみ選択時: p2 と p-none が抽出される
       const filteredB = filterTargetModifiedItems(items, displayedIds, 'group-b');
@@ -495,6 +510,40 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       expect(screenUnanswered.has('deleted')).toBe(false);
       expect(screenUnanswered.size).toBe(0);
       clearGlobalDrafts();
+    });
+  });
+
+  describe('restoreDraftOnTellError (送信エラー時の下書き復元)', () => {
+    it('送信に失敗したとき、直前の送信文（body）をトリムして安全に下書きとして復元する', () => {
+      const captured = '  回答しました\n○ 11/10(火) ノア A 行きます  \n';
+      const restored = restoreDraftOnTellError(null, captured);
+      expect(restored).toBe('回答しました\n○ 11/10(火) ノア A 行きます');
+    });
+  });
+
+  describe('並行取得・タブ復帰時の回答巻き戻り防止（displayed のステート優先順位）', () => {
+    it('特定予約モードで回答選択中・保存中に古いサーバー一覧が届いても、下書きステートが優先され回答が巻き戻らない', () => {
+      // 1. 初期状態: サーバー上は p1 の myAnswer が null
+      const basePractice: PracticeView = { practice: mockPractice1, myAnswer: null, attendees: [] };
+
+      // 2. ユーザーが '行く' を選択し、specificStaged にセット
+      const specificStaged = new Map([['p1', '行く' as const]]);
+
+      // 3. 画面表示の算出（Answer.tsx の displayed ロジック）
+      const displayedAnswer = specificStaged.has(basePractice.practice.id)
+        ? specificStaged.get(basePractice.practice.id)!
+        : basePractice.myAnswer;
+
+      expect(displayedAnswer).toBe('行く');
+
+      // 4. 保存中に古いサーバー一覧（myAnswer が null のまま）が再度届いた場合をシミュレート
+      const staleServerPractice: PracticeView = { practice: mockPractice1, myAnswer: null, attendees: [] };
+      const displayedAfterStaleFetch = specificStaged.has(staleServerPractice.practice.id)
+        ? specificStaged.get(staleServerPractice.practice.id)!
+        : staleServerPractice.myAnswer;
+
+      // 古い一覧で上書きされず、ユーザーが選択した '行く' が保持される
+      expect(displayedAfterStaleFetch).toBe('行く');
     });
   });
 });

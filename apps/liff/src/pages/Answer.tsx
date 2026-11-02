@@ -24,6 +24,7 @@ import {
   processCommitItems,
   pruneStaleDrafts,
   recordSpecificChange,
+  restoreDraftOnTellError,
   stageAnswer,
   type ModifiedItem,
   type SpecificChangeMap,
@@ -363,7 +364,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
       }
     } catch (e) {
       // 送信（またはクリップボードコピー）に失敗した場合、body を下書きとして復元して再送可能にする
-      setDraft(body);
+      setDraft(restoreDraftOnTellError(draft, body));
       toast(e instanceof Error ? e.message : '送信に失敗しました', true);
     } finally {
       setSaving(false);
