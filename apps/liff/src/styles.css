@@ -2270,60 +2270,6 @@ button + .muted {
   border: 1px dashed var(--line);
 }
 
-/* ---------- RSVP まとめ回答・選択バー ---------- */
-.bulk-bar {
-  position: sticky;
-  top: 48px;
-  z-index: 8;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 8px 12px;
-  margin-bottom: 12px;
-  border-radius: 10px;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  box-shadow: 0 4px 16px rgb(0 0 0 / 6%);
-}
-.bulk-bar .count-info {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink);
-}
-.bulk-bar .bulk-actions {
-  display: flex;
-  gap: 6px;
-}
-.bulk-bar button {
-  padding: 5px 10px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.ticket-select-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.ticket-select-check {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-  cursor: pointer;
-}
-.ticket-select-check input[type='checkbox'] {
-  width: 18px;
-  height: 18px;
-  margin: 0;
-  cursor: pointer;
-  accent-color: var(--ink);
-}
-
 /* ---------- ナビバーのバッジ ---------- */
 .nav-badge {
   display: inline-flex;
@@ -2411,11 +2357,6 @@ button + .muted {
   color: var(--bg);
   font-weight: 600;
 }
-.group-pill .count {
-  font-size: 11px;
-  opacity: 0.8;
-}
-
 
 /* ---------- 満員時のフィードバック（チケット揺れ） ---------- */
 @keyframes ticket-shake {

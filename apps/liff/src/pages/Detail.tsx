@@ -4,7 +4,6 @@ import { api } from '../api';
 import { RoomSelect } from '../components/StudioRoom';
 import { openCalendar, prefersIcs, shareLink } from '../liff';
 import { Avatar, DeleteConfirmDialog, FRESH_MS, Icon, Pass, Spinner, Syncing, TopBar, go, shareData, useApp, useRunner } from '../ui';
-import { isAnswering } from '../answering';
 import { MyAnswerBadge } from './List';
 
 /**
@@ -28,11 +27,8 @@ export function usePractice(id: string) {
     setV(null);
     if (fresh()) return setLoading(false);
     setLoading(true);
-    const started = Date.now();
     api('getPractice', { id })
       .then((r) => {
-        // 取り直している間に回答を押していれば、押す前に読んだかもしれないので使わない（結果は回答の処理が入れる）
-        if (isAnswering(id, started)) return;
         setV(r);
         updatePractice(r);
       })
@@ -43,11 +39,8 @@ export function usePractice(id: string) {
   const update = async (fn: () => Promise<PracticeView>, done?: string) => {
     const r = await run(fn, done);
     if (r) {
-      // 回答を送っている途中なら、押した回答はそのまま出す（人数などは回答の結果で差し替わる）
-      const cur = latest.current;
-      const next = isAnswering(id) && cur ? { ...r, myAnswer: cur.myAnswer } : r;
-      setV(next);
-      updatePractice(next); // 一覧にもすぐ反映する
+      setV(r);
+      updatePractice(r); // 一覧にもすぐ反映する
     }
     return r;
   };

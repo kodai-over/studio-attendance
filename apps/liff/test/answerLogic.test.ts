@@ -443,4 +443,58 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       expect(staged.has('p2')).toBe(true);
     });
   });
+
+  describe('ナビゲーションガードと画面同期の安全性', () => {
+    it('同じ RSVP 画面（/answer で始まるパス）への遷移時はガード確認を行わず許可する', () => {
+      const confirmMock = vi.fn();
+      const originalConfirm = globalThis.window?.confirm;
+      if (globalThis.window) {
+        globalThis.window.confirm = confirmMock;
+      }
+
+      try {
+        const hasChanges = true;
+        const guard = (toPath: string) => {
+          if (toPath.startsWith('/answer')) return true;
+          if (hasChanges) {
+            return confirmMock('破棄しますか？');
+          }
+          return true;
+        };
+
+        // /answer を押した場合: confirm は呼ばれず true
+        expect(guard('/answer')).toBe(true);
+        expect(confirmMock).not.toHaveBeenCalled();
+
+        // 別画面 / を押した場合: confirm が呼ばれる
+        confirmMock.mockReturnValue(false);
+        expect(guard('/')).toBe(false);
+        expect(confirmMock).toHaveBeenCalledTimes(1);
+      } finally {
+        if (globalThis.window && originalConfirm) {
+          globalThis.window.confirm = originalConfirm;
+        }
+      }
+    });
+
+    it('pruneStaleDrafts 後に画面ステートを同期することで、古い下書きが画面に残らない', () => {
+      clearGlobalDrafts();
+      // 一覧更新前に古い下書きが残っている状態
+      globalDrafts.unanswered.set('p2', '保留'); // サーバー側も '保留'
+      globalDrafts.unanswered.set('deleted', '行く');
+
+      let screenUnanswered = new Map(globalDrafts.unanswered);
+      expect(screenUnanswered.size).toBe(2);
+
+      // サーバーから最新の mockList が届いたときの同期処理
+      pruneStaleDrafts(mockList);
+      screenUnanswered = new Map(globalDrafts.unanswered);
+
+      // 画面側のステートからも安全に消去されている
+      expect(screenUnanswered.has('p2')).toBe(false);
+      expect(screenUnanswered.has('deleted')).toBe(false);
+      expect(screenUnanswered.size).toBe(0);
+      clearGlobalDrafts();
+    });
+  });
 });

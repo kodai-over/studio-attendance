@@ -12,7 +12,6 @@ import {
 import { api } from '../api';
 import { canSendToChat, closeApp, sendToChat } from '../liff';
 import { FRESH_MS, Icon, Spinner, Syncing, Tabs, TopBar, go, setNavigationGuard, useApp, useRunner } from '../ui';
-import { answersSettled } from '../answering';
 import { PracticeCard } from './List';
 import {
   cleanupAfterCommit,
@@ -85,6 +84,9 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   useEffect(() => {
     if (list) {
       pruneStaleDrafts(list);
+      setSpecificStaged(new Map(globalDrafts.specific));
+      setUnansweredStaged(new Map(globalDrafts.unanswered));
+      setAnsweredStaged(new Map(globalDrafts.answered));
     }
   }, [list]);
 
@@ -163,7 +165,11 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
 
   // ナビゲーションガード（下部メニューなどの遷移時に未保存変更があれば確認し、キャンセルなら画面遷移を阻止）
   useEffect(() => {
-    setNavigationGuard(() => {
+    setNavigationGuard((toPath) => {
+      // RSVP 画面自身への遷移時は確認ダイアログを出さずにそのまま許可
+      if (toPath.startsWith('/answer')) {
+        return true;
+      }
       if (hasAnyChangesRef.current) {
         if (!window.confirm('回答の変更が反映されていません。破棄して移動しますか？')) {
           return false;
@@ -346,7 +352,6 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
       if (hasTargetChanges) {
         const { failed } = await commitItems(targetModifiedItems);
         if (failed > 0) return; // 失敗があった場合は送信を中断して再試行を促す
-        await answersSettled();
       }
       if (chat === 'ok') {
         await sendToChat(body);
