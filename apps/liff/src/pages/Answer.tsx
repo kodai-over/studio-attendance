@@ -347,7 +347,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
       )}
 
       {fresh && displayed.length > 0 && (
-        <section style={{ marginTop: 28 }}>
+        <section class="rsvp-tell-section">
           <div class="sec-head">
             <Icon name="chat" size={18} />
             グループに伝える
@@ -426,7 +426,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
                 <Icon name="send" size={18} />
                 {hasTargetChanges ? `回答を反映してグループに伝える（${targetModifiedItems.length}件）` : 'グループに伝える'}
               </button>
-              <p class="note" style={{ marginTop: 14, lineHeight: 1.5 }}>
+              <p class="note rsvp-tell-note">
                 押すと、回答が反映され、あなたの発言として開いているトークに送ります。
                 {userGroups.length > 1 && '（他のグループにも伝えたいときは、文をコピーしてそのトークに貼り付けてください）'}
               </p>
@@ -437,8 +437,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
 
       {displayed.length > 0 && (
         <button
-          class={`btn ${hasChanges ? 'primary' : 'ghost'} block`}
-          style={{ marginTop: 24, marginBottom: 28 }}
+          class={`btn ${hasChanges ? 'primary' : 'ghost'} block rsvp-done-btn`}
           disabled={saving}
           onClick={handleDone}
         >

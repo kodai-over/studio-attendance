@@ -1794,18 +1794,18 @@ details > summary {
 .sec-head + .note {
   margin-top: 0;
 }
-/* ボタンと補足文章（.note / .muted / p）の間の十分な余白 */
+/* ボタンと補足文章（.note / .muted / p）の間の余白 */
 .btn + .note,
 .btn-group + .note,
 button + .note,
 .btn + .muted,
 button + .muted {
-  margin-top: 14px;
+  margin-top: 8px;
 }
 .note + .btn,
 .note + button,
 .note + .btn-group {
-  margin-top: 14px;
+  margin-top: 16px;
 }
 .btn.block + .btn.block {
   margin-top: 10px;
@@ -2463,6 +2463,21 @@ button + .muted {
 }
 .rsvp button.yes.is-blocked-full:hover {
   opacity: 0.6;
+}
+
+/* ---------- RSVP 画面のメッセージ・完了ボタン周り ---------- */
+.rsvp-tell-section {
+  margin-top: 28px;
+}
+.rsvp-tell-note {
+  margin-top: 8px !important;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--sub);
+}
+.rsvp-done-btn {
+  margin-top: 32px !important;
+  margin-bottom: 32px !important;
 }
 
 
