@@ -365,14 +365,15 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   latest.current = text;
   const chat = canSendToChat();
 
-  // 回答を反映してグループに伝える（送信先グループの変更のみ保存して送信）
-  const handleTell = async () => {
+  // 回答を反映してグループに伝える・またはコピーする（未反映の下書きがある場合は必ず先に保存してから実行）
+  const handleTell = async (mode: 'send' | 'copy' = 'send') => {
     // commitItems による再レンダリングで latest.current がリセットされる前に、送信メッセージを先にキャプチャ
     const body = latest.current.trim();
     if (!body) {
       toast('送る文がありません', true);
       return;
     }
+    const hadChanges = hasTargetChanges;
     setSaving(true);
     try {
       const outcome = await runTellWorkflow({
@@ -381,13 +382,13 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
         targetModifiedItems,
         commitItems,
         send: async (msg) => {
-          if (chat === 'ok') {
+          if (mode === 'send' && chat === 'ok') {
             await sendToChat(msg);
-            toast(isSpecific ? 'グループに伝えました' : '回答を反映し、グループに伝えました');
+            toast(isSpecific || !hadChanges ? 'グループに伝えました' : '回答を反映し、グループに伝えました');
             closeApp();
           } else {
             await navigator.clipboard.writeText(msg);
-            toast(isSpecific ? 'メッセージをコピーしました' : '回答を反映し、メッセージをコピーしました');
+            toast(isSpecific || !hadChanges ? 'メッセージをコピーしました' : '回答を反映し、メッセージをコピーしました');
           }
         },
         onPreserveDraft: (preserved) => setDraft(preserved),
@@ -400,12 +401,12 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
         },
       });
       if (outcome === 'aborted_by_commit_failure') {
-        return; // 失敗があった場合は送信を中断して再試行を促す
+        return; // 失敗があった場合は送信・コピーを中断して再試行を促す
       }
     } catch (e) {
       // 送信（またはクリップボードコピー）に失敗した場合、body を下書きとして復元して再送可能にする
       setDraft(body);
-      toast(e instanceof Error ? e.message : '送信に失敗しました', true);
+      toast(e instanceof Error ? e.message : mode === 'copy' ? 'メッセージのコピーに失敗しました' : '送信に失敗しました', true);
     } finally {
       setSaving(false);
     }
@@ -566,7 +567,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
                 class="btn ghost block"
                 style={{ marginTop: 14 }}
                 disabled={!text.trim() || saving || !fresh || (!isSpecific && subTab === 'answered' && !hasReportableChanges)}
-                onClick={handleTell}
+                onClick={() => handleTell('copy')}
               >
                 <Icon name="copy" size={16} />
                 {hasTargetChanges
@@ -610,7 +611,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
                   class="btn primary"
                   style={{ flex: 1 }}
                   disabled={!text.trim() || saving || !fresh || (!isSpecific && subTab === 'answered' && !hasReportableChanges)}
-                  onClick={handleTell}
+                  onClick={() => handleTell('send')}
                 >
                   <Icon name="send" size={18} />
                   {hasTargetChanges
@@ -622,16 +623,10 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
                 <button
                   class="btn ghost"
                   style={{ padding: '0 14px' }}
-                  title="メッセージをコピー"
+                  title={hasTargetChanges ? '回答を反映してメッセージをコピー' : 'メッセージをコピー'}
+                  aria-label={hasTargetChanges ? '回答を反映してメッセージをコピー' : 'メッセージをコピー'}
                   disabled={!text.trim() || saving || !fresh || (!isSpecific && subTab === 'answered' && !hasReportableChanges)}
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(latest.current.trim());
-                      toast('メッセージをコピーしました');
-                    } catch (e) {
-                      toast('メッセージのコピーに失敗しました', true);
-                    }
-                  }}
+                  onClick={() => handleTell('copy')}
                 >
                   <Icon name="copy" size={18} />
                 </button>

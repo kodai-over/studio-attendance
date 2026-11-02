@@ -82,7 +82,7 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
             ))}
           </div>
           <p class="note list-rsvp-note">
-            ※予定の一覧からは回答できなくなり、「<button type="button" class="link-btn" style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', textDecoration: 'underline', cursor: 'pointer', font: 'inherit' }} onClick={() => go('/answer')}>RSVP</button>」からまとめて回答・変更します
+            ※回答・変更は下のメニューの「RSVP」から行います
           </p>
         </>
       )}
