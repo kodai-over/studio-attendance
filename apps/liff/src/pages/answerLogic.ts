@@ -249,3 +249,21 @@ export function generateSpecificReport(changes: Iterable<SpecificChange>): strin
 
   return parts.join('\n\n');
 }
+
+/**
+ * サーバーからの一覧再取得時、回答操作中・操作済みの練習を現在の内容で保護してマージする。
+ * （古いサーバー結果で、ユーザーが押した回答が「未回答」に戻るのを防止する）
+ */
+export function mergePracticesWithKeep(
+  incoming: PracticeView[],
+  current: PracticeView[] | null | undefined,
+  keepIds: Set<string> | null | undefined,
+): PracticeView[] {
+  if (!current || !keepIds || keepIds.size === 0) return incoming;
+  return incoming.map((v) => {
+    if (keepIds.has(v.practice.id)) {
+      return current.find((x) => x.practice.id === v.practice.id) ?? v;
+    }
+    return v;
+  });
+}

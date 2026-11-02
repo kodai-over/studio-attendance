@@ -33,16 +33,16 @@ import {
 
 type RsvpSubTab = 'unanswered' | 'answered';
 
-/** 募集カードの「回答」またはメニューの「RSVP」から開く画面。まとめて変更して、完了またはメッセージ送信で一括反映 */
+/** 募集カードの「回答」またはメニューの「RSVP」から開く画面。まとめて変更して、完了またはメッセージ送信でまとめて反映 */
 export function AnswerPage({ ids: raw }: { ids: string[] }) {
-  const { me, practices: list, practicesAt, startupFailed, loadHome, updatePractice, toast } = useApp();
+  const { me, practices: list, practicesAt, startupFailed, loadHome, updatePractice, touchPractice, toast } = useApp();
   const ids = [...new Set(raw)];
   const isSpecific = ids.length > 0;
 
   // 通常表示のタブ（未回答／回答済）
   const [subTab, setSubTab] = useState<RsvpSubTab>('unanswered');
 
-  // 下書き（ドラフト）管理: 画面切り替えで消えないよう globalDrafts と同期
+  // 下書き管理: 画面切り替えで消えないよう globalDrafts と同期
   const [specificStaged, setSpecificStaged] = useState<StageMap>(() => new Map(globalDrafts.specific));
   const [unansweredStaged, setUnansweredStaged] = useState<StageMap>(() => new Map(globalDrafts.unanswered));
   const [answeredStaged, setAnsweredStaged] = useState<StageMap>(() => new Map(globalDrafts.answered));
@@ -140,7 +140,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     ? setUnansweredStaged
     : setAnsweredStaged;
 
-  // 画面上の現在の回答（現在のタブのドラフトを反映した表示用リスト）
+  // 画面上の現在の回答（現在のタブの下書きを反映した表示用リスト）
   const displayed = baseList.map((v) => {
     const answer = currentStaged.has(v.practice.id) ? currentStaged.get(v.practice.id)! : v.myAnswer;
     return answer !== v.myAnswer ? { ...v, myAnswer: answer } : v;
@@ -193,12 +193,14 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, []);
 
-  // 個別の回答変更（特定予約指定時は即時保存、通常画面ではドラフト更新）
+  // 個別の回答変更（特定予約指定時は即時保存、通常画面では下書き更新）
   const handleStageAnswer = async (id: string, a: Answer) => {
+    if (!fresh || busy || saving) return;
     const original = list?.find((x) => x.practice.id === id);
     if (!original) return;
 
     if (isSpecific) {
+      touchPractice(id);
       setSaving(true);
       try {
         const updated = await api('rsvp', { id, answer: a });
@@ -273,7 +275,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
         globalDrafts.answered = next;
         return next;
       });
-      setDraft(null); // 手動編集ドラフトをリセットして古い文の二重送信を防止
+      setDraft(null); // 手動編集した下書きをリセットして古い文の二重送信を防止
     }
 
     if (failed > 0) {

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { HomeView, MeView, PracticeView } from '@studio-attendance/shared';
 import { api } from './api';
 import { initLiff, loginApp } from './liff';
+import { mergePracticesWithKeep } from './pages/answerLogic';
 import { AnswerPage } from './pages/Answer';
 import { DetailPage } from './pages/Detail';
 import { FeedbackPage } from './pages/Feedback';
@@ -78,7 +79,7 @@ function App() {
     setPracticesState((cur) => {
       const keep = touched.current;
       touched.current = null;
-      const list = home.practices.map((v) => (keep?.has(v.practice.id) ? (cur?.list.find((x) => x.practice.id === v.practice.id) ?? v) : v));
+      const list = mergePracticesWithKeep(home.practices, cur?.list, keep);
       return { list: clean(list), at: Date.now() };
     });
     saveCache(home);
@@ -189,6 +190,9 @@ function App() {
       return { ...cur, list: has ? cur.list.map((x) => (x.practice.id === v.practice.id ? v : x)) : [...cur.list, v] };
     });
   };
+  const touchPractice = (id: string) => {
+    touched.current = (touched.current ?? new Set()).add(id);
+  };
 
   return (
     <div class="app">
@@ -203,7 +207,7 @@ function App() {
       ) : error ? (
         <div class="empty">{error}</div>
       ) : me ? (
-        <AppContext.Provider value={{ me, setMe, toast, practices: practices?.list ?? null, practicesAt: practices?.at ?? 0, startupFailed, setPractices, updatePractice, deletePractice, loadHome }}>
+        <AppContext.Provider value={{ me, setMe, toast, practices: practices?.list ?? null, practicesAt: practices?.at ?? 0, startupFailed, setPractices, updatePractice, touchPractice, deletePractice, loadHome }}>
           {me.actAs && me.actAs !== 'self' && (
             <button class="acting-banner" onClick={() => go('/settings')}>
               {me.actAs === 'member' ? '一般として表示中' : '確認用アカウント「admin」として操作中'}（「自分」で戻せます）

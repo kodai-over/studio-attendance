@@ -8,6 +8,7 @@ import {
   generateSpecificReport,
   getModifiedItems,
   globalDrafts,
+  mergePracticesWithKeep,
   processCommitItems,
   pruneStaleDrafts,
   recordSpecificChange,
@@ -538,6 +539,45 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
 
       // 古い一覧で上書きされず、ユーザーが選択した '行く' が保持される
       expect(displayedAfterStaleFetch).toBe('行く');
+    });
+  });
+
+  describe('mergePracticesWithKeep (回答操作中の練習の巻き戻り防止)', () => {
+    it('keepIds が空または current が存在しない場合、incoming をそのまま返す', () => {
+      const incoming: PracticeView[] = [
+        { practice: mockPractice1, myAnswer: null, attendees: [] },
+      ];
+      expect(mergePracticesWithKeep(incoming, null, new Set(['p1']))).toBe(incoming);
+      expect(mergePracticesWithKeep(incoming, [], new Set())).toBe(incoming);
+      expect(mergePracticesWithKeep(incoming, [], null)).toBe(incoming);
+    });
+
+    it('keepIds に含まれる練習は current の内容が保持され、それ以外は incoming が反映される', () => {
+      const current: PracticeView[] = [
+        { practice: mockPractice1, myAnswer: '行く', attendees: [] },
+        { practice: mockPractice2, myAnswer: '保留', attendees: [] },
+      ];
+      // サーバーから届いた古い一覧（p1 がまだ未回答、p2 は更新されている）
+      const incoming: PracticeView[] = [
+        { practice: mockPractice1, myAnswer: null, attendees: [] },
+        { practice: mockPractice2, myAnswer: '行かない', attendees: [] },
+      ];
+
+      const merged = mergePracticesWithKeep(incoming, current, new Set(['p1']));
+      // p1 は回答操作中のため current（'行く'）が保持される
+      expect(merged.find((x) => x.practice.id === 'p1')?.myAnswer).toBe('行く');
+      // p2 は keepIds に入っていないため incoming（'行かない'）が反映される
+      expect(merged.find((x) => x.practice.id === 'p2')?.myAnswer).toBe('行かない');
+    });
+
+    it('keepIds にあっても current に見つからない場合は incoming をフォールバックとして採用する', () => {
+      const incoming: PracticeView[] = [
+        { practice: mockPractice1, myAnswer: null, attendees: [] },
+      ];
+      const current: PracticeView[] = [];
+
+      const merged = mergePracticesWithKeep(incoming, current, new Set(['p1']));
+      expect(merged.find((x) => x.practice.id === 'p1')?.myAnswer).toBeNull();
     });
   });
 });

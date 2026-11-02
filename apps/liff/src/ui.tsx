@@ -64,6 +64,8 @@ interface AppState {
   setPractices(list: PracticeView[], fresh?: boolean, startedAt?: number): void;
   /** 1件だけ差し替える（出欠や修正の結果をすぐ一覧に反映する） */
   updatePractice(v: PracticeView, opts?: { revert?: boolean }): void;
+  /** 回答操作中の練習をマークし、一覧の再取得で上書き・巻き戻されないよう保護する */
+  touchPractice(id: string): void;
   /** 練習を削除する（すぐ一覧から消し、失敗したら戻す）。消せたら true */
   deletePractice(v: PracticeView, opts?: { notifyGroups?: boolean }): Promise<boolean>;
   /** 起動時と同じまとめ取得をやり直す（グループのカードから開いたときは、そのグループのメンバーとしても覚えてもらう） */

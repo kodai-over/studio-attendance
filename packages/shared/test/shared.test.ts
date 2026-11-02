@@ -413,6 +413,16 @@ describe('Flex Message', () => {
     ]);
     expect(sameDay).toBe('回答を変更しました\n・11/1(日) 13:00: 行く → 未定\n・11/1(日) 19:00: 未回答 → 行く');
 
+    // 引数の配列を変更しない（非破壊的であること）
+    const originalItems = [
+      { practice: at('2026-11-03', '19:00'), from: '行く' as const, to: '行かない' as const },
+      { practice: at('2026-11-01', '19:00'), from: '保留' as const, to: '行く' as const },
+      { practice: at('2026-11-02', '19:00'), from: '保留' as const, to: '行かない' as const },
+    ];
+    const clone = [...originalItems];
+    answerChangeReport(originalItems);
+    expect(originalItems).toEqual(clone);
+
     expect(answerChangeReport([])).toBeNull();
   });
 
