@@ -96,10 +96,10 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     allTargets = list.filter((v) => isRsvpTarget(v, me.member.userId, me.member.groups, today, currentTime));
   }
 
-  // 所属グループ選択によるチケット絞り込み（groupsが空の予約情報は全グループで表示）
+  // 所属グループ選択によるチケット絞り込み（groupsが空の予約情報や自分が予約者の予約情報は全グループで表示）
   const groupFiltered = isSpecific
     ? allTargets
-    : filterGroupPractices(allTargets, selectedGroup);
+    : filterGroupPractices(allTargets, selectedGroup, me.member.userId);
 
   // 未回答・回答済の分類（タブ分類の基準は元の回答 myAnswer に固定し、回答変更してもチケットが消えないようにする）
   const todos = groupFiltered.filter((v) => v.myAnswer == null);
@@ -168,6 +168,9 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
           isRevertingHashRef.current = true;
           const oldHash = new URL(e.oldURL).hash || '#/answer';
           window.location.hash = oldHash;
+          setTimeout(() => {
+            isRevertingHashRef.current = false;
+          }, 100);
         }
       }
     };
@@ -202,7 +205,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   const displayedIds = new Set(displayed.map((v) => v.practice.id));
   const targetModifiedItems = isSpecific
     ? modifiedItems
-    : filterTargetModifiedItems(modifiedItems, displayedIds, selectedGroup);
+    : filterTargetModifiedItems(modifiedItems, displayedIds, selectedGroup, me.member.userId);
   const hasTargetChanges = targetModifiedItems.length > 0;
 
   // 複数件の回答保存処理（1件ずつ反映し、成功分は下書きから削除、失敗分は下書きに残して安全に再試行可能にする）
@@ -296,15 +299,15 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     }
   };
 
-  // 回答を反映して完了（全タブの変更があれば保存。予定画面へは切り替えずそのまま留まる）
+  // 回答を反映して完了（選択中グループの変更があれば保存。予定画面へは切り替えずそのまま留まる）
   const handleDone = async () => {
-    if (hasAnyChanges) {
+    if (hasTargetChanges) {
       setSaving(true);
       try {
-        const count = allModifiedItems.length;
-        const { succeeded, failed } = await commitItems(allModifiedItems);
+        const count = targetModifiedItems.length;
+        const { succeeded, failed } = await commitItems(targetModifiedItems);
         if (failed === 0) {
-          toast(`${count}件の回答を反映しました`);
+          toast(`${count}件の回答を反映しました（グループには送信されていません）`);
         }
       } catch (e) {
         toast(e instanceof Error ? e.message : '保存に失敗しました', true);
@@ -315,11 +318,11 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   };
 
   const handleBack = () => {
-    // hashchange リスナー側で未保存の確認を行うため、ここでは直接 history.back / 遷移を実行
-    if (history.length > 1) {
-      history.back();
-    } else if (ids.length === 1) {
+    // 詳細画面からの遷移時は確実に詳細画面に戻る（LIFF内でのアプリ終了を防ぐ）
+    if (ids.length === 1) {
       go(`/p/${encodeURIComponent(ids[0])}`);
+    } else if (history.length > 1) {
+      history.back();
     } else {
       go('/');
     }
@@ -384,7 +387,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
           {isSpecific
             ? '予約情報が見つかりません（終了した・削除された・見られない予約情報です）'
             : subTab === 'unanswered'
-            ? '未回答の募集はありません。すべて回答済です！'
+            ? '未回答の募集はありません。すべて回答済です。'
             : '回答済の今後の予約情報はありません。'}
         </div>
       ) : (
@@ -481,17 +484,22 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
       )}
 
       {displayed.length > 0 && (
-        <button
-          class={`btn ${hasAnyChanges ? 'primary' : 'ghost'} block rsvp-done-btn`}
-          disabled={saving}
-          onClick={handleDone}
-        >
-          {saving
-            ? '保存中...'
-            : hasAnyChanges
-            ? `回答を反映して完了（${allModifiedItems.length}件）`
-            : '完了'}
-        </button>
+        <>
+          <button
+            class={`btn ${hasTargetChanges ? 'primary' : 'ghost'} block rsvp-done-btn`}
+            disabled={saving}
+            onClick={handleDone}
+          >
+            {saving
+              ? '保存中...'
+              : hasTargetChanges
+              ? `回答を反映して完了（${targetModifiedItems.length}件）`
+              : '完了'}
+          </button>
+          <p class="note rsvp-tell-note" style={{ textAlign: 'center', marginTop: 8 }}>
+            ※「完了」は回答の保存のみ行います。グループへ知らせたいときは「グループに伝える」を押してください。
+          </p>
+        </>
       )}
     </>
   );

@@ -69,31 +69,38 @@ export function cleanupAfterCommit(staged: StageMap, succeededIds: string[]): St
 
 /**
  * 選択中グループに合致する予約情報を抽出する。
- * groups が空の予約情報（登録のみ等）は全グループで表示する。
+ * groups が空の予約情報（登録のみ等）や、自分が予約者の予約情報はどのグループ選択時にも表示する。
  */
 export function filterGroupPractices(
   practices: PracticeView[],
   selectedGroup: string,
+  myUserId?: string,
 ): PracticeView[] {
   if (!selectedGroup) return practices;
-  return practices.filter(
-    (v) => v.practice.groups.length === 0 || v.practice.groups.includes(selectedGroup),
-  );
+  return practices.filter((v) => {
+    if (v.practice.groups.length === 0) return true;
+    if (v.practice.groups.includes(selectedGroup)) return true;
+    if (myUserId && v.practice.booker === myUserId) return true;
+    return false;
+  });
 }
 
 /**
  * 表示中かつ選択中グループに合致する変更項目のみをフィルタリングする。
- * groups が空の予約情報はどのグループ選択時にも対象に含める。
+ * groups が空の予約情報や自分が予約者の予約情報はどのグループ選択時にも対象に含める。
  */
 export function filterTargetModifiedItems(
   modifiedItems: ModifiedItem[],
   displayedIds: Set<string>,
   selectedGroup: string,
+  myUserId?: string,
 ): ModifiedItem[] {
   return modifiedItems.filter((item) => {
     if (!displayedIds.has(item.id)) return false;
     if (!selectedGroup || item.practice.groups.length === 0) return true;
-    return item.practice.groups.includes(selectedGroup);
+    if (item.practice.groups.includes(selectedGroup)) return true;
+    if (myUserId && item.practice.booker === myUserId) return true;
+    return false;
   });
 }
 
