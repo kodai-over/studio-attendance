@@ -11,15 +11,17 @@ import {
 } from '@studio-attendance/shared';
 import { api } from '../api';
 import { canSendToChat, closeApp, sendToChat } from '../liff';
-import { FRESH_MS, Icon, Spinner, Syncing, Tabs, TopBar, go, useApp, useRunner } from '../ui';
+import { FRESH_MS, Icon, Spinner, Syncing, Tabs, TopBar, go, setNavigationGuard, useApp, useRunner } from '../ui';
 import { answersSettled } from '../answering';
 import { PracticeCard } from './List';
 import {
   cleanupAfterCommit,
+  clearGlobalDrafts,
   filterGroupPractices,
   filterTargetModifiedItems,
   generateSpecificReport,
   getModifiedItems,
+  globalDrafts,
   stageAnswer,
   type ModifiedItem,
   type StageMap,
@@ -36,10 +38,10 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   // 通常表示のタブ（未回答／回答済）
   const [subTab, setSubTab] = useState<RsvpSubTab>('unanswered');
 
-  // 下書き（ドラフト）管理: 特定予約表示時は1つにまとめ、通常表示時は未回答と回答済を分離
-  const [specificStaged, setSpecificStaged] = useState<StageMap>(new Map());
-  const [unansweredStaged, setUnansweredStaged] = useState<StageMap>(new Map());
-  const [answeredStaged, setAnsweredStaged] = useState<StageMap>(new Map());
+  // 下書き（ドラフト）管理: 画面切り替えで消えないよう globalDrafts と同期
+  const [specificStaged, setSpecificStaged] = useState<StageMap>(() => new Map(globalDrafts.specific));
+  const [unansweredStaged, setUnansweredStaged] = useState<StageMap>(() => new Map(globalDrafts.unanswered));
+  const [answeredStaged, setAnsweredStaged] = useState<StageMap>(() => new Map(globalDrafts.answered));
 
   const [run, busy] = useRunner();
   const [saving, setSaving] = useState(false);
@@ -146,6 +148,20 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   hasAnyChangesRef.current = hasAnyChanges;
   const isRevertingHashRef = useRef(false);
 
+  // ナビゲーションガード（下部メニューなどの遷移時に未保存変更があれば確認し、キャンセルなら画面遷移を阻止）
+  useEffect(() => {
+    setNavigationGuard(() => {
+      if (hasAnyChangesRef.current) {
+        if (!window.confirm('回答の変更が反映されていません。破棄して移動しますか？')) {
+          return false;
+        }
+        clearGlobalDrafts();
+      }
+      return true;
+    });
+    return () => setNavigationGuard(null);
+  }, []);
+
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       if (hasAnyChangesRef.current) {
@@ -171,6 +187,8 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
           setTimeout(() => {
             isRevertingHashRef.current = false;
           }, 100);
+        } else {
+          clearGlobalDrafts();
         }
       }
     };
@@ -178,10 +196,14 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
-  // 個別の回答変更（現在のタブのドラフトのみ更新）
+  // 個別の回答変更（現在のタブのドラフトおよび globalDrafts を更新）
   const handleStageAnswer = (id: string, a: Answer) => {
     const original = list?.find((x) => x.practice.id === id);
-    setCurrentStaged((prev) => stageAnswer(prev, id, a, original ? original.myAnswer : null));
+    const key = isSpecific ? 'specific' : subTab;
+    const targetMap = isSpecific ? specificStaged : subTab === 'unanswered' ? unansweredStaged : answeredStaged;
+    const next = stageAnswer(targetMap, id, a, original ? original.myAnswer : null);
+    globalDrafts[key] = next;
+    setCurrentStaged(next);
     setDraft(null); // 手動編集をリセットして再生成
   };
 
@@ -229,9 +251,21 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     }
 
     if (succeededIds.length > 0) {
-      setSpecificStaged((prev) => cleanupAfterCommit(prev, succeededIds));
-      setUnansweredStaged((prev) => cleanupAfterCommit(prev, succeededIds));
-      setAnsweredStaged((prev) => cleanupAfterCommit(prev, succeededIds));
+      setSpecificStaged((prev) => {
+        const next = cleanupAfterCommit(prev, succeededIds);
+        globalDrafts.specific = next;
+        return next;
+      });
+      setUnansweredStaged((prev) => {
+        const next = cleanupAfterCommit(prev, succeededIds);
+        globalDrafts.unanswered = next;
+        return next;
+      });
+      setAnsweredStaged((prev) => {
+        const next = cleanupAfterCommit(prev, succeededIds);
+        globalDrafts.answered = next;
+        return next;
+      });
       setDraft(null); // 手動編集ドラフトをリセットして古い文の二重送信を防止
     }
 
@@ -342,6 +376,13 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
       <TopBar title="RSVP" back={isSpecific} onBack={handleBack}>
         {(busy || saving || load === 'loading' || load === 'wait') && <Syncing />}
       </TopBar>
+
+      {hasAnyChanges && (
+        <div class="rsvp-unsaved-banner">
+          <Icon name="check" size={15} />
+          <span>下書きがあります。「グループに伝える」または「完了」を押すまで保存されません</span>
+        </div>
+      )}
 
       {!isSpecific && (
         <>
@@ -462,21 +503,37 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
                   回答から作り直す
                 </button>
               )}
-              <button
-                class="btn primary block"
-                disabled={!text.trim() || saving || !fresh || (!isSpecific && subTab === 'answered' && !hasTargetChanges)}
-                onClick={handleTell}
-              >
-                <Icon name="send" size={18} />
-                {hasTargetChanges
-                  ? `回答を反映してグループに伝える（${targetModifiedItems.length}件）`
-                  : !isSpecific && subTab === 'answered'
-                  ? '回答を変更するとグループに伝えられます'
-                  : 'グループに伝える'}
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  class="btn primary"
+                  style={{ flex: 1 }}
+                  disabled={!text.trim() || saving || !fresh || (!isSpecific && subTab === 'answered' && !hasTargetChanges)}
+                  onClick={handleTell}
+                >
+                  <Icon name="send" size={18} />
+                  {hasTargetChanges
+                    ? `回答を反映してグループに伝える（${targetModifiedItems.length}件）`
+                    : !isSpecific && subTab === 'answered'
+                    ? '回答を変更するとグループに伝えられます'
+                    : 'グループに伝える'}
+                </button>
+                <button
+                  class="btn ghost"
+                  style={{ padding: '0 14px' }}
+                  title="メッセージをコピー"
+                  disabled={!text.trim() || saving || !fresh || (!isSpecific && subTab === 'answered' && !hasTargetChanges)}
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(latest.current.trim());
+                    toast('メッセージをコピーしました');
+                  }}
+                >
+                  <Icon name="copy" size={18} />
+                </button>
+              </div>
               <p class="note rsvp-tell-note">
                 押すと、回答が反映され、あなたの発言として開いているトークに送ります。
-                {userGroups.length > 1 && '（他のグループは上のグループを切り替えて伝えられます）'}
+                {userGroups.length > 1 &&
+                  '（他のグループへ伝えたいときは、上のグループを切り替えて文をコピーし、そのトークに貼り付けてください）'}
               </p>
             </>
           )}

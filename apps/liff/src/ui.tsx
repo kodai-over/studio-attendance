@@ -23,7 +23,15 @@ export function useRoute() {
   return route;
 }
 
+export type NavigationGuard = (toPath: string) => boolean;
+let currentGuard: NavigationGuard | null = null;
+
+export function setNavigationGuard(guard: NavigationGuard | null) {
+  currentGuard = guard;
+}
+
 export const go = (path: string) => {
+  if (currentGuard && !currentGuard(path)) return;
   location.hash = path;
 };
 

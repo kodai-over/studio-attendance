@@ -7,6 +7,25 @@ import {
 
 export type StageMap = Map<string, Answer>;
 
+/**
+ * 画面切り替えやアンマウントで下書きが失われないよう、モジュールレベルで保持
+ */
+export const globalDrafts: {
+  specific: StageMap;
+  unanswered: StageMap;
+  answered: StageMap;
+} = {
+  specific: new Map(),
+  unanswered: new Map(),
+  answered: new Map(),
+};
+
+export function clearGlobalDrafts() {
+  globalDrafts.specific.clear();
+  globalDrafts.unanswered.clear();
+  globalDrafts.answered.clear();
+}
+
 export interface ModifiedItem {
   id: string;
   answer: Answer;

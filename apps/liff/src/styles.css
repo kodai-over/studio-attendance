@@ -2458,5 +2458,28 @@ button + .muted {
   margin-bottom: 32px !important;
 }
 
+/* ---------- RSVP 画面の下書き未保存バナー ---------- */
+.rsvp-unsaved-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  border-radius: 8px;
+  background: rgba(234, 179, 8, 0.12);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  color: #ca8a04;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+@media (prefers-color-scheme: dark) {
+  .rsvp-unsaved-banner {
+    background: rgba(234, 179, 8, 0.16);
+    border-color: rgba(234, 179, 8, 0.4);
+    color: #facc15;
+  }
+}
+
 
 
