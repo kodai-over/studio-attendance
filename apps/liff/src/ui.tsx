@@ -1,6 +1,6 @@
 import { createContext, type ComponentChildren } from 'preact';
 import { useCallback, useContext, useEffect, useState } from 'preact/hooks';
-import { canRegister, computeCancelDeadline, isHoliday, labelDate, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
+import { canRegister, computeCancelDeadline, isActive, isHoliday, labelDate, toJstDate, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
 import { applyTheme, getTheme, type ThemeMode } from './theme';
 
 // ---------------------------------------------------------------- ルーティング（ハッシュ）
@@ -382,6 +382,14 @@ export function CancelDeadlineBadge({ date, studio }: { date: string; studio: st
   );
 }
 
+/** 予約情報削除の確認で、グループ通知チェックの初期値を決める（終了済・中止・未募集は false） */
+export function shouldNotifyInitially(v: PracticeView | null, today = toJstDate(new Date())): boolean {
+  if (!v) return false;
+  const p = v.practice;
+  if (!isActive(p) || p.date < today) return false;
+  return p.groups.length > 0;
+}
+
 /** 予約情報削除の確認。募集済グループへの通知オプション付き */
 export function DeleteConfirmDialog({
   view: v,
@@ -394,16 +402,18 @@ export function DeleteConfirmDialog({
   onConfirm: (notifyGroups: boolean) => Promise<unknown> | void;
   busy?: boolean;
 }) {
-  const hasGroups = Boolean(v && v.practice.groups.length > 0);
-  const [notify, setNotify] = useState(hasGroups);
+  const canNotify = shouldNotifyInitially(v);
+  const [notify, setNotify] = useState(canNotify);
 
   useEffect(() => {
-    setNotify(hasGroups);
-  }, [v?.practice.id, hasGroups]);
+    setNotify(canNotify);
+  }, [v?.practice.id, canNotify]);
 
   if (!v) return null;
   const p = v.practice;
   const answered = v.goingCount + v.maybe.length;
+  const isPast = p.date < toJstDate(new Date());
+  const isCanceled = !isActive(p);
 
   return (
     <div class="overlay" role="dialog" aria-modal="true" aria-label="予約情報の削除">
@@ -424,7 +434,7 @@ export function DeleteConfirmDialog({
           </p>
         )}
 
-        {hasGroups ? (
+        {canNotify ? (
           <div style={{ padding: '10px 12px', background: 'var(--paper-subtle, rgb(0 0 0 / 4%))', borderRadius: 8, margin: '8px 0 16px' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.88rem', fontWeight: 500 }}>
               <input
@@ -441,15 +451,19 @@ export function DeleteConfirmDialog({
           </div>
         ) : (
           <div class="muted" style={{ fontSize: '0.78rem', margin: '8px 0 16px', lineHeight: 1.3 }}>
-            ※まだグループに募集されていないため、グループへの通知は行われません。
+            {isPast
+              ? '※終了した予約情報のため、グループへの通知は行われません。'
+              : isCanceled
+              ? '※中止済の予約情報のため、グループへの通知は行われません。'
+              : '※まだグループに募集されていないため、グループへの通知は行われません。'}
           </div>
         )}
 
         <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-          <button class="btn secondary" style={{ flex: 1 }} onClick={onClose} disabled={busy}>
+          <button class="btn ghost" style={{ flex: 1 }} onClick={onClose} disabled={busy}>
             キャンセル
           </button>
-          <button class="btn danger" style={{ flex: 1 }} onClick={() => onConfirm(hasGroups && notify)} disabled={busy}>
+          <button class="btn danger" style={{ flex: 1 }} onClick={() => onConfirm(canNotify && notify)} disabled={busy}>
             {busy ? '削除中...' : '削除する'}
           </button>
         </div>
@@ -465,7 +479,7 @@ export function ParsingProgressOverlay({ kind }: { kind: 'image' | 'text' }) {
   const steps =
     kind === 'image'
       ? [
-          { label: 'スクショから文字を読み取り中...', note: '画像からテキストを抽出しています' },
+          { label: 'スクショから文字を読み取り中...', note: 'スクショからテキストを抽出しています' },
           { label: '日時・スタジオ情報を特定中...', note: '予約内容を抽出・照合しています' },
           { label: 'スタジオ代・キャンセル期限を計算中...', note: '入力内容を準備しています' },
         ]
@@ -492,7 +506,7 @@ export function ParsingProgressOverlay({ kind }: { kind: 'image' | 'text' }) {
           <strong style={{ fontSize: '0.98rem' }}>予約内容を読み取り中</strong>
         </div>
         <p class="muted" style={{ fontSize: '0.75rem', margin: '0 0 14px' }}>
-          通常3〜5秒ほどかかります
+          数秒ほどかかる場合があります
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {steps.map((st, i) => {

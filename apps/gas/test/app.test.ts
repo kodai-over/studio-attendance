@@ -438,6 +438,31 @@ describe('出欠', () => {
     expect(t.line.pushes).toHaveLength(initialPushes);
   });
 
+  it('終了済み・中止の練習は notifyGroups: true を指定してもグループ通知は送られない', () => {
+    t.store.s.groups.push({ id: 'C_PAST', name: 'チーム過去' });
+    // 過去の予約（2026-10-01）
+    const pastItem = { ...reservation, date: '2026-10-01', max: null, min: null, memo: '' };
+    const { created: pastCreated } = handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [pastItem], groups: ['C_PAST'] }) as any;
+    const pastPid = pastCreated[0];
+    const pushesAfterCreatePast = t.line.pushes.length;
+
+    const list1 = handleApi(t.ctx, { userId: BOOKER }, 'deletePractice', { id: pastPid, notifyGroups: true }) as any[];
+    expect(list1.map((v) => v.practice.id)).not.toContain(pastPid);
+    expect(t.line.pushes).toHaveLength(pushesAfterCreatePast);
+
+    // 中止の予約
+    const canceledItem = { ...reservation, date: '2026-11-20', max: null, min: null, memo: '' };
+    const { created: canceledCreated } = handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [canceledItem], groups: ['C_PAST'] }) as any;
+    const canceledPid = canceledCreated[0];
+    const pObj = t.store.getPractice(canceledPid)!;
+    t.store.savePractice({ ...pObj, status: '中止' });
+    const pushesAfterCreateCanceled = t.line.pushes.length;
+
+    const list2 = handleApi(t.ctx, { userId: BOOKER }, 'deletePractice', { id: canceledPid, notifyGroups: true }) as any[];
+    expect(list2.map((v) => v.practice.id)).not.toContain(canceledPid);
+    expect(t.line.pushes).toHaveLength(pushesAfterCreateCanceled);
+  });
+
   it('notifyGroups: true を指定した場合は募集済グループに削除の連絡が送られ、pushが失敗しても削除は完了する', () => {
     const item = { ...reservation, date: '2026-11-05', max: null, min: null, memo: '' };
     t.store.s.groups.push({ id: 'C3', name: 'チームC' });

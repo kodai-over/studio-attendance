@@ -364,9 +364,11 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
       ctx.store.deletePractice(id);
     });
     // 削除が成功したあと、ロックの外でグループへ知らせる（通信待ちでロックを長引かせない）
+    // 終了した予約情報や中止の予約情報は通知しない
     if (notifyGroups && practiceToDelete != null) {
       const p = practiceToDelete as Practice;
-      if (p.groups.length > 0) {
+      const canNotify = isActive(p) && p.date >= toJstDate(ctx.now());
+      if (canNotify && p.groups.length > 0) {
         sendPracticeCancellation(ctx, p, p.groups, bookerName);
       }
     }

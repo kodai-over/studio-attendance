@@ -243,17 +243,6 @@ function Attendees({ v, onRemove }: { v: PracticeView; onRemove: (a: AttendeeVie
   );
 }
 
-/** 練習を削除する前の確認の文。答えている人がいれば人数も添える */
-export function deleteMessage(v: PracticeView): string {
-  const p = v.practice;
-  const answered = v.goingCount + v.maybe.length;
-  return [
-    `${labelDate(p.date)} ${p.start}〜 ${p.studio}${p.room ? ' ' + p.room : ''} を削除しますか？`,
-    answered > 0 ? `回答している人がいます（行く${v.goingCount}人・未定${v.maybe.length}人）。回答も削除されます。` : '回答も削除されます。',
-    'グループへの連絡は送られないので、必要ならグループで伝えてください。',
-  ].join('\n');
-}
-
 /** 練習の編集（予約者と管理者）。「募集」の練習の画面に出す */
 export function EditForm({
   v,
