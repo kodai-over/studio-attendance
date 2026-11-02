@@ -6,13 +6,14 @@ import {
   filterGroupPractices,
   filterTargetModifiedItems,
   generateSpecificReport,
+  getDraftGroupStatus,
   getModifiedItems,
   globalDrafts,
   mergePracticesWithKeep,
   processCommitItems,
   pruneStaleDrafts,
   recordSpecificChange,
-  restoreDraftOnTellError,
+  runTellWorkflow,
   stageAnswer,
 } from '../src/pages/answerLogic';
 
@@ -508,11 +509,108 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
     });
   });
 
-  describe('restoreDraftOnTellError (送信エラー時の下書き復元)', () => {
-    it('送信に失敗したとき、直前の送信文（body）をトリムして安全に下書きとして復元する', () => {
-      const captured = '  回答しました\n○ 11/10(火) ノア A 行きます  \n';
-      const restored = restoreDraftOnTellError(null, captured);
-      expect(restored).toBe('回答しました\n○ 11/10(火) ノア A 行きます');
+  describe('getDraftGroupStatus (複数グループ環境での下書き状態判定)', () => {
+    const userGroups = [
+      { id: 'group-a', name: 'チームA' },
+      { id: 'group-b', name: 'チームB' },
+    ];
+
+    it('選択中グループに下書きがある場合、hasSelectedDraft が true になる', () => {
+      const allModified = [
+        { id: 'p1', answer: '行く' as const, practice: mockPractice1 }, // group-a
+      ];
+      const status = getDraftGroupStatus(allModified, userGroups, 'group-a');
+      expect(status.hasSelectedDraft).toBe(true);
+      expect(status.selectedGroupName).toBe('チームA');
+      expect(status.otherDraftGroupNames).toEqual([]);
+    });
+
+    it('選択中グループには下書きがなく、他グループに下書きがある場合、他グループ名が抽出される', () => {
+      const allModified = [
+        { id: 'p1', answer: '行く' as const, practice: mockPractice1 }, // group-a
+      ];
+      const status = getDraftGroupStatus(allModified, userGroups, 'group-b');
+      expect(status.hasSelectedDraft).toBe(false);
+      expect(status.selectedGroupName).toBe('チームB');
+      expect(status.otherDraftGroupNames).toEqual(['チームA']);
+    });
+
+    it('両方のグループに下書きがある場合、hasSelectedDraft が true かつ otherDraftGroupNames にも含まれる', () => {
+      const allModified = [
+        { id: 'p1', answer: '行く' as const, practice: mockPractice1 }, // group-a
+        { id: 'p2', answer: '行かない' as const, practice: mockPractice2 }, // group-b
+      ];
+      const status = getDraftGroupStatus(allModified, userGroups, 'group-a');
+      expect(status.hasSelectedDraft).toBe(true);
+      expect(status.otherDraftGroupNames).toEqual(['チームB']);
+    });
+  });
+
+  describe('runTellWorkflow (回答保存・送信フローの画面連携ロジック)', () => {
+    it('保存処理で一部でも失敗（failed > 0）した場合、LINE送信を中断し aborted_by_commit_failure を返す', () => {
+      const commitItems = vi.fn().mockResolvedValue({ succeeded: 1, failed: 1 });
+      const send = vi.fn().mockResolvedValue(undefined);
+
+      return runTellWorkflow({
+        body: '回答しました',
+        hasTargetChanges: true,
+        targetModifiedItems: [{ id: 'p1', answer: '行く' as const, practice: mockPractice1 }],
+        commitItems,
+        send,
+      }).then((result) => {
+        expect(commitItems).toHaveBeenCalledTimes(1);
+        expect(send).not.toHaveBeenCalled(); // 誤送信防止のため送信は絶対に呼ばれない
+        expect(result).toBe('aborted_by_commit_failure');
+      });
+    });
+
+    it('保存処理が全件成功した場合、LINE送信を実行して sent を返す', () => {
+      const commitItems = vi.fn().mockResolvedValue({ succeeded: 2, failed: 0 });
+      const send = vi.fn().mockResolvedValue(undefined);
+
+      return runTellWorkflow({
+        body: '回答しました',
+        hasTargetChanges: true,
+        targetModifiedItems: [{ id: 'p1', answer: '行く' as const, practice: mockPractice1 }],
+        commitItems,
+        send,
+      }).then((result) => {
+        expect(commitItems).toHaveBeenCalledTimes(1);
+        expect(send).toHaveBeenCalledWith('回答しました');
+        expect(result).toBe('sent');
+      });
+    });
+
+    it('未保存の変更がない場合（hasTargetChanges: false）、commitItems を呼ばずに即座に送信する', () => {
+      const commitItems = vi.fn();
+      const send = vi.fn().mockResolvedValue(undefined);
+
+      return runTellWorkflow({
+        body: '特定予約の回答文',
+        hasTargetChanges: false,
+        targetModifiedItems: [],
+        commitItems,
+        send,
+      }).then((result) => {
+        expect(commitItems).not.toHaveBeenCalled();
+        expect(send).toHaveBeenCalledWith('特定予約の回答文');
+        expect(result).toBe('sent');
+      });
+    });
+
+    it('LINE送信処理でエラーが発生した場合、例外が呼び出し元に伝播する', async () => {
+      const commitItems = vi.fn().mockResolvedValue({ succeeded: 1, failed: 0 });
+      const send = vi.fn().mockRejectedValue(new Error('LINE送信エラー'));
+
+      await expect(
+        runTellWorkflow({
+          body: '回答しました',
+          hasTargetChanges: true,
+          targetModifiedItems: [{ id: 'p1', answer: '行く' as const, practice: mockPractice1 }],
+          commitItems,
+          send,
+        }),
+      ).rejects.toThrow('LINE送信エラー');
     });
   });
 

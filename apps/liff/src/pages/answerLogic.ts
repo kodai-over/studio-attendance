@@ -174,13 +174,69 @@ export async function processCommitItems(
 }
 
 /**
- * グループ送信（またはコピー）失敗時に、送信文が失われないよう下書きを復元する。
+ * 複数グループ環境における下書きの所属グループ状態を判定する。
  */
-export function restoreDraftOnTellError(
-  currentDraft: string | null,
-  capturedBody: string,
-): string {
-  return capturedBody.trim();
+export interface DraftGroupStatus {
+  hasSelectedDraft: boolean;
+  selectedGroupName: string;
+  otherDraftGroupNames: string[];
+}
+
+export function getDraftGroupStatus(
+  allModifiedItems: ModifiedItem[],
+  userGroups: { id: string; name: string }[],
+  selectedGroupId: string,
+  myUserId?: string,
+): DraftGroupStatus {
+  const selectedGroup = userGroups.find((g) => g.id === selectedGroupId);
+  const selectedGroupName = selectedGroup?.name ?? '選択中のグループ';
+
+  const matchesGroup = (item: ModifiedItem, groupId: string) => {
+    if (item.practice.groups.length === 0) return true;
+    if (item.practice.groups.includes(groupId)) return true;
+    if (myUserId && item.practice.booker === myUserId) return true;
+    return false;
+  };
+
+  const hasSelectedDraft = selectedGroupId
+    ? allModifiedItems.some((m) => matchesGroup(m, selectedGroupId))
+    : allModifiedItems.length > 0;
+
+  const otherDraftGroupNames = userGroups
+    .filter((g) => g.id !== selectedGroupId)
+    .filter((g) => allModifiedItems.some((m) => matchesGroup(m, g.id)))
+    .map((g) => g.name);
+
+  return {
+    hasSelectedDraft,
+    selectedGroupName,
+    otherDraftGroupNames,
+  };
+}
+
+/**
+ * 回答保存・メッセージ送信のワークフロー。
+ * 未保存の変更がある場合は先に保存を実行し、保存失敗（failed > 0）時は送信を中断する。
+ */
+export async function runTellWorkflow({
+  body,
+  hasTargetChanges,
+  targetModifiedItems,
+  commitItems,
+  send,
+}: {
+  body: string;
+  hasTargetChanges: boolean;
+  targetModifiedItems: ModifiedItem[];
+  commitItems: (items: ModifiedItem[]) => Promise<{ succeeded: number; failed: number }>;
+  send: (body: string) => Promise<void>;
+}): Promise<'sent' | 'aborted_by_commit_failure'> {
+  if (hasTargetChanges) {
+    const { failed } = await commitItems(targetModifiedItems);
+    if (failed > 0) return 'aborted_by_commit_failure';
+  }
+  await send(body);
+  return 'sent';
 }
 
 /**

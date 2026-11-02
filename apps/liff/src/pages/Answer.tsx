@@ -19,12 +19,13 @@ import {
   filterGroupPractices,
   filterTargetModifiedItems,
   generateSpecificReport,
+  getDraftGroupStatus,
   getModifiedItems,
   globalDrafts,
   processCommitItems,
   pruneStaleDrafts,
   recordSpecificChange,
-  restoreDraftOnTellError,
+  runTellWorkflow,
   stageAnswer,
   type ModifiedItem,
   type SpecificChangeMap,
@@ -158,6 +159,14 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
         ...getModifiedItems(answeredStaged, list),
       ];
   const hasAnyChanges = allModifiedItems.length > 0;
+
+  // 所属グループ全体の下書き状態（複数グループ所属時のバナー文・完了後案内に使用）
+  const draftGroupStatus = getDraftGroupStatus(
+    allModifiedItems,
+    userGroups,
+    selectedGroup,
+    me.member.userId,
+  );
 
   // 離脱防止用に最新の hasAnyChanges を保持
   const hasAnyChangesRef = useRef(false);
@@ -328,21 +337,28 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     }
     setSaving(true);
     try {
-      if (hasTargetChanges) {
-        const { failed } = await commitItems(targetModifiedItems);
-        if (failed > 0) return; // 失敗があった場合は送信を中断して再試行を促す
-      }
-      if (chat === 'ok') {
-        await sendToChat(body);
-        toast(isSpecific ? 'グループに伝えました' : '回答を反映し、グループに伝えました');
-        closeApp();
-      } else {
-        await navigator.clipboard.writeText(body);
-        toast(isSpecific ? 'メッセージをコピーしました' : '回答を反映し、メッセージをコピーしました');
+      const outcome = await runTellWorkflow({
+        body,
+        hasTargetChanges,
+        targetModifiedItems,
+        commitItems,
+        send: async (msg) => {
+          if (chat === 'ok') {
+            await sendToChat(msg);
+            toast(isSpecific ? 'グループに伝えました' : '回答を反映し、グループに伝えました');
+            closeApp();
+          } else {
+            await navigator.clipboard.writeText(msg);
+            toast(isSpecific ? 'メッセージをコピーしました' : '回答を反映し、メッセージをコピーしました');
+          }
+        },
+      });
+      if (outcome === 'aborted_by_commit_failure') {
+        return; // 失敗があった場合は送信を中断して再試行を促す
       }
     } catch (e) {
       // 送信（またはクリップボードコピー）に失敗した場合、body を下書きとして復元して再送可能にする
-      setDraft(restoreDraftOnTellError(draft, body));
+      setDraft(body);
       toast(e instanceof Error ? e.message : '送信に失敗しました', true);
     } finally {
       setSaving(false);
@@ -355,9 +371,13 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
       setSaving(true);
       try {
         const count = targetModifiedItems.length;
-        const { succeeded, failed } = await commitItems(targetModifiedItems);
+        const { failed } = await commitItems(targetModifiedItems);
         if (failed === 0) {
-          toast(`${count}件の回答を反映しました（グループには送信されていません）`);
+          if (draftGroupStatus.otherDraftGroupNames.length > 0) {
+            toast(`${count}件の回答を反映しました（「${draftGroupStatus.otherDraftGroupNames.join('、')}」の下書きが残っています）`);
+          } else {
+            toast(`${count}件の回答を反映しました（グループには送信されていません）`);
+          }
         }
       } catch (e) {
         toast(e instanceof Error ? e.message : '保存に失敗しました', true);
@@ -396,7 +416,13 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
       {!isSpecific && hasAnyChanges && (
         <div class="rsvp-unsaved-banner">
           <Icon name="check" size={15} />
-          <span>下書きがあります。「グループに伝える」または「完了」を押すまで保存されません</span>
+          <span>
+            {draftGroupStatus.hasSelectedDraft
+              ? userGroups.length > 1
+                ? `「${draftGroupStatus.selectedGroupName}」の下書きがあります。「グループに伝える」または「完了」を押すまで保存されません`
+                : '下書きがあります。「グループに伝える」または「完了」を押すまで保存されません'
+              : `他グループ（${draftGroupStatus.otherDraftGroupNames.join('、')}）に未反映の下書きがあります`}
+          </span>
         </div>
       )}
 
