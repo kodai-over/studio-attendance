@@ -407,23 +407,45 @@ describe('出欠', () => {
     expect(t.line.pushes.filter((p) => JSON.stringify(p).includes('【中止】'))).toEqual([]);
   });
 
-  it('募集を流した練習も削除でき、グループには何も送らない', () => {
+  it('募集を流した練習も削除でき、notifyGroups が省略または false のときはグループに何も送らない', () => {
     t.store.s.groups.push({ id: 'C2', name: 'チームB' });
     handleApi(t.ctx, { userId: BOOKER }, 'recruitPractice', { id: PID, groups: ['C2'] });
     const pushes = t.line.pushes.length;
-    const list = handleApi(t.ctx, { userId: ADMIN }, 'deletePractice', { id: PID }) as any[];
-    expect(list.map((v) => v.practice.id)).not.toContain(PID);
+    // notifyGroups: undefined
+    const list1 = handleApi(t.ctx, { userId: ADMIN }, 'deletePractice', { id: PID }) as any[];
+    expect(list1.map((v) => v.practice.id)).not.toContain(PID);
     expect(t.line.pushes).toHaveLength(pushes);
     expect(t.store.a.filter((a) => a.practiceId === PID)).toEqual([]);
+
+    // 別の予約で notifyGroups: false を確認
+    const item = { ...reservation, date: '2026-11-04', max: null, min: null, memo: '' };
+    const { created } = handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [item], groups: ['C2'] }) as any;
+    const pid2 = created[0];
+    const pushes2 = t.line.pushes.length;
+    const list2 = handleApi(t.ctx, { userId: BOOKER }, 'deletePractice', { id: pid2, notifyGroups: false }) as any[];
+    expect(list2.map((v) => v.practice.id)).not.toContain(pid2);
+    expect(t.line.pushes).toHaveLength(pushes2);
   });
 
-  it('notifyGroups: true を指定した場合は募集済みグループにキャンセル通知が送られる', () => {
+  it('未募集の練習は notifyGroups: true を指定してもグループ通知は送られない', () => {
+    const item = { ...reservation, date: '2026-11-06', max: null, min: null, memo: '' };
+    const { created } = handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [item], groups: [] }) as any;
+    const pid = created[0];
+    const initialPushes = t.line.pushes.length;
+
+    const list = handleApi(t.ctx, { userId: BOOKER }, 'deletePractice', { id: pid, notifyGroups: true }) as any[];
+    expect(list.map((v) => v.practice.id)).not.toContain(pid);
+    expect(t.line.pushes).toHaveLength(initialPushes);
+  });
+
+  it('notifyGroups: true を指定した場合は募集済グループに削除の連絡が送られ、pushが失敗しても削除は完了する', () => {
     const item = { ...reservation, date: '2026-11-05', max: null, min: null, memo: '' };
     t.store.s.groups.push({ id: 'C3', name: 'チームC' });
     const { created } = handleApi(t.ctx, { userId: BOOKER, name: 'よやくしゃ' }, 'createPractices', { items: [item], groups: ['C3'] }) as any;
     const pid = created[0];
     const initialPushes = t.line.pushes.length;
 
+    // 正常系
     const list = handleApi(t.ctx, { userId: BOOKER, name: 'よやくしゃ' }, 'deletePractice', { id: pid, notifyGroups: true }) as any[];
     expect(list.map((v) => v.practice.id)).not.toContain(pid);
     expect(t.line.pushes).toHaveLength(initialPushes + 1);
@@ -432,6 +454,33 @@ describe('出欠', () => {
     expect(JSON.stringify(sent.messages)).toContain('【予約削除のお知らせ】');
     expect(JSON.stringify(sent.messages)).toContain('11/5');
     expect(JSON.stringify(sent.messages)).toContain('予約者: 後輩');
+
+    // push が例外を投げても削除自体は完了すること
+    const item2 = { ...reservation, date: '2026-11-07', max: null, min: null, memo: '' };
+    const { created: c2 } = handleApi(t.ctx, { userId: BOOKER, name: 'よやくしゃ' }, 'createPractices', { items: [item2], groups: ['C3'] }) as any;
+    const pid2 = c2[0];
+    const origPush = t.line.push;
+    t.line.push = () => {
+      throw new Error('LINE network error');
+    };
+    try {
+      const list2 = handleApi(t.ctx, { userId: BOOKER, name: 'よやくしゃ' }, 'deletePractice', { id: pid2, notifyGroups: true }) as any[];
+      expect(list2.map((v) => v.practice.id)).not.toContain(pid2);
+    } finally {
+      t.line.push = origPush;
+    }
+  });
+
+  it('権限のない人は削除もグループ通知も実行できない', () => {
+    const item = { ...reservation, date: '2026-11-08', max: null, min: null, memo: '' };
+    t.store.s.groups.push({ id: 'C4', name: 'チームD' });
+    const { created } = handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [item], groups: ['C4'] }) as any;
+    const pid = created[0];
+    const initialPushes = t.line.pushes.length;
+
+    expect(() => handleApi(t.ctx, { userId: 'U_OTHER', name: '部外者' }, 'deletePractice', { id: pid, notifyGroups: true })).toThrow('予約者か管理者');
+    expect(t.line.pushes).toHaveLength(initialPushes);
+    expect(t.store.p.some((p) => p.id === pid)).toBe(true);
   });
 
   it('アプリから登録すると、取り直さなくてよいよう登録後の一覧も返す', () => {

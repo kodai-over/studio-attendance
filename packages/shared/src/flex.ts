@@ -406,7 +406,7 @@ export function reservationLabel(r: Reservation): string {
   return practiceSummary(r);
 }
 
-/** 予約情報が削除されたときに、募集済みグループへ送るメッセージ */
+/** 予約情報が削除されたときに、募集済グループへ送るメッセージ */
 export function practiceCancellationMessage(
   p: Pick<Practice, 'date' | 'start' | 'end' | 'studio' | 'room' | 'memo'>,
   bookerName?: string,

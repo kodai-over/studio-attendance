@@ -370,7 +370,7 @@ export function sendRecruit(ctx: Ctx, practices: Practice[], groups: string[], b
   return sent;
 }
 
-/** 予約情報が削除されたことを募集済みグループに知らせる */
+/** 予約情報が削除されたことを募集済グループに知らせる */
 export function sendPracticeCancellation(ctx: Ctx, practice: Practice, groups: string[], bookerName?: string): string[] {
   if (groups.length === 0) return [];
   const msg = practiceCancellationMessage(practice, bookerName);

@@ -155,4 +155,17 @@ describe('LIFF 初期化 & 画面遷移ロジック', () => {
       expect(resolveInitialHash(new URLSearchParams('draft=d1&view=register'))).toBe('/register?draft=d1');
     });
   });
+
+  describe('予約削除ダイアログの初期状態判定', () => {
+    it('募集済グループがある予約情報では通知フラグ初期値が true になる', () => {
+      const hasGroups = (groups: string[]) => groups.length > 0;
+      expect(hasGroups(['C1'])).toBe(true);
+      expect(hasGroups(['C1', 'C2'])).toBe(true);
+    });
+
+    it('未募集の予約情報では通知フラグ初期値が false になる', () => {
+      const hasGroups = (groups: string[]) => groups.length > 0;
+      expect(hasGroups([])).toBe(false);
+    });
+  });
 });

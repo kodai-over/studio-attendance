@@ -352,16 +352,24 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
     return view(ctx, id, me);
   },
 
-  /** 予約情報を削除する。notifyGroups が true のときは募集済みグループにキャンセル通知を送る */
+  /** 予約情報を削除する。notifyGroups が true のときは募集済グループに削除のお知らせを送る */
   deletePractice(ctx, me, { id, notifyGroups }) {
+    let practiceToDelete: Practice | null = null;
+    let bookerName = '';
     ctx.withLock(() => {
       const p = getPracticeOrThrow(ctx, id);
       requireEditable(me, p);
-      if (notifyGroups && p.groups.length > 0) {
-        sendPracticeCancellation(ctx, p, p.groups, memberNameOf(ctx, p.booker));
-      }
+      practiceToDelete = p;
+      bookerName = memberNameOf(ctx, p.booker);
       ctx.store.deletePractice(id);
     });
+    // 削除が成功したあと、ロックの外でグループへ知らせる（通信待ちでロックを長引かせない）
+    if (notifyGroups && practiceToDelete != null) {
+      const p = practiceToDelete as Practice;
+      if (p.groups.length > 0) {
+        sendPracticeCancellation(ctx, p, p.groups, bookerName);
+      }
+    }
     return handlers.listPractices(ctx, me, {});
   },
 

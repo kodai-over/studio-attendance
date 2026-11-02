@@ -382,7 +382,7 @@ export function CancelDeadlineBadge({ date, studio }: { date: string; studio: st
   );
 }
 
-/** 予約情報削除の確認ダイアログ。募集済みグループへの通知オプション付き */
+/** 予約情報削除の確認。募集済グループへの通知オプション付き */
 export function DeleteConfirmDialog({
   view: v,
   onClose,
@@ -394,10 +394,15 @@ export function DeleteConfirmDialog({
   onConfirm: (notifyGroups: boolean) => Promise<unknown> | void;
   busy?: boolean;
 }) {
+  const hasGroups = Boolean(v && v.practice.groups.length > 0);
+  const [notify, setNotify] = useState(hasGroups);
+
+  useEffect(() => {
+    setNotify(hasGroups);
+  }, [v?.practice.id, hasGroups]);
+
   if (!v) return null;
   const p = v.practice;
-  const hasGroups = p.groups.length > 0;
-  const [notify, setNotify] = useState(hasGroups);
   const answered = v.goingCount + v.maybe.length;
 
   return (
@@ -427,10 +432,10 @@ export function DeleteConfirmDialog({
                 onChange={(e) => setNotify((e.target as HTMLInputElement).checked)}
                 disabled={busy}
               />
-              <span>募集したグループにキャンセルを通知</span>
+              <span>募集済のグループに削除を通知</span>
             </label>
             <div class="muted" style={{ fontSize: '0.75rem', marginTop: 4, paddingLeft: 24, lineHeight: 1.3 }}>
-              {notify ? 'グループに「予約削除のお知らせ」が送信されます。' : 'チェックを外すとグループへは送信されません。'}
+              {notify ? 'グループに削除の連絡が送信されます。' : 'チェックを外すとグループへは送信されません。'}
             </div>
           </div>
         ) : (
@@ -441,7 +446,7 @@ export function DeleteConfirmDialog({
 
         <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
           <button class="btn secondary" style={{ flex: 1 }} onClick={onClose} disabled={busy}>
-            やめる
+            キャンセル
           </button>
           <button class="btn danger" style={{ flex: 1 }} onClick={() => onConfirm(hasGroups && notify)} disabled={busy}>
             {busy ? '削除中...' : '削除する'}
@@ -452,26 +457,26 @@ export function DeleteConfirmDialog({
   );
 }
 
-/** 読み取り中の進捗ステップオーバーレイ（画像・文章両対応） */
+/** 読み取り中の進捗オーバーレイ（スクショ・文章両対応、目安のステップ表示） */
 export function ParsingProgressOverlay({ kind }: { kind: 'image' | 'text' }) {
   const [stepIndex, setStepIndex] = useState(0);
 
   const steps =
     kind === 'image'
       ? [
-          { label: '画像を解析中...', note: 'スクショから文字を読み取っています' },
+          { label: 'スクショから文字を読み取り中...', note: '画像からテキストを抽出しています' },
           { label: '日時・スタジオ情報を特定中...', note: '予約内容を抽出・照合しています' },
-          { label: '料金・キャンセル期限を算出中...', note: '入力項目を準備しています' },
+          { label: 'スタジオ代・キャンセル期限を計算中...', note: '入力内容を準備しています' },
         ]
       : [
-          { label: '文章を解析中...', note: 'テキストから予約情報を解析しています' },
+          { label: '文章から予約内容を読み取り中...', note: 'テキストから項目を解析しています' },
           { label: '日時・スタジオ情報を特定中...', note: '予約内容を抽出・照合しています' },
-          { label: '料金・キャンセル期限を算出中...', note: '入力項目を準備しています' },
+          { label: 'スタジオ代・キャンセル期限を計算中...', note: '入力内容を準備しています' },
         ];
 
   useEffect(() => {
-    const t1 = setTimeout(() => setStepIndex(1), 1600);
-    const t2 = setTimeout(() => setStepIndex(2), 3400);
+    const t1 = setTimeout(() => setStepIndex(1), 1800);
+    const t2 = setTimeout(() => setStepIndex(2), 3600);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
@@ -481,21 +486,24 @@ export function ParsingProgressOverlay({ kind }: { kind: 'image' | 'text' }) {
   return (
     <div class="overlay" role="alertdialog" aria-busy="true" aria-label="読み取り中">
       <div class="overlay-box" style={{ maxWidth: 300, textAlign: 'left', padding: '20px 18px 18px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
           <div class="spinner" style={{ width: 20, height: 20, margin: 0 }} />
           <strong style={{ fontSize: '0.98rem' }}>予約内容を読み取り中</strong>
         </div>
+        <p class="muted" style={{ fontSize: '0.75rem', margin: '0 0 14px' }}>
+          通常3〜5秒ほどかかります
+        </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {steps.map((st, i) => {
-            const isDone = i < stepIndex;
             const isCurrent = i === stepIndex;
+            const isPassed = i < stepIndex;
             return (
               <div
                 style={{
                   display: 'flex',
                   alignItems: 'flex-start',
                   gap: 8,
-                  opacity: isDone || isCurrent ? 1 : 0.4,
+                  opacity: isCurrent ? 1 : isPassed ? 0.7 : 0.35,
                   transition: 'opacity 0.2s',
                 }}
               >
@@ -509,11 +517,11 @@ export function ParsingProgressOverlay({ kind }: { kind: 'image' | 'text' }) {
                     justifyContent: 'center',
                     marginTop: 2,
                     flexShrink: 0,
-                    background: isDone ? 'var(--forest, #065F46)' : isCurrent ? 'var(--ink)' : 'var(--line)',
-                    color: isDone || isCurrent ? '#fff' : 'var(--muted)',
+                    background: isCurrent ? 'var(--ink)' : isPassed ? 'var(--forest, #065F46)' : 'var(--line)',
+                    color: isCurrent || isPassed ? '#fff' : 'var(--muted)',
                   }}
                 >
-                  {isDone ? <Icon name="check" size={12} /> : <span style={{ fontSize: '0.65rem', fontWeight: 'bold' }}>{i + 1}</span>}
+                  <span style={{ fontSize: '0.65rem', fontWeight: 'bold' }}>{i + 1}</span>
                 </div>
                 <div>
                   <div style={{ fontSize: '0.84rem', fontWeight: isCurrent ? 600 : 400, color: 'var(--ink)' }}>{st.label}</div>
