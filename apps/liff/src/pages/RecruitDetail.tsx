@@ -65,12 +65,12 @@ export function RecruitDetailPage({ id }: { id: string }) {
               v={v}
               busy={busy}
               onSave={(patch) => update(() => api('updatePractice', { id, patch }), '保存しました')}
-              onDelete={async () => {
+              onDelete={async (notifyGroups) => {
                 // サーバーの返事を待たずに「募集」に戻る（失敗したら一覧に戻して知らせる）
                 // 一覧から来たときは戻る（履歴に削除した練習の画面を残さない）。お知らせのリンクから来たときは「募集」へ
                 if (history.length > 1) history.back();
                 else go('/recruit');
-                await deletePractice(v);
+                await deletePractice(v, { notifyGroups });
               }}
             />
           )}

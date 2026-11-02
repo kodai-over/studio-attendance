@@ -417,6 +417,23 @@ describe('出欠', () => {
     expect(t.store.a.filter((a) => a.practiceId === PID)).toEqual([]);
   });
 
+  it('notifyGroups: true を指定した場合は募集済みグループにキャンセル通知が送られる', () => {
+    const item = { ...reservation, date: '2026-11-05', max: null, min: null, memo: '' };
+    t.store.s.groups.push({ id: 'C3', name: 'チームC' });
+    const { created } = handleApi(t.ctx, { userId: BOOKER, name: 'よやくしゃ' }, 'createPractices', { items: [item], groups: ['C3'] }) as any;
+    const pid = created[0];
+    const initialPushes = t.line.pushes.length;
+
+    const list = handleApi(t.ctx, { userId: BOOKER, name: 'よやくしゃ' }, 'deletePractice', { id: pid, notifyGroups: true }) as any[];
+    expect(list.map((v) => v.practice.id)).not.toContain(pid);
+    expect(t.line.pushes).toHaveLength(initialPushes + 1);
+    const sent = t.line.pushes[t.line.pushes.length - 1];
+    expect(sent.to).toBe('C3');
+    expect(JSON.stringify(sent.messages)).toContain('【予約削除のお知らせ】');
+    expect(JSON.stringify(sent.messages)).toContain('11/5');
+    expect(JSON.stringify(sent.messages)).toContain('予約者: 後輩');
+  });
+
   it('アプリから登録すると、取り直さなくてよいよう登録後の一覧も返す', () => {
     const item = { ...reservation, date: '2026-10-31', max: null, min: null, memo: '' };
     const res = handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [item], groups: [] }) as any;

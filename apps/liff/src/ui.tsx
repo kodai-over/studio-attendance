@@ -44,7 +44,7 @@ interface AppState {
   /** 1件だけ差し替える（出欠や修正の結果をすぐ一覧に反映する） */
   updatePractice(v: PracticeView, opts?: { revert?: boolean }): void;
   /** 練習を削除する（すぐ一覧から消し、失敗したら戻す）。消せたら true */
-  deletePractice(v: PracticeView): Promise<boolean>;
+  deletePractice(v: PracticeView, opts?: { notifyGroups?: boolean }): Promise<boolean>;
   /** 起動時と同じまとめ取得をやり直す（グループのカードから開いたときは、そのグループのメンバーとしても覚えてもらう） */
   loadHome(): Promise<void>;
 }
@@ -378,6 +378,156 @@ export function CancelDeadlineBadge({ date, studio }: { date: string; studio: st
     <div class={`ticket-deadline${deadline.isSoon ? ' is-soon' : ''}${deadline.isPast ? ' is-past' : ''}`}>
       <Icon name="clock" size={10} />
       <span>{deadline.isPast ? 'キャンセル期限超過' : `キャンセル期限: ${deadline.formatted}`}</span>
+    </div>
+  );
+}
+
+/** 予約情報削除の確認ダイアログ。募集済みグループへの通知オプション付き */
+export function DeleteConfirmDialog({
+  view: v,
+  onClose,
+  onConfirm,
+  busy,
+}: {
+  view: PracticeView | null;
+  onClose: () => void;
+  onConfirm: (notifyGroups: boolean) => Promise<unknown> | void;
+  busy?: boolean;
+}) {
+  if (!v) return null;
+  const p = v.practice;
+  const hasGroups = p.groups.length > 0;
+  const [notify, setNotify] = useState(hasGroups);
+  const answered = v.goingCount + v.maybe.length;
+
+  return (
+    <div class="overlay" role="dialog" aria-modal="true" aria-label="予約情報の削除">
+      <div class="overlay-box" style={{ maxWidth: 320, textAlign: 'left' }}>
+        <h3 style={{ margin: '0 0 10px', fontSize: '1.05rem', fontWeight: 600 }}>予約情報を削除</h3>
+        <p style={{ margin: '0 0 8px', fontSize: '0.9rem', lineHeight: 1.5 }}>
+          <b>{labelDate(p.date)} {p.start}〜{p.end}</b><br />
+          {place(p)}
+        </p>
+        {answered > 0 ? (
+          <p class="muted" style={{ margin: '0 0 12px', fontSize: '0.8rem', lineHeight: 1.4 }}>
+            回答している人がいます（行く{v.goingCount}人・未定{v.maybe.length}人）。回答も削除されます。
+          </p>
+        ) : (
+          <p class="muted" style={{ margin: '0 0 12px', fontSize: '0.8rem' }}>
+            この予約情報を削除します。
+          </p>
+        )}
+
+        {hasGroups ? (
+          <div style={{ padding: '10px 12px', background: 'var(--paper-subtle, rgb(0 0 0 / 4%))', borderRadius: 8, margin: '8px 0 16px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.88rem', fontWeight: 500 }}>
+              <input
+                type="checkbox"
+                checked={notify}
+                onChange={(e) => setNotify((e.target as HTMLInputElement).checked)}
+                disabled={busy}
+              />
+              <span>募集したグループにキャンセルを通知</span>
+            </label>
+            <div class="muted" style={{ fontSize: '0.75rem', marginTop: 4, paddingLeft: 24, lineHeight: 1.3 }}>
+              {notify ? 'グループに「予約削除のお知らせ」が送信されます。' : 'チェックを外すとグループへは送信されません。'}
+            </div>
+          </div>
+        ) : (
+          <div class="muted" style={{ fontSize: '0.78rem', margin: '8px 0 16px', lineHeight: 1.3 }}>
+            ※まだグループに募集されていないため、グループへの通知は行われません。
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+          <button class="btn secondary" style={{ flex: 1 }} onClick={onClose} disabled={busy}>
+            やめる
+          </button>
+          <button class="btn danger" style={{ flex: 1 }} onClick={() => onConfirm(hasGroups && notify)} disabled={busy}>
+            {busy ? '削除中...' : '削除する'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** 読み取り中の進捗ステップオーバーレイ（画像・文章両対応） */
+export function ParsingProgressOverlay({ kind }: { kind: 'image' | 'text' }) {
+  const [stepIndex, setStepIndex] = useState(0);
+
+  const steps =
+    kind === 'image'
+      ? [
+          { label: '画像を解析中...', note: 'スクショから文字を読み取っています' },
+          { label: '日時・スタジオ情報を特定中...', note: '予約内容を抽出・照合しています' },
+          { label: '料金・キャンセル期限を算出中...', note: '入力項目を準備しています' },
+        ]
+      : [
+          { label: '文章を解析中...', note: 'テキストから予約情報を解析しています' },
+          { label: '日時・スタジオ情報を特定中...', note: '予約内容を抽出・照合しています' },
+          { label: '料金・キャンセル期限を算出中...', note: '入力項目を準備しています' },
+        ];
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setStepIndex(1), 1600);
+    const t2 = setTimeout(() => setStepIndex(2), 3400);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, []);
+
+  return (
+    <div class="overlay" role="alertdialog" aria-busy="true" aria-label="読み取り中">
+      <div class="overlay-box" style={{ maxWidth: 300, textAlign: 'left', padding: '20px 18px 18px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <div class="spinner" style={{ width: 20, height: 20, margin: 0 }} />
+          <strong style={{ fontSize: '0.98rem' }}>予約内容を読み取り中</strong>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {steps.map((st, i) => {
+            const isDone = i < stepIndex;
+            const isCurrent = i === stepIndex;
+            return (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 8,
+                  opacity: isDone || isCurrent ? 1 : 0.4,
+                  transition: 'opacity 0.2s',
+                }}
+              >
+                <div
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginTop: 2,
+                    flexShrink: 0,
+                    background: isDone ? 'var(--forest, #065F46)' : isCurrent ? 'var(--ink)' : 'var(--line)',
+                    color: isDone || isCurrent ? '#fff' : 'var(--muted)',
+                  }}
+                >
+                  {isDone ? <Icon name="check" size={12} /> : <span style={{ fontSize: '0.65rem', fontWeight: 'bold' }}>{i + 1}</span>}
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.84rem', fontWeight: isCurrent ? 600 : 400, color: 'var(--ink)' }}>{st.label}</div>
+                  {isCurrent && (
+                    <div class="muted" style={{ fontSize: '0.72rem', marginTop: 1 }}>
+                      {st.note}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

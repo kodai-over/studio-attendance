@@ -1,9 +1,8 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { isAdmin, labelDate, type PracticeView } from '@studio-attendance/shared';
-import { deleteMessage } from './Detail';
 import { api } from '../api';
-import { CancelDeadlineBadge, Icon, Spinner, Stub, TopBar, go, place, useApp, useRunner } from '../ui';
+import { CancelDeadlineBadge, DeleteConfirmDialog, Icon, Spinner, Stub, TopBar, go, place, useApp, useRunner } from '../ui';
 
 /**
  * 「募集」。自分が登録した練習（管理者はすべての練習）を並べ、押すと募集・編集の画面へ。
@@ -15,6 +14,8 @@ export function RecruitListPage() {
   const [fresh, setFresh] = useState(false);
   // 削除ボタンを出しているチケット（一度に1枚だけ）
   const [opened, setOpened] = useState<string | null>(null);
+  // 削除確認ダイアログを出している予約情報
+  const [deletingTarget, setDeletingTarget] = useState<PracticeView | null>(null);
 
   // 手元の一覧ですぐ表示し、最新の一覧は裏で取り直す
   useEffect(() => {
@@ -29,10 +30,9 @@ export function RecruitListPage() {
   // 直せる練習（自分が登録した練習。管理者はすべて）。サーバーの判定（canEdit）にそろえる
   const list = practices == null && !fresh ? null : (practices ?? []).filter((v) => v.canEdit);
 
-  // 確認したら、サーバーの返事を待たずに一覧から消す（失敗したらその練習だけ元に戻す）
   const remove = (v: PracticeView) => {
     setOpened(null);
-    if (confirm(deleteMessage(v))) deletePractice(v);
+    setDeletingTarget(v);
   };
 
   return (
@@ -61,6 +61,16 @@ export function RecruitListPage() {
           ))}
         </div>
       )}
+
+      <DeleteConfirmDialog
+        view={deletingTarget}
+        onClose={() => setDeletingTarget(null)}
+        onConfirm={async (notifyGroups) => {
+          const target = deletingTarget;
+          setDeletingTarget(null);
+          if (target) await deletePractice(target, { notifyGroups });
+        }}
+      />
     </>
   );
 }

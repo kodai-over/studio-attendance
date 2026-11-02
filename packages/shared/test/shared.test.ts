@@ -27,6 +27,7 @@ import {
   parsePostback,
   perPersonFee,
   endAfterStart,
+  practiceCancellationMessage,
   practiceListMessage,
   recruitMessages,
   answerReport,
@@ -474,6 +475,20 @@ describe('Flex Message', () => {
     // 上限があれば「参加/上限」で出す
     expect(JSON.stringify(practiceListMessage([{ practice: practice({ max: 12 }), going: 1 }], appUrl))).toContain('"1/12人"');
     expect(JSON.stringify(practiceListMessage([{ practice: practice({ max: 5, status: '満員' }), going: 5 }], appUrl))).toContain('5/5人 満員');
+  });
+
+  it('予約情報削除の通知メッセージ', () => {
+    const msg = practiceCancellationMessage(
+      { date: '2026-11-10', start: '18:00', end: '21:00', studio: 'スタジオノア 渋谷店', room: 'Ast', memo: '自主練' },
+      'たろう',
+    );
+    expect(msg.type).toBe('text');
+    expect(msg.text).toContain('【予約削除のお知らせ】');
+    expect(msg.text).toContain('11/10');
+    expect(msg.text).toContain('18:00〜21:00');
+    expect(msg.text).toContain('スタジオノア 渋谷店 Ast');
+    expect(msg.text).toContain('予約者: たろう');
+    expect(msg.text).toContain('メモ: 自主練');
   });
 
   it('開始を変えたら、終了を開始の1時間後より前にしない', () => {

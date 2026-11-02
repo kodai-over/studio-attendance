@@ -3,7 +3,7 @@ import { computeCancelDeadline, endAfterStart, labelDate, roomInfo, yen, type An
 import { api } from '../api';
 import { RoomSelect } from '../components/StudioRoom';
 import { openCalendar, prefersIcs, shareLink } from '../liff';
-import { Avatar, FRESH_MS, Icon, Pass, RsvpButtons, Spinner, Syncing, TopBar, shareData, useApp, useRunner } from '../ui';
+import { Avatar, DeleteConfirmDialog, FRESH_MS, Icon, Pass, RsvpButtons, Spinner, Syncing, TopBar, shareData, useApp, useRunner } from '../ui';
 import { isAnswering } from '../answering';
 import { useAnswer } from './List';
 
@@ -263,11 +263,12 @@ export function EditForm({
 }: {
   v: PracticeView;
   onSave: (p: PracticePatch) => Promise<unknown>;
-  onDelete: () => Promise<unknown>;
+  onDelete: (notifyGroups: boolean) => Promise<unknown> | void;
   busy: boolean;
 }) {
   const { me } = useApp();
   const p = v.practice;
+  const [confirming, setConfirming] = useState(false);
   const [f, setF] = useState({
     start: p.start,
     end: p.end,
@@ -282,71 +283,81 @@ export function EditForm({
   const num = (s: string) => (s.trim() === '' ? null : Number(s));
 
   return (
-    <details class="menu edit">
-      <summary class="menu-row">
-        <Icon name="edit" size={20} />
-        <span class="grow">編集</span>
-        <Icon name="chevron" size={18} />
-      </summary>
-      <section class="card" style={{ margin: 0, borderRadius: 0 }}>
-        <div class="grid2">
-          <label class="field">
-            <span>開始</span>
-            <input type="time" value={f.start} onInput={(e) => setF({ ...f, start: e.currentTarget.value, end: endAfterStart(e.currentTarget.value, f.end) })} />
-          </label>
-          <label class="field">
-            <span>終了</span>
-            <input type="time" value={f.end} onInput={set('end')} />
-          </label>
-        </div>
-        <div class="grid2">
-          <div class="field">
-            <span>部屋</span>
-            <RoomSelect studios={me.settings.studios} studio={p.studio} value={f.room} onChange={(room) => setF({ ...f, room })} />
+    <>
+      <details class="menu edit">
+        <summary class="menu-row">
+          <Icon name="edit" size={20} />
+          <span class="grow">編集</span>
+          <Icon name="chevron" size={18} />
+        </summary>
+        <section class="card" style={{ margin: 0, borderRadius: 0 }}>
+          <div class="grid2">
+            <label class="field">
+              <span>開始</span>
+              <input type="time" value={f.start} onInput={(e) => setF({ ...f, start: e.currentTarget.value, end: endAfterStart(e.currentTarget.value, f.end) })} />
+            </label>
+            <label class="field">
+              <span>終了</span>
+              <input type="time" value={f.end} onInput={set('end')} />
+            </label>
+          </div>
+          <div class="grid2">
+            <div class="field">
+              <span>部屋</span>
+              <RoomSelect studios={me.settings.studios} studio={p.studio} value={f.room} onChange={(room) => setF({ ...f, room })} />
+            </div>
+            <label class="field">
+              <span>スタジオ代 ¥</span>
+              <input type="number" inputMode="numeric" value={f.fee} onInput={set('fee')} />
+            </label>
+          </div>
+          <div class="grid3">
+            <label class="field">
+              <span>上限人数</span>
+              <input type="number" inputMode="numeric" placeholder="なし" value={f.max} onInput={set('max')} />
+            </label>
+            <label class="field">
+              <span>最低人数</span>
+              <input type="number" inputMode="numeric" placeholder={`標準 ${me.settings.minDefault}人`} value={f.min} onInput={set('min')} />
+            </label>
+            <label class="field">
+              <span>1人あたり ¥</span>
+              <input type="number" inputMode="numeric" placeholder="自動" value={f.feeOverride} onInput={set('feeOverride')} />
+            </label>
           </div>
           <label class="field">
-            <span>スタジオ代 ¥</span>
-            <input type="number" inputMode="numeric" value={f.fee} onInput={set('fee')} />
+            <span>メモ</span>
+            <textarea rows={3} value={f.memo} onInput={set('memo')} />
           </label>
-        </div>
-        <div class="grid3">
-          <label class="field">
-            <span>上限人数</span>
-            <input type="number" inputMode="numeric" placeholder="なし" value={f.max} onInput={set('max')} />
-          </label>
-          <label class="field">
-            <span>最低人数</span>
-            <input type="number" inputMode="numeric" placeholder={`標準 ${me.settings.minDefault}人`} value={f.min} onInput={set('min')} />
-          </label>
-          <label class="field">
-            <span>1人あたり ¥</span>
-            <input type="number" inputMode="numeric" placeholder="自動" value={f.feeOverride} onInput={set('feeOverride')} />
-          </label>
-        </div>
-        <label class="field">
-          <span>メモ</span>
-          <textarea rows={3} value={f.memo} onInput={set('memo')} />
-        </label>
-        <button
-          class="btn primary block"
-          disabled={busy}
-          onClick={() =>
-            onSave({ start: f.start, end: f.end, room: f.room, fee: Number(f.fee) || 0, max: num(f.max), min: num(f.min), feeOverride: num(f.feeOverride), memo: f.memo })
-          }
-        >
-          保存
-        </button>
-        <button
-          class="btn danger block"
-          style={{ marginTop: 8 }}
-          disabled={busy}
-          onClick={() => {
-            if (confirm(deleteMessage(v))) onDelete();
-          }}
-        >
-          削除する
-        </button>
-      </section>
-    </details>
+          <button
+            class="btn primary block"
+            disabled={busy}
+            onClick={() =>
+              onSave({ start: f.start, end: f.end, room: f.room, fee: Number(f.fee) || 0, max: num(f.max), min: num(f.min), feeOverride: num(f.feeOverride), memo: f.memo })
+            }
+          >
+            保存
+          </button>
+          <button
+            class="btn danger block"
+            style={{ marginTop: 8 }}
+            disabled={busy}
+            onClick={() => setConfirming(true)}
+          >
+            削除する
+          </button>
+        </section>
+      </details>
+
+      <DeleteConfirmDialog
+        view={confirming ? v : null}
+        onClose={() => setConfirming(false)}
+        onConfirm={async (notifyGroups) => {
+          setConfirming(false);
+          await onDelete(notifyGroups);
+        }}
+        busy={busy}
+      />
+    </>
   );
 }
