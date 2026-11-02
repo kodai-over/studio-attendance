@@ -197,14 +197,13 @@ export function filterGroupPractices(
     if (v.practice.groups.length === 0) return true;
     if (v.practice.groups.includes(selectedGroup)) return true;
     if (myUserId && v.practice.booker === myUserId) return true;
-    if (v.myAnswer != null) return true;
     return false;
   });
 }
 
 /**
  * 表示中かつ選択中グループに合致する変更項目のみをフィルタリングする。
- * groups が空の予約情報や自分が予約者の予約情報、回答済みの予約情報はどのグループ選択時にも対象に含める。
+ * groups が空の予約情報や自分が予約者の予約情報はどのグループ選択時にも対象に含める。
  */
 export function filterTargetModifiedItems(
   modifiedItems: ModifiedItem[],
@@ -217,7 +216,6 @@ export function filterTargetModifiedItems(
     if (!selectedGroup || item.practice.groups.length === 0) return true;
     if (item.practice.groups.includes(selectedGroup)) return true;
     if (myUserId && item.practice.booker === myUserId) return true;
-    if (item.originalAnswer != null) return true;
     return false;
   });
 }

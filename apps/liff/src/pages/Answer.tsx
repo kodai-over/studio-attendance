@@ -162,9 +162,8 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   // 離脱防止用に最新の hasAnyChanges を保持
   const hasAnyChangesRef = useRef(false);
   hasAnyChangesRef.current = hasAnyChanges;
-  const isRevertingHashRef = useRef(false);
 
-  // ナビゲーションガード（下部メニューなどの遷移時に未保存変更があれば確認し、キャンセルなら画面遷移を阻止）
+  // ナビゲーションガード（下部メニューや戻るなどの遷移時に未保存変更があれば確認し、キャンセルなら画面遷移を阻止）
   useEffect(() => {
     setNavigationGuard((toPath) => {
       // RSVP 画面自身への遷移時は確認ダイアログを出さずにそのまま許可
@@ -192,29 +191,6 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     };
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
-  }, []);
-
-  useEffect(() => {
-    const onHashChange = (e: HashChangeEvent) => {
-      if (isRevertingHashRef.current) {
-        isRevertingHashRef.current = false;
-        return;
-      }
-      if (hasAnyChangesRef.current) {
-        if (!window.confirm('回答の変更が反映されていません。破棄して移動しますか？')) {
-          isRevertingHashRef.current = true;
-          const oldHash = new URL(e.oldURL).hash || '#/answer';
-          history.replaceState(null, '', oldHash);
-          setTimeout(() => {
-            isRevertingHashRef.current = false;
-          }, 100);
-        } else {
-          clearGlobalDrafts();
-        }
-      }
-    };
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
   // 個別の回答変更（特定予約指定時は即時保存、通常画面ではドラフト更新）

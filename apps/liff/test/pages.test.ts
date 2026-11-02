@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MyAnswerBadge, readTab } from '../src/pages/List';
-import { RsvpButtons } from '../src/ui';
+import { NavBar, RsvpButtons, go, setNavigationGuard } from '../src/ui';
 
 describe('MyAnswerBadge（予定一覧・詳細の回答ステータスバッジ）', () => {
   it('行く（○）のバッジが正しく返る', () => {
@@ -136,6 +136,42 @@ describe('RsvpButtons（出欠選択ボタン）', () => {
     }>;
     for (const btn of buttons) {
       expect(btn.props.disabled).toBe(true);
+    }
+  });
+});
+
+describe('NavigationGuard（ui.tsx の画面遷移ガード）', () => {
+  it('ガードが false を返した場合、go() による遷移が阻止される', () => {
+    const originalLocation = globalThis.location;
+    globalThis.location = { hash: '#/answer' } as Location;
+    try {
+      const guard = vi.fn().mockReturnValue(false);
+      setNavigationGuard(guard);
+
+      go('/settings');
+
+      expect(guard).toHaveBeenCalledWith('/settings');
+      expect(location.hash).toBe('#/answer');
+    } finally {
+      setNavigationGuard(null);
+      globalThis.location = originalLocation;
+    }
+  });
+
+  it('ガードが true を返した場合、go() による遷移が実行される', () => {
+    const originalLocation = globalThis.location;
+    globalThis.location = { hash: '#/answer' } as Location;
+    try {
+      const guard = vi.fn().mockReturnValue(true);
+      setNavigationGuard(guard);
+
+      go('/settings');
+
+      expect(guard).toHaveBeenCalledWith('/settings');
+      expect(location.hash).toBe('/settings');
+    } finally {
+      setNavigationGuard(null);
+      globalThis.location = originalLocation;
     }
   });
 });

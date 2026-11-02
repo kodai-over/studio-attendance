@@ -10,24 +10,37 @@ export function parseHash(): { path: string[]; query: URLSearchParams } {
   return { path: p.split('/').filter(Boolean).map(decodeURIComponent), query: new URLSearchParams(q) };
 }
 
+export type NavigationGuard = (toPath: string) => boolean;
+let currentGuard: NavigationGuard | null = null;
+let isRevertingGuard = false;
+
+export function setNavigationGuard(guard: NavigationGuard | null) {
+  currentGuard = guard;
+}
+
 export function useRoute() {
   const [route, setRoute] = useState(parseHash);
   useEffect(() => {
-    const on = () => {
-      setRoute(parseHash());
+    const on = (e: HashChangeEvent) => {
+      if (isRevertingGuard) {
+        isRevertingGuard = false;
+        return;
+      }
+      const newParsed = parseHash();
+      const toPath = '/' + newParsed.path.join('/');
+      if (currentGuard && !currentGuard(toPath)) {
+        isRevertingGuard = true;
+        const oldHash = new URL(e.oldURL).hash || '#/';
+        location.hash = oldHash;
+        return;
+      }
+      setRoute(newParsed);
       window.scrollTo(0, 0);
     };
     window.addEventListener('hashchange', on);
     return () => window.removeEventListener('hashchange', on);
   }, []);
   return route;
-}
-
-export type NavigationGuard = (toPath: string) => boolean;
-let currentGuard: NavigationGuard | null = null;
-
-export function setNavigationGuard(guard: NavigationGuard | null) {
-  currentGuard = guard;
 }
 
 export const go = (path: string) => {

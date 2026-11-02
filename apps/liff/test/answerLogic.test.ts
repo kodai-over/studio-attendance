@@ -135,25 +135,19 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       { practice: practiceOtherUnanswered, myAnswer: null, attendees: [] },
     ];
 
-    it('選択中グループの予約情報に加え、groupsが空（登録のみ等）の予約情報も含まれる（他グループの未回答予約は除外される）', () => {
+    it('選択中グループの予約情報に加え、groupsが空（登録のみ等）の予約情報も含まれる（他グループの予約は除外される）', () => {
       const filtered = filterGroupPractices(listWithNoGroup, 'group-a');
       const ids = filtered.map((v) => v.practice.id);
       expect(ids).toContain('p1');
       expect(ids).toContain('p-no-group');
-      expect(ids).not.toContain('p-other-unanswered'); // group-b かつ未回答なので除外される
+      expect(ids).not.toContain('p2'); // group-b なので除外される（他グループ混ざり防止）
+      expect(ids).not.toContain('p-other-unanswered'); // group-b なので除外される
     });
 
     it('自分が予約者の予約情報は、選択中グループに含まれなくても表示される', () => {
       const filtered = filterGroupPractices(listWithNoGroup, 'group-a', 'user-me');
       const ids = filtered.map((v) => v.practice.id);
       expect(ids).toContain('p-other-mine');
-    });
-
-    it('自分が回答済みの予約情報は、所属グループ外でも「回答済」として表示・変更できる', () => {
-      // p2 は group-b の予約情報で、myAnswer が '保留'（回答済み）
-      const filtered = filterGroupPractices(listWithNoGroup, 'group-a');
-      const ids = filtered.map((v) => v.practice.id);
-      expect(ids).toContain('p2');
     });
 
     it('グループが未選択（空文字）の場合は全件が返る', () => {
@@ -171,7 +165,7 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       booker: 'user-me',
     };
 
-    it('表示中かつ選択グループに該当する項目のみ抽出する（groupsが空の予約情報や自分が予約者の予約情報も含む）', () => {
+    it('表示中かつ選択グループに該当する項目のみ抽出する（他グループの変更は除外して誤送信を防止する）', () => {
       const items = [
         { id: 'p1', answer: '行く' as const, originalAnswer: null, practice: mockPractice1 }, // group-a
         { id: 'p2', answer: '行かない' as const, originalAnswer: '保留' as const, practice: mockPractice2 }, // group-b
@@ -180,11 +174,11 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       ];
       const displayedIds = new Set(['p1', 'p2', 'p-none', 'p-other-mine']);
 
-      // group-a のみ選択時: p1 (group-a), p2 (回答済のため対象), p-none (groups空), p-other-mine (予約者) が抽出される
+      // group-a のみ選択時: p1 (group-a), p-none (groups空), p-other-mine (予約者) が抽出され、p2 は除外される
       const filteredA = filterTargetModifiedItems(items, displayedIds, 'group-a', 'user-me');
-      expect(filteredA.map((x) => x.id)).toEqual(['p1', 'p2', 'p-none', 'p-other-mine']);
+      expect(filteredA.map((x) => x.id)).toEqual(['p1', 'p-none', 'p-other-mine']);
 
-      // group-b のみ選択時: p2 と p-none が抽出される
+      // group-b のみ選択時: p2 (group-b) と p-none (groups空) が抽出される
       const filteredB = filterTargetModifiedItems(items, displayedIds, 'group-b');
       expect(filteredB.map((x) => x.id)).toEqual(['p2', 'p-none']);
 
