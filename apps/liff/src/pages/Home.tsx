@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { toJstDate, toJstTime } from '@studio-attendance/shared';
+import { labelDate, toJstDate, toJstTime, yen } from '@studio-attendance/shared';
 import { api } from '../api';
-import { FRESH_MS, Icon, Spinner, Syncing, Tabs, TopBar, go, useApp, useRunner } from '../ui';
+import { FRESH_MS, Icon, Spinner, Syncing, Tabs, TopBar, go, place, useApp, useRunner } from '../ui';
 import { getDraftOwnerKey, getUnansweredSummary } from './answerLogic';
 import {
   LATEST_RELEASE_VERSION,
@@ -84,42 +84,72 @@ export function HomePage() {
       <TopBar title="ホーム" showTheme />
       {(practicesAt === 0 || busy) && <Syncing />}
 
-      {/* 1. 未回答の予約情報バナー */}
+      {/* 1. 未回答の予約情報バナー（GitHub Announcement Banner 風） */}
       {todoCount > 0 && (
-        <button class="home-todo-banner" onClick={() => go('/answer')}>
-          <div class="home-todo-banner-main">
-            <span class="home-todo-badge">{todoCount}</span>
-            <div class="home-todo-text">
+        <button class="gh-flash-banner" onClick={() => go('/answer')}>
+          <div class="gh-flash-main">
+            <span class="gh-flash-badge">{todoCount}</span>
+            <div class="gh-flash-text">
               <strong>未回答の予約情報が {todoCount} 件あります</strong>
-              <span>RSVP から回答できます</span>
+              <span>RSVP からまとめて回答できます</span>
             </div>
           </div>
-          <Icon name="chevron" size={18} />
+          <span class="gh-flash-action">
+            <span>回答する</span>
+            <Icon name="chevron" size={13} />
+          </span>
         </button>
       )}
 
-      {/* 2. 次の参加予定 */}
+      {/* 2. 次の参加予定（GitHub Pinned Repository 風） */}
       <section class="home-section">
         <div class="home-section-head">
-          <h2 class="section-title" style={{ margin: 0 }}>次の参加予定</h2>
-          <button class="home-section-link" onClick={() => go('/?tab=mine')}>
+          <h2 class="gh-section-title">次の参加予定</h2>
+          <button class="gh-section-link" onClick={() => go('/?tab=mine')}>
             <span>予定へ</span>
-            <Icon name="chevron" size={14} />
+            <Icon name="chevron" size={13} />
           </button>
         </div>
         {nextGoing ? (
-          <div class="ticket-grid" style={{ marginTop: 8 }}>
-            <PracticeCard v={nextGoing} />
-          </div>
+          <article
+            class="gh-pinned-card"
+            onClick={() => go(`/p/${encodeURIComponent(nextGoing.practice.id)}`)}
+          >
+            <div class="gh-pinned-header">
+              <div class="gh-pinned-title-wrap">
+                <Icon name="calendar" size={15} />
+                <span class="gh-pinned-title">
+                  {labelDate(nextGoing.practice.date)} {nextGoing.practice.start}–{nextGoing.practice.end}
+                </span>
+              </div>
+              <span class="gh-pill-badge">参加確定</span>
+            </div>
+            <p class="gh-pinned-body">{place(nextGoing.practice)}</p>
+            <div class="gh-pinned-footer">
+              <span class="gh-meta-stat">
+                <span class="gh-stat-dot" />
+                <span>{nextGoing.going.length}人参加</span>
+              </span>
+              <span class="gh-meta-stat">
+                1人あたり {yen(nextGoing.practice.fee ? Math.ceil(nextGoing.practice.fee / Math.max(1, nextGoing.going.length)) : 0)}
+              </span>
+              {nextGoing.bookerName && (
+                <span class="gh-meta-stat">
+                  <Icon name="user" size={12} />
+                  <span>{nextGoing.bookerName}</span>
+                </span>
+              )}
+            </div>
+          </article>
         ) : (
-          <div class="home-empty-card">
+          <div class="gh-blankslate">
             <span>次の参加予定はありません。</span>
           </div>
         )}
       </section>
 
-      {/* 3. お知らせ / リリースノート */}
-      <section class="home-section" style={{ marginTop: 22 }}>
+      {/* 3. お知らせ / リリースノート（GitHub Contribution Activity タイムライン風） */}
+      <section class="home-section" style={{ marginTop: 24 }}>
         <Tabs
           value={subTab}
           onChange={handleSelectSubTab}
@@ -138,65 +168,83 @@ export function HomePage() {
 
         {subTab === 'notices' ? (
           notices.length === 0 ? (
-            <div class="home-empty-card" style={{ marginTop: 12 }}>
+            <div class="gh-blankslate" style={{ marginTop: 12 }}>
               <span>お知らせはありません。</span>
             </div>
           ) : (
-            <ul class="home-notice-list">
+            <div class="gh-timeline">
               {notices.map((n) => {
                 const isUnread = readAtBefore != null && n.updatedAt > readAtBefore;
                 return (
-                  <li key={n.id}>
+                  <div key={n.id} class={`gh-timeline-item${isUnread ? ' is-unread' : ''}`}>
+                    <div class={`gh-timeline-badge ${n.kind}`}>
+                      <Icon
+                        name={
+                          n.kind === 'practice_canceled'
+                            ? 'x'
+                            : n.kind === 'practice_changed'
+                            ? 'edit'
+                            : 'user'
+                        }
+                        size={12}
+                      />
+                    </div>
                     <button
-                      class={`home-notice-row${isUnread ? ' is-unread' : ''}`}
-                      data-kind={n.kind}
+                      class="gh-timeline-body"
                       onClick={() => go(`/p/${encodeURIComponent(n.practiceId)}`)}
                     >
-                      <span class={`home-notice-dot${isUnread ? ' is-unread' : ''}`} aria-hidden="true" />
-                      <div class="home-notice-content">
-                        <div class="home-notice-primary">
-                          <span class="home-notice-title">{n.title}</span>
-                          <span class="home-notice-time">{formatNoticeTime(n.updatedAt)}</span>
-                        </div>
-                        <div class="home-notice-secondary">
-                          <span>{n.detail}</span>
-                        </div>
+                      <div class="gh-timeline-header">
+                        <span class="gh-timeline-title">
+                          {n.title}
+                          {isUnread && <span class="gh-unread-tag">未読</span>}
+                        </span>
+                        <span class="gh-timeline-time">{formatNoticeTime(n.updatedAt)}</span>
+                      </div>
+                      <div class="gh-timeline-box">
+                        <span class="gh-timeline-detail">{n.detail}</span>
                       </div>
                     </button>
-                  </li>
+                  </div>
                 );
               })}
-            </ul>
+            </div>
           )
         ) : RELEASE_NOTES.length === 0 ? (
-          <div class="home-empty-card" style={{ marginTop: 12 }}>
+          <div class="gh-blankslate" style={{ marginTop: 12 }}>
             <span>リリースノートはありません。</span>
           </div>
         ) : (
-          <div class="home-release-list">
+          <div class="gh-timeline">
             {RELEASE_NOTES.map((rel) => {
               const isLatest = rel.version === LATEST_RELEASE_VERSION;
               return (
-                <article key={rel.version} class={`home-release-card${isLatest ? ' is-latest' : ''}`}>
-                  <div class="home-release-head">
-                    <div class="home-release-ver-wrap">
-                      <span class="home-release-ver">{rel.version}</span>
-                      {isLatest && <span class="home-release-badge">最新</span>}
-                    </div>
-                    <span class="home-release-date">{rel.date}</span>
+                <div key={rel.version} class={`gh-timeline-item release${isLatest ? ' is-latest' : ''}`}>
+                  <div class="gh-timeline-badge release">
+                    <Icon name="note" size={12} />
                   </div>
-                  {rel.summary && <p class="home-release-summary">{rel.summary}</p>}
-                  {rel.sections.map((sec) => (
-                    <div key={sec.heading} class="home-release-sec">
-                      <h4>{sec.heading}</h4>
-                      <ul>
-                        {sec.items.map((item, idx) => (
-                          <li key={idx}>{item}</li>
-                        ))}
-                      </ul>
+                  <article class="gh-timeline-body release-body">
+                    <div class="gh-timeline-header">
+                      <div class="gh-release-title-row">
+                        <span class="gh-release-version">{rel.version}</span>
+                        {isLatest && <span class="gh-pill-badge latest">Latest</span>}
+                      </div>
+                      <span class="gh-timeline-time">{rel.date}</span>
                     </div>
-                  ))}
-                </article>
+                    {rel.summary && <p class="gh-release-summary">{rel.summary}</p>}
+                    <div class="gh-release-content">
+                      {rel.sections.map((sec) => (
+                        <div key={sec.heading} class="gh-release-sec">
+                          <h4>{sec.heading}</h4>
+                          <ul>
+                            {sec.items.map((item, idx) => (
+                              <li key={idx}>{item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </article>
+                </div>
               );
             })}
           </div>

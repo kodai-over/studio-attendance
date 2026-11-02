@@ -2423,63 +2423,77 @@ button + .muted {
   }
 }
 
-/* ---------- ホーム画面（ポータル & お知らせ・リリースノート） ---------- */
-.home-todo-banner {
+/* ---------- ホーム画面（GitHub Primer スタイル: ポータル & タイムライン） ---------- */
+.gh-flash-banner {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   width: 100%;
   margin: 4px 0 16px;
-  padding: 12px 14px;
+  padding: 10px 14px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 6px;
   background: var(--paper);
   color: var(--ink);
   text-align: left;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
-.home-todo-banner:hover {
-  border-color: color-mix(in srgb, var(--ink) 25%, var(--line));
+.gh-flash-banner:hover {
+  border-color: color-mix(in srgb, var(--ink) 30%, var(--line));
 }
-.home-todo-banner:active {
+.gh-flash-banner:active {
   background: color-mix(in srgb, var(--ink) 4%, var(--paper));
 }
-.home-todo-banner-main {
+.gh-flash-main {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
 }
-.home-todo-badge {
+.gh-flash-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 24px;
-  height: 24px;
-  padding: 0 7px;
-  border-radius: 6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
   background: var(--ink);
   color: var(--bg);
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   flex-shrink: 0;
 }
-.home-todo-text {
+.gh-flash-text {
   display: flex;
   flex-direction: column;
   gap: 1px;
   min-width: 0;
 }
-.home-todo-text strong {
-  font-size: 13.5px;
+.gh-flash-text strong {
+  font-size: 13px;
   font-weight: 600;
   line-height: 1.35;
+  color: var(--ink);
 }
-.home-todo-text span {
-  font-size: 12px;
+.gh-flash-text span {
+  font-size: 11.5px;
   color: var(--sub);
+}
+.gh-flash-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--sub);
+  flex-shrink: 0;
+}
+.gh-flash-banner:hover .gh-flash-action {
+  color: var(--ink);
 }
 
 .home-section {
@@ -2490,187 +2504,280 @@ button + .muted {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
-.home-section-link {
+.gh-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--ink);
+}
+.gh-section-link {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  padding: 4px 6px;
+  padding: 2px 6px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 4px;
   background: transparent;
   color: var(--sub);
   font-size: 12px;
   font-weight: 500;
+  cursor: pointer;
 }
-.home-section-link:hover {
+.gh-section-link:hover {
   color: var(--ink);
 }
-.home-empty-card {
+
+/* GitHub Pinned Repository 風カード */
+.gh-pinned-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.gh-pinned-card:hover {
+  border-color: color-mix(in srgb, var(--ink) 30%, var(--line));
+}
+.gh-pinned-card:active {
+  background: color-mix(in srgb, var(--ink) 3%, var(--paper));
+}
+.gh-pinned-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.gh-pinned-title-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+}
+.gh-pinned-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.gh-pill-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border: 1px solid var(--line);
+  border-radius: 2em;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--sub);
+  white-space: nowrap;
+}
+.gh-pill-badge.latest {
+  border-color: var(--brand-green);
+  color: var(--brand-green);
+  font-weight: 600;
+}
+.gh-pinned-body {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  color: var(--sub);
+  line-height: 1.4;
+}
+.gh-pinned-footer {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 11.5px;
+  color: var(--sub);
+  flex-wrap: wrap;
+}
+.gh-meta-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.gh-stat-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand-green);
+  flex-shrink: 0;
+}
+
+.gh-blankslate {
   padding: 24px 16px;
-  border-radius: 12px;
+  border: 1px dashed var(--line);
+  border-radius: 6px;
   background: var(--paper);
   color: var(--sub);
   font-size: 13px;
   text-align: center;
 }
 
-/* お知らせリスト: 過剰なカード枠・丸アイコン・シェブロンを排した端正なエディトリアルリスト */
-.home-notice-list {
-  list-style: none;
-  margin: 10px 0 0;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--paper);
-  overflow: hidden;
+/* GitHub Contribution Activity タイムライン風 */
+.gh-timeline {
+  position: relative;
+  margin-top: 14px;
+  padding-left: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
-.home-notice-list > li {
-  margin: 0;
-  padding: 0;
+.gh-timeline::before {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: var(--line);
+  z-index: 1;
 }
-.home-notice-row {
+.gh-timeline-item {
+  position: relative;
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  width: 100%;
-  padding: 12px 14px;
+}
+.gh-timeline-badge {
+  position: absolute;
+  left: -28px;
+  top: 1px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  color: var(--sub);
+}
+.gh-timeline-item.is-unread .gh-timeline-badge {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.gh-timeline-badge.practice_canceled {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.gh-timeline-badge.practice_changed {
+  border-color: #f59e0b;
+  color: #f59e0b;
+}
+.gh-timeline-body {
+  flex: 1;
+  min-width: 0;
+  padding: 0 0 0 6px;
   border: 0;
-  border-bottom: 1px solid var(--line);
   background: transparent;
   color: var(--ink);
   text-align: left;
   cursor: pointer;
-  transition: background 0.12s ease;
 }
-.home-notice-list > li:last-child .home-notice-row {
-  border-bottom: 0;
-}
-.home-notice-row:hover,
-.home-notice-row:focus-visible {
-  background: color-mix(in srgb, var(--ink) 3%, var(--paper));
-}
-.home-notice-row.is-unread {
-  background: color-mix(in srgb, var(--ink) 2%, var(--paper));
-}
-.home-notice-dot {
-  width: 6px;
-  height: 6px;
-  margin-top: 6px;
-  border-radius: 50%;
-  background: transparent;
-  flex-shrink: 0;
-}
-.home-notice-dot.is-unread {
-  background: var(--ink);
-}
-.home-notice-content {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.home-notice-primary {
+.gh-timeline-header {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
 }
-.home-notice-title {
+.gh-timeline-title {
   font-size: 13.5px;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.4;
   color: var(--ink);
 }
-.home-notice-row[data-kind='practice_canceled'] .home-notice-title {
+.gh-timeline-item.is-unread .gh-timeline-title {
+  color: var(--ink);
+}
+.gh-timeline-badge.practice_canceled + .gh-timeline-body .gh-timeline-title {
   color: var(--danger);
 }
-.home-notice-time {
+.gh-unread-tag {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 2em;
+  padding: 1px 6px;
+  background: var(--ink);
+  color: var(--bg);
+  vertical-align: middle;
+}
+.gh-timeline-time {
   font-family: var(--mono);
   font-size: 11px;
-  color: var(--faint);
-  flex-shrink: 0;
+  color: var(--sub);
   white-space: nowrap;
+  flex-shrink: 0;
 }
-.home-notice-secondary {
+.gh-timeline-box {
+  margin-top: 6px;
+  padding: 7px 11px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
   font-size: 12px;
   color: var(--sub);
   line-height: 1.4;
   word-break: break-all;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.gh-timeline-body:hover .gh-timeline-box {
+  border-color: color-mix(in srgb, var(--ink) 30%, var(--line));
 }
 
-.home-release-list {
-  margin-top: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+/* タイムライン上のリリースノート */
+.gh-timeline-item.release .gh-timeline-body {
+  cursor: default;
 }
-.home-release-card {
-  padding: 14px 16px;
-  border-radius: 12px;
-  background: var(--paper);
-  border: 1px solid var(--line);
-}
-.home-release-card.is-latest {
-  border-color: var(--ink);
-}
-.home-release-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--line);
-}
-.home-release-ver-wrap {
+.gh-release-title-row {
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
-.home-release-ver {
+.gh-release-version {
   font-family: var(--mono);
-  font-size: 15px;
+  font-size: 14.5px;
   font-weight: 700;
+  color: var(--ink);
 }
-.home-release-badge {
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--ink);
-  color: var(--bg);
-  font-size: 10.5px;
-  font-weight: 600;
-}
-.home-release-date {
-  font-family: var(--mono);
-  font-size: 12px;
+.gh-release-summary {
+  margin: 6px 0 8px;
+  font-size: 12.5px;
   color: var(--sub);
+  line-height: 1.4;
 }
-.home-release-summary {
-  margin: 0 0 8px;
-  font-size: 13px;
-  color: var(--sub);
+.gh-release-content {
+  margin-top: 6px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
 }
-.home-release-sec + .home-release-sec {
-  margin-top: 10px;
+.gh-release-sec {
+  margin-bottom: 8px;
 }
-.home-release-sec h4 {
+.gh-release-sec:last-child {
+  margin-bottom: 0;
+}
+.gh-release-sec h4 {
   margin: 0 0 4px;
   font-size: 12.5px;
   font-weight: 600;
   color: var(--ink);
 }
-.home-release-sec ul {
+.gh-release-sec ul {
   margin: 0;
   padding-left: 18px;
-  font-size: 12.5px;
-  line-height: 1.55;
-  color: var(--ink);
-}
-.home-release-sec li + li {
-  margin-top: 4px;
+  font-size: 12px;
+  color: var(--sub);
+  line-height: 1.5;
 }
 
 
