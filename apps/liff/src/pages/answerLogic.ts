@@ -228,8 +228,55 @@ export function getDraftGroupStatus(
 }
 
 /**
+ * RSVP 画面のナビゲーションガードを生成する。
+ * 未反映の下書きがある状態で別画面へ遷移しようとした場合に確認ダイアログを出し、
+ * 承認された場合は下書きをクリアして遷移を許可、キャンセルされた場合は遷移を阻止する。
+ */
+export function createRsvpNavigationGuard(
+  hasAnyChangesRef: { current: boolean },
+  confirmFn: (message: string) => boolean = (msg) => window.confirm(msg),
+): (toPath: string) => boolean {
+  return (toPath: string) => {
+    // RSVP 画面自身への遷移時は確認ダイアログを出さずにそのまま許可
+    if (toPath.startsWith('/answer')) {
+      return true;
+    }
+    if (hasAnyChangesRef.current) {
+      if (!confirmFn('回答の変更が反映されていません。破棄して移動しますか？')) {
+        return false;
+      }
+      hasAnyChangesRef.current = false;
+      clearGlobalDrafts();
+    }
+    return true;
+  };
+}
+
+/**
+ * 「グループに伝える」の途中で保存済になった（が未送信の）項目と、現在の未保存変更項目を統合する。
+ * 一部保存失敗後の再試行時や、pruneStaleDrafts 実行後でも送信文面から成功分が欠けないようにする。
+ */
+export function mergePendingTellItems(
+  pendingItems: ModifiedItem[],
+  currentModifiedItems: ModifiedItem[],
+): ModifiedItem[] {
+  if (pendingItems.length === 0) return currentModifiedItems;
+  const currentMap = new Map(currentModifiedItems.map((item) => [item.id, item]));
+  const merged: ModifiedItem[] = [];
+  for (const p of pendingItems) {
+    merged.push(currentMap.get(p.id) ?? p);
+    currentMap.delete(p.id);
+  }
+  for (const item of currentMap.values()) {
+    merged.push(item);
+  }
+  return merged;
+}
+
+/**
  * 回答保存・メッセージ送信のワークフロー。
  * 未保存の変更がある場合は先に保存を実行し、保存失敗（failed > 0）時は送信を中断する。
+ * 一部保存失敗時や送信エラー時には、文面や保存済項目を保持して再試行で文面が欠けないようにする。
  */
 export async function runTellWorkflow({
   body,
@@ -237,19 +284,43 @@ export async function runTellWorkflow({
   targetModifiedItems,
   commitItems,
   send,
+  onPreserveDraft,
+  onPartialCommit,
+  onSent,
 }: {
   body: string;
   hasTargetChanges: boolean;
   targetModifiedItems: ModifiedItem[];
-  commitItems: (items: ModifiedItem[]) => Promise<{ succeeded: number; failed: number }>;
+  commitItems: (items: ModifiedItem[]) => Promise<{ succeeded: number; failed: number; succeededIds?: string[] }>;
   send: (body: string) => Promise<void>;
+  onPreserveDraft?: (body: string) => void;
+  onPartialCommit?: (succeededItems: ModifiedItem[]) => void;
+  onSent?: () => void;
 }): Promise<'sent' | 'aborted_by_commit_failure'> {
   if (hasTargetChanges) {
-    const { failed } = await commitItems(targetModifiedItems);
-    if (failed > 0) return 'aborted_by_commit_failure';
+    const { succeeded, failed, succeededIds } = await commitItems(targetModifiedItems);
+    if (failed > 0) {
+      if (succeeded > 0) {
+        const succeededSet = succeededIds
+          ? new Set(succeededIds)
+          : new Set(targetModifiedItems.slice(0, succeeded).map((i) => i.id));
+        onPartialCommit?.(targetModifiedItems.filter((item) => succeededSet.has(item.id)));
+      }
+      onPreserveDraft?.(body);
+      return 'aborted_by_commit_failure';
+    }
   }
-  await send(body);
-  return 'sent';
+  try {
+    await send(body);
+    onSent?.();
+    return 'sent';
+  } catch (err) {
+    if (hasTargetChanges && targetModifiedItems.length > 0) {
+      onPartialCommit?.(targetModifiedItems);
+    }
+    onPreserveDraft?.(body);
+    throw err;
+  }
 }
 
 /**
@@ -360,17 +431,42 @@ export function generateSpecificReport(changes: Iterable<SpecificChange>): strin
 }
 
 /**
+ * 回答保存中（Infinity）・保存完了直後（完了時刻）の練習マップと一覧取得開始時刻（fetchStartedAt）を比較し、
+ * 今回の再取得で保護すべきID一覧を抽出する。
+ * 保存中（Infinity）または取得開始以降に保存完了した練習（touchedAt >= fetchStartedAt）は保護を継続し、
+ * 保存完了後に開始された再取得（touchedAt < fetchStartedAt）でのみ保護を解除する。
+ */
+export function resolveKeepIds(
+  touched: Map<string, number>,
+  fetchStartedAt: number,
+): Set<string> {
+  const keep = new Set<string>();
+  for (const [id, touchedAt] of touched.entries()) {
+    if (touchedAt >= fetchStartedAt) {
+      keep.add(id);
+    } else {
+      touched.delete(id);
+    }
+  }
+  return keep;
+}
+
+/**
  * サーバーからの一覧再取得時、回答操作中・操作済みの練習を現在の内容で保護してマージする。
  * （古いサーバー結果で、ユーザーが押した回答が「未回答」に戻るのを防止する）
  */
 export function mergePracticesWithKeep(
   incoming: PracticeView[],
   current: PracticeView[] | null | undefined,
-  keepIds: Set<string> | null | undefined,
+  keepIds: Set<string> | Map<string, number> | null | undefined,
+  fetchStartedAt = 0,
 ): PracticeView[] {
   if (!current || !keepIds || keepIds.size === 0) return incoming;
+  const activeKeepIds =
+    keepIds instanceof Map ? resolveKeepIds(keepIds, fetchStartedAt) : keepIds;
+  if (activeKeepIds.size === 0) return incoming;
   return incoming.map((v) => {
-    if (keepIds.has(v.practice.id)) {
+    if (activeKeepIds.has(v.practice.id)) {
       return current.find((x) => x.practice.id === v.practice.id) ?? v;
     }
     return v;
@@ -393,6 +489,7 @@ export interface StageAnswerParams {
   originalPractice?: PracticeView;
   apiSave: (id: string, answer: Answer) => Promise<PracticeView>;
   touchPractice: (id: string) => void;
+  untouchPractice?: (id: string) => void;
   updatePractice: (updated: PracticeView) => void;
   toast: (msg: string, error?: boolean) => void;
   onSpecificSaved: (updated: PracticeView, originalAnswer: Answer | null) => void;
@@ -414,6 +511,7 @@ export async function executeStageAnswer(
       params.toast('回答を記録しました');
       return 'saved';
     } catch (e) {
+      params.untouchPractice?.(params.id);
       params.toast(e instanceof Error ? e.message : '保存に失敗しました', true);
       throw e;
     }

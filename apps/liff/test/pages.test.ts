@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { clearGlobalDrafts, createRsvpNavigationGuard, globalDrafts } from '../src/pages/answerLogic';
 import { MyAnswerBadge, readTab } from '../src/pages/List';
 import { NavBar, RsvpButtons, go, setNavigationGuard } from '../src/ui';
 
@@ -171,6 +172,43 @@ describe('NavigationGuard（ui.tsx の画面遷移ガード）', () => {
       expect(location.hash).toBe('/settings');
     } finally {
       setNavigationGuard(null);
+      globalThis.location = originalLocation;
+    }
+  });
+
+  it('RSVP 画面の createRsvpNavigationGuard と go() の結合: 未保存の下書きがあるときの離脱確認・阻止・破棄移動', () => {
+    const originalLocation = globalThis.location;
+    globalThis.location = { hash: '#/answer' } as Location;
+    clearGlobalDrafts();
+    globalDrafts.unanswered.set('p1', '行く');
+    const hasAnyChangesRef = { current: true };
+    const confirmMock = vi.fn();
+
+    try {
+      setNavigationGuard(createRsvpNavigationGuard(hasAnyChangesRef, confirmMock));
+
+      // 1. 同一画面（/answer）への移動は確認を出さずに許可され、下書きも消えない
+      go('/answer');
+      expect(confirmMock).not.toHaveBeenCalled();
+      expect(globalDrafts.unanswered.get('p1')).toBe('行く');
+
+      // 2. 別画面（/settings）への移動でキャンセルしたとき、遷移は阻止され下書きが保持される
+      confirmMock.mockReturnValueOnce(false);
+      go('/settings');
+      expect(confirmMock).toHaveBeenCalledWith('回答の変更が反映されていません。破棄して移動しますか？');
+      expect(location.hash).toBe('/answer');
+      expect(hasAnyChangesRef.current).toBe(true);
+      expect(globalDrafts.unanswered.get('p1')).toBe('行く');
+
+      // 3. 別画面（/settings）への移動でOKしたとき、下書きが破棄されて遷移が実行される
+      confirmMock.mockReturnValueOnce(true);
+      go('/settings');
+      expect(location.hash).toBe('/settings');
+      expect(hasAnyChangesRef.current).toBe(false);
+      expect(globalDrafts.unanswered.size).toBe(0);
+    } finally {
+      setNavigationGuard(null);
+      clearGlobalDrafts();
       globalThis.location = originalLocation;
     }
   });

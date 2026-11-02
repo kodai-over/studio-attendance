@@ -4,6 +4,7 @@ import {
   cleanupAfterCommit,
   clearGlobalDrafts,
   computeDisplayedPractices,
+  createRsvpNavigationGuard,
   executeStageAnswer,
   filterGroupPractices,
   filterTargetModifiedItems,
@@ -11,13 +12,16 @@ import {
   getDraftGroupStatus,
   getModifiedItems,
   globalDrafts,
+  mergePendingTellItems,
   mergePracticesWithKeep,
   processCommitItems,
   pruneStaleDrafts,
   recordSpecificChange,
+  resolveKeepIds,
   runDoneWorkflow,
   runTellWorkflow,
   stageAnswer,
+  type ModifiedItem,
 } from '../src/pages/answerLogic';
 
 describe('answerLogic (RSVP画面の純粋ロジック)', () => {
@@ -494,36 +498,32 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
   });
 
   describe('ナビゲーションガードと画面同期の安全性', () => {
-    it('同じ RSVP 画面（/answer で始まるパス）への遷移時はガード確認を行わず許可する', () => {
+    it('createRsvpNavigationGuard: 同じ RSVP 画面（/answer で始まるパス）への遷移時はガード確認を行わず許可し、別画面への遷移時は確認ダイアログを出す', () => {
+      clearGlobalDrafts();
+      globalDrafts.unanswered.set('p1', '行く');
+      const hasAnyChangesRef = { current: true };
       const confirmMock = vi.fn();
-      const originalConfirm = globalThis.window?.confirm;
-      if (globalThis.window) {
-        globalThis.window.confirm = confirmMock;
-      }
 
-      try {
-        const hasChanges = true;
-        const guard = (toPath: string) => {
-          if (toPath.startsWith('/answer')) return true;
-          if (hasChanges) {
-            return confirmMock('破棄しますか？');
-          }
-          return true;
-        };
+      const guard = createRsvpNavigationGuard(hasAnyChangesRef, confirmMock);
 
-        // /answer を押した場合: confirm は呼ばれず true
-        expect(guard('/answer')).toBe(true);
-        expect(confirmMock).not.toHaveBeenCalled();
+      // /answer を押した場合: confirm は呼ばれず true、下書きも保持
+      expect(guard('/answer')).toBe(true);
+      expect(guard('/answer?r=p1')).toBe(true);
+      expect(confirmMock).not.toHaveBeenCalled();
+      expect(globalDrafts.unanswered.get('p1')).toBe('行く');
 
-        // 別画面 / を押した場合: confirm が呼ばれる
-        confirmMock.mockReturnValue(false);
-        expect(guard('/')).toBe(false);
-        expect(confirmMock).toHaveBeenCalledTimes(1);
-      } finally {
-        if (globalThis.window && originalConfirm) {
-          globalThis.window.confirm = originalConfirm;
-        }
-      }
+      // 別画面 / を押してキャンセルした場合: false を返し、下書きは保持
+      confirmMock.mockReturnValueOnce(false);
+      expect(guard('/')).toBe(false);
+      expect(confirmMock).toHaveBeenCalledWith('回答の変更が反映されていません。破棄して移動しますか？');
+      expect(hasAnyChangesRef.current).toBe(true);
+      expect(globalDrafts.unanswered.get('p1')).toBe('行く');
+
+      // 別画面 / を押して承認した場合: true を返し、下書きをクリア
+      confirmMock.mockReturnValueOnce(true);
+      expect(guard('/')).toBe(true);
+      expect(hasAnyChangesRef.current).toBe(false);
+      expect(globalDrafts.unanswered.size).toBe(0);
     });
 
     it('pruneStaleDrafts 後に画面ステートを同期することで、古い下書きが画面に残らない', () => {
@@ -649,6 +649,113 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
           send,
         }),
       ).rejects.toThrow('LINE送信エラー');
+    });
+
+    it('一部保存失敗で中断したあと、pruneStaleDrafts が走ってから再試行しても、先に成功した分の文面が欠けずに全件分送信される', async () => {
+      clearGlobalDrafts();
+      // 1. 初期状態: p1（11/10・未回答）と p2（11/11・未回答）の両方を「行く」にした下書きがある
+      let serverList: PracticeView[] = [
+        { practice: mockPractice1, myAnswer: null, attendees: [] },
+        { practice: mockPractice2, myAnswer: null, attendees: [] },
+      ];
+      globalDrafts.unanswered.set('p1', '行く');
+      globalDrafts.unanswered.set('p2', '行く');
+      let unansweredStaged = new Map(globalDrafts.unanswered);
+      let pendingTellItems: ModifiedItem[] = [];
+      let draft: string | null = null;
+
+      // 初回の変更項目と送信文の算出
+      let targetModified = getModifiedItems(unansweredStaged, serverList);
+      let reportItems = mergePendingTellItems(pendingTellItems, targetModified);
+      let report = answerReport(reportItems.map((i) => ({ practice: i.practice, answer: i.answer }))) ?? '';
+      expect(report).toContain('11/10');
+      expect(report).toContain('11/11');
+
+      const sendMock = vi.fn().mockResolvedValue(undefined);
+
+      // 2. 1回目の「グループに伝える」: p1 は保存成功、p2 は通信エラーで失敗
+      const firstResult = await runTellWorkflow({
+        body: draft ?? report,
+        hasTargetChanges: targetModified.length > 0,
+        targetModifiedItems: targetModified,
+        commitItems: async () => {
+          // p1 のみ成功してサーバー一覧が更新される
+          serverList = serverList.map((v) =>
+            v.practice.id === 'p1' ? { ...v, myAnswer: '行く' } : v,
+          );
+          // Answer.tsx と同様に cleanupAfterCommit と pruneStaleDrafts が走る
+          unansweredStaged = cleanupAfterCommit(unansweredStaged, ['p1']);
+          globalDrafts.unanswered = unansweredStaged;
+          pruneStaleDrafts(serverList);
+          unansweredStaged = new Map(globalDrafts.unanswered);
+          return { succeeded: 1, failed: 1, succeededIds: ['p1'] };
+        },
+        send: sendMock,
+        onPreserveDraft: (preserved) => {
+          draft = preserved;
+        },
+        onPartialCommit: (succeededItems) => {
+          pendingTellItems = mergePendingTellItems(pendingTellItems, succeededItems);
+        },
+        onSent: () => {
+          pendingTellItems = [];
+          draft = null;
+        },
+      });
+
+      expect(firstResult).toBe('aborted_by_commit_failure');
+      expect(sendMock).not.toHaveBeenCalled();
+
+      // p1 はサーバー保存済のため下書きからは消え、未保存の p2 だけが残っている
+      expect(unansweredStaged.has('p1')).toBe(false);
+      expect(unansweredStaged.has('p2')).toBe(true);
+
+      // 再試行前の画面文面を再計算: pruneStaleDrafts 後でも draft と report の両方に p1(11/10) と p2(11/11) が残っている
+      targetModified = getModifiedItems(unansweredStaged, serverList);
+      expect(targetModified.map((i) => i.id)).toEqual(['p2']); // 次に保存すべきは p2 のみ
+      reportItems = mergePendingTellItems(pendingTellItems, targetModified);
+      report = answerReport(reportItems.map((i) => ({ practice: i.practice, answer: i.answer }))) ?? '';
+      expect(report).toContain('11/10'); // p1 が欠けていない
+      expect(report).toContain('11/11'); // p2 も含まれている
+      expect(draft).toContain('11/10');
+      expect(draft).toContain('11/11');
+
+      // 3. 2回目の「グループに伝える」（再試行）: 残りの p2 のみ保存し、文面は p1 + p2 の全件分を送信
+      const savedOnRetry: string[] = [];
+      const secondResult = await runTellWorkflow({
+        body: draft ?? report,
+        hasTargetChanges: targetModified.length > 0,
+        targetModifiedItems: targetModified,
+        commitItems: async (items) => {
+          for (const item of items) {
+            savedOnRetry.push(item.id);
+          }
+          unansweredStaged = cleanupAfterCommit(unansweredStaged, ['p2']);
+          globalDrafts.unanswered = unansweredStaged;
+          return { succeeded: 1, failed: 0, succeededIds: ['p2'] };
+        },
+        send: sendMock,
+        onPreserveDraft: (preserved) => {
+          draft = preserved;
+        },
+        onPartialCommit: (succeededItems) => {
+          pendingTellItems = mergePendingTellItems(pendingTellItems, succeededItems);
+        },
+        onSent: () => {
+          pendingTellItems = [];
+          draft = null;
+        },
+      });
+
+      expect(secondResult).toBe('sent');
+      expect(savedOnRetry).toEqual(['p2']); // 再試行時は未保存だった p2 だけが API 保存される
+      expect(sendMock).toHaveBeenCalledTimes(1);
+      const sentText = sendMock.mock.calls[0][0] as string;
+      expect(sentText).toContain('11/10'); // 1回目に保存成功していた p1 も文面に含まれている
+      expect(sentText).toContain('11/11'); // 2回目に保存成功した p2 も文面に含まれている
+      expect(pendingTellItems).toEqual([]);
+      expect(draft).toBeNull();
+      clearGlobalDrafts();
     });
   });
 
@@ -1007,6 +1114,45 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
 
       const merged = mergePracticesWithKeep(incoming, current, new Set(['p1']));
       expect(merged.find((x) => x.practice.id === 'p1')?.myAnswer).toBeNull();
+    });
+
+    it('反映中（Infinity）や保存完了直後に2回連続で取り直し（loadHome）が走っても、古い応答で回答が巻き戻らない', () => {
+      // p1 の保存開始（touchPractice により Infinity がセットされる）
+      const touched = new Map<string, number>([['p1', Infinity]]);
+      let currentList: PracticeView[] = [
+        { practice: mockPractice1, myAnswer: '行く', attendees: [] },
+        { practice: mockPractice2, myAnswer: '保留', attendees: [] },
+      ];
+      const staleServerList: PracticeView[] = [
+        { practice: mockPractice1, myAnswer: null, attendees: [] },
+        { practice: mockPractice2, myAnswer: '保留', attendees: [] },
+      ];
+
+      // 1回目の取り直し（t = 1000 に開始した loadHome が完了）
+      currentList = mergePracticesWithKeep(staleServerList, currentList, touched, 1000);
+      expect(currentList.find((x) => x.practice.id === 'p1')?.myAnswer).toBe('行く');
+      // 保存中（Infinity）のため 1回目の loadHome が終わっても保護は消えない
+      expect(touched.get('p1')).toBe(Infinity);
+
+      // 2回目の取り直しが t = 1200 に開始し、その直後の t = 1500 に p1 の保存が完了（updatePractice）
+      touched.set('p1', 1500);
+
+      // 2回目の取り直し（t = 1200 に開始していた古い応答）が t = 1600 に到着
+      // touchedAt(1500) >= fetchStartedAt(1200) のため、2回目でも保護が効いて巻き戻らない
+      currentList = mergePracticesWithKeep(staleServerList, currentList, touched, 1200);
+      expect(currentList.find((x) => x.practice.id === 'p1')?.myAnswer).toBe('行く');
+      expect(touched.has('p1')).toBe(true);
+
+      // 3回目の取り直し（保存完了後の t = 2000 に開始した新しい loadHome）が到着
+      const freshServerList: PracticeView[] = [
+        { practice: mockPractice1, myAnswer: '行く', attendees: ['佐藤'] },
+        { practice: mockPractice2, myAnswer: '保留', attendees: [] },
+      ];
+      currentList = mergePracticesWithKeep(freshServerList, currentList, touched, 2000);
+      expect(currentList.find((x) => x.practice.id === 'p1')?.myAnswer).toBe('行く');
+      expect(currentList.find((x) => x.practice.id === 'p1')?.attendees).toEqual(['佐藤']);
+      // 保存完了後に開始された取り直しが完了したため、保護マップから安全に解除される
+      expect(touched.has('p1')).toBe(false);
     });
   });
 });

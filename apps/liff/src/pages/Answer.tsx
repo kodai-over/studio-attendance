@@ -17,6 +17,7 @@ import {
   cleanupAfterCommit,
   clearGlobalDrafts,
   computeDisplayedPractices,
+  createRsvpNavigationGuard,
   executeStageAnswer,
   filterGroupPractices,
   filterTargetModifiedItems,
@@ -24,6 +25,7 @@ import {
   getDraftGroupStatus,
   getModifiedItems,
   globalDrafts,
+  mergePendingTellItems,
   processCommitItems,
   pruneStaleDrafts,
   recordSpecificChange,
@@ -39,7 +41,7 @@ type RsvpSubTab = 'unanswered' | 'answered';
 
 /** 募集カードの「回答」またはメニューの「RSVP」から開く画面。まとめて変更して、完了またはメッセージ送信でまとめて反映 */
 export function AnswerPage({ ids: raw }: { ids: string[] }) {
-  const { me, practices: list, practicesAt, startupFailed, loadHome, updatePractice, touchPractice, toast } = useApp();
+  const { me, practices: list, practicesAt, startupFailed, loadHome, updatePractice, touchPractice, untouchPractice, toast } = useApp();
   const ids = [...new Set(raw)];
   const isSpecific = ids.length > 0;
 
@@ -53,6 +55,9 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
 
   // 特定予約指定時の変更履歴（即時保存された変更を送信文生成に使う）
   const [specificChanges, setSpecificChanges] = useState<SpecificChangeMap>(new Map());
+
+  // 「グループに伝える」実行中に一部保存成功して送信中断された項目（再試行時に文面から欠けないよう保持）
+  const [pendingTellItems, setPendingTellItems] = useState<ModifiedItem[]>([]);
 
   const [run, busy] = useRunner();
   const [saving, setSaving] = useState(false);
@@ -177,20 +182,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
 
   // ナビゲーションガード（下部メニューや戻るなどの遷移時に未保存変更があれば確認し、キャンセルなら画面遷移を阻止）
   useEffect(() => {
-    setNavigationGuard((toPath) => {
-      // RSVP 画面自身への遷移時は確認ダイアログを出さずにそのまま許可
-      if (toPath.startsWith('/answer')) {
-        return true;
-      }
-      if (hasAnyChangesRef.current) {
-        if (!window.confirm('回答の変更が反映されていません。破棄して移動しますか？')) {
-          return false;
-        }
-        hasAnyChangesRef.current = false;
-        clearGlobalDrafts();
-      }
-      return true;
-    });
+    setNavigationGuard(createRsvpNavigationGuard(hasAnyChangesRef));
     return () => setNavigationGuard(null);
   }, []);
 
@@ -222,6 +214,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
         originalPractice: original,
         apiSave: (pId, pAnswer) => api('rsvp', { id: pId, answer: pAnswer }),
         touchPractice,
+        untouchPractice,
         updatePractice,
         toast,
         onSpecificSaved: (updated, originalAnswer) => {
@@ -256,12 +249,14 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   // タブ切り替え
   const handleTabChange = (t: RsvpSubTab) => {
     setSubTab(t);
+    setPendingTellItems([]);
     setDraft(null);
   };
 
   // グループ切り替え
   const handleGroupFilterChange = (gId: string) => {
     setSelectedGroup(gId);
+    setPendingTellItems([]);
     setDraft(null);
   };
 
@@ -271,6 +266,8 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     ? modifiedItems
     : filterTargetModifiedItems(modifiedItems, displayedIds, selectedGroup, me.member.userId, myGroupIds);
   const hasTargetChanges = targetModifiedItems.length > 0;
+  const reportModifiedItems = mergePendingTellItems(pendingTellItems, targetModifiedItems);
+  const hasReportableChanges = reportModifiedItems.length > 0;
 
   // 選択中グループに属する全タブの変更項目（「完了」ボタンでまとめて保存する対象）
   const groupAllModifiedItems = isSpecific
@@ -280,13 +277,18 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
 
   // 複数件の回答保存処理（1件ずつ反映し、成功分は下書きから削除、失敗分は下書きに残して安全に再試行可能にする）
   const commitItems = async (items: ModifiedItem[]) => {
-    if (items.length === 0) return { succeeded: 0, failed: 0 };
+    if (items.length === 0) return { succeeded: 0, failed: 0, succeededIds: [] as string[] };
     const { succeeded, failed, succeededIds, lastError } = await processCommitItems(
       items,
       async (item) => {
         touchPractice(item.id);
-        const updated = await api('rsvp', { id: item.id, answer: item.answer });
-        updatePractice(updated);
+        try {
+          const updated = await api('rsvp', { id: item.id, answer: item.answer });
+          updatePractice(updated);
+        } catch (err) {
+          untouchPractice?.(item.id);
+          throw err;
+        }
       },
     );
 
@@ -319,10 +321,10 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
       }
     }
 
-    return { succeeded, failed };
+    return { succeeded, failed, succeededIds };
   };
 
-  // 送信文の生成
+  // 送信文の生成（一部保存成功後に中断した pendingTellItems も統合して再試行時に欠けないようにする）
   let report = '';
   if (isSpecific) {
     if (specificChanges.size > 0) {
@@ -335,12 +337,12 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
       }
     }
   } else if (subTab === 'unanswered') {
-    // 未回答タブ: 「回答しました」形式（回答が入力された項目のみ。targetModifiedItems に揃える）
-    const activeUnanswered = targetModifiedItems.filter((item) => item.practice.status !== '中止');
+    // 未回答タブ: 「回答しました」形式（回答が入力された項目のみ。reportModifiedItems に揃える）
+    const activeUnanswered = reportModifiedItems.filter((item) => item.practice.status !== '中止');
     report = answerReport(activeUnanswered.map((item) => ({ practice: item.practice, answer: item.answer }))) ?? '';
   } else {
     // 回答済タブ: 「回答を変更しました」形式（どういう変更をしたかを明示）
-    const activeModified = targetModifiedItems.filter((item) => item.practice.status !== '中止');
+    const activeModified = reportModifiedItems.filter((item) => item.practice.status !== '中止');
     report =
       answerChangeReport(
         activeModified.map((item) => ({ practice: item.practice, from: item.originalAnswer, to: item.answer })),
@@ -376,6 +378,14 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
             toast(isSpecific ? 'メッセージをコピーしました' : '回答を反映し、メッセージをコピーしました');
           }
         },
+        onPreserveDraft: (preserved) => setDraft(preserved),
+        onPartialCommit: (succeededItems) => {
+          setPendingTellItems((prev) => mergePendingTellItems(prev, succeededItems));
+        },
+        onSent: () => {
+          setPendingTellItems([]);
+          setDraft(null);
+        },
       });
       if (outcome === 'aborted_by_commit_failure') {
         return; // 失敗があった場合は送信を中断して再試行を促す
@@ -398,7 +408,10 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
           groupAllModifiedItems,
           commitItems,
           otherDraftGroupNames: draftGroupStatus.otherDraftGroupNames,
-          onSuccess: (msg) => toast(msg),
+          onSuccess: (msg) => {
+            setPendingTellItems([]);
+            toast(msg);
+          },
         });
       } catch (e) {
         toast(e instanceof Error ? e.message : '保存に失敗しました', true);
@@ -532,13 +545,13 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
               <button
                 class="btn ghost block"
                 style={{ marginTop: 14 }}
-                disabled={!text.trim() || saving || !fresh || (!isSpecific && subTab === 'answered' && !hasTargetChanges)}
+                disabled={!text.trim() || saving || !fresh || (!isSpecific && subTab === 'answered' && !hasReportableChanges)}
                 onClick={handleTell}
               >
                 <Icon name="copy" size={16} />
                 {hasTargetChanges
                   ? `回答を反映してコピー（${targetModifiedItems.length}件）`
-                  : !isSpecific && subTab === 'answered'
+                  : !isSpecific && subTab === 'answered' && !hasReportableChanges
                   ? '回答を変更するとコピーできます'
                   : '回答メッセージをコピー'}
               </button>
@@ -576,13 +589,13 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
                 <button
                   class="btn primary"
                   style={{ flex: 1 }}
-                  disabled={!text.trim() || saving || !fresh || (!isSpecific && subTab === 'answered' && !hasTargetChanges)}
+                  disabled={!text.trim() || saving || !fresh || (!isSpecific && subTab === 'answered' && !hasReportableChanges)}
                   onClick={handleTell}
                 >
                   <Icon name="send" size={18} />
                   {hasTargetChanges
                     ? `回答を反映してグループに伝える（${targetModifiedItems.length}件）`
-                    : !isSpecific && subTab === 'answered'
+                    : !isSpecific && subTab === 'answered' && !hasReportableChanges
                     ? '回答を変更するとグループに伝えられます'
                     : 'グループに伝える'}
                 </button>
@@ -590,7 +603,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
                   class="btn ghost"
                   style={{ padding: '0 14px' }}
                   title="メッセージをコピー"
-                  disabled={!text.trim() || saving || !fresh || (!isSpecific && subTab === 'answered' && !hasTargetChanges)}
+                  disabled={!text.trim() || saving || !fresh || (!isSpecific && subTab === 'answered' && !hasReportableChanges)}
                   onClick={async () => {
                     try {
                       await navigator.clipboard.writeText(latest.current.trim());
@@ -644,7 +657,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
             <span>未反映の下書き（{groupAllModifiedItems.length}件）</span>
           </div>
           <button class="btn primary" disabled={saving} onClick={handleDone}>
-            {saving ? '保存中...' : '反映して完了'}
+            {saving ? '保存中...' : '回答を反映して完了'}
           </button>
         </div>
       )}

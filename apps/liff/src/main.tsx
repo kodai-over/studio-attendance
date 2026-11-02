@@ -63,22 +63,21 @@ function App() {
   const [startupFailed, setStartupFailed] = useState(false);
   const [loggedOut, setLoggedOut] = useState(false);
   const [toast, toastNode] = useToast();
-  // 起動中に回答などで差し替えた練習。あとから届いた起動時の一覧（それより前の状態）で戻さない
-  const touched = useRef<Set<string> | null>(new Set());
+  // 回答保存中（Infinity）や保存・編集直後（完了時刻）の練習。それより前に始まった一覧取得で戻さない
+  const touched = useRef<Map<string, number>>(new Map());
   // 削除した（している）練習。あとから届いた一覧（削除より前に読んだもの）で戻さない
   const removed = useRef(new Set<string>());
   const clean = (list: PracticeView[]) => list.filter((v) => !removed.current.has(v.practice.id));
   // グループのカードから開いたときのグループと合言葉（読み込み直すときも、そのグループのメンバーとして覚えてもらう）
   const entry = useRef<{ group?: string; key?: string }>({});
 
-  /** 起動時と同じまとめ取得。起動中に差し替えた練習と、回答を送っている途中の練習は、取得の結果で戻さない */
+  /** 起動時と同じまとめ取得。保存中や、この取得開始以降に更新された練習は、取得の結果で戻さない */
   const loadHome = async () => {
+    const fetchStartedAt = Date.now();
     const home = await api('home', entry.current);
     setMe(home.me);
     setPracticesState((cur) => {
-      const keep = touched.current;
-      touched.current = null;
-      const list = mergePracticesWithKeep(home.practices, cur?.list, keep);
+      const list = mergePracticesWithKeep(home.practices, cur?.list, touched.current, fetchStartedAt);
       return { list: clean(list), at: Date.now() };
     });
     saveCache(home);
@@ -180,9 +179,9 @@ function App() {
   const updatePractice = (v: PracticeView, { revert = false } = {}) => {
     // 削除した練習は、あとから届いた結果（取り直し・回答）で戻さない
     if (removed.current.has(v.practice.id)) return;
-    // 失敗して元に戻したときは、起動時の一覧の最新の内容を入れてよい
-    if (revert) touched.current?.delete(v.practice.id);
-    else touched.current?.add(v.practice.id);
+    // 失敗して元に戻したときは保護を外し、成功時は保存完了時刻を記録してその時刻以前に始まった取り直しから守る
+    if (revert) touched.current.delete(v.practice.id);
+    else touched.current.set(v.practice.id, Date.now());
     setPracticesState((cur) => {
       if (!cur) return cur;
       const has = cur.list.some((x) => x.practice.id === v.practice.id);
@@ -190,7 +189,11 @@ function App() {
     });
   };
   const touchPractice = (id: string) => {
-    touched.current = (touched.current ?? new Set()).add(id);
+    // 保存処理開始時は Infinity をセットし、保存が終わるまで何回 loadHome が走っても戻されないようにする
+    touched.current.set(id, Infinity);
+  };
+  const untouchPractice = (id: string) => {
+    touched.current.delete(id);
   };
 
   return (
@@ -206,7 +209,7 @@ function App() {
       ) : error ? (
         <div class="empty">{error}</div>
       ) : me ? (
-        <AppContext.Provider value={{ me, setMe, toast, practices: practices?.list ?? null, practicesAt: practices?.at ?? 0, startupFailed, setPractices, updatePractice, touchPractice, deletePractice, loadHome }}>
+        <AppContext.Provider value={{ me, setMe, toast, practices: practices?.list ?? null, practicesAt: practices?.at ?? 0, startupFailed, setPractices, updatePractice, touchPractice, untouchPractice, deletePractice, loadHome }}>
           {me.actAs && me.actAs !== 'self' && (
             <button class="acting-banner" onClick={() => go('/settings')}>
               {me.actAs === 'member' ? '一般として表示中' : '確認用アカウント「admin」として操作中'}（「自分」で戻せます）
