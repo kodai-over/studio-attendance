@@ -278,18 +278,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
 
       {!isSpecific && (
         <>
-          <header class="tabs-head" style={{ marginBottom: 10 }}>
-            <Tabs
-              value={subTab}
-              onChange={handleTabChange}
-              items={[
-                { key: 'unanswered', label: '未回答', count: list ? todoCount : undefined },
-                { key: 'answered', label: '回答済', count: list ? answeredCount : undefined },
-              ]}
-            />
-          </header>
-
-          {/* 複数グループに所属している場合のグループ切り替え */}
+          {/* 複数グループに所属している場合のグループ切り替え（大分類を上に配置） */}
           {userGroups.length > 1 && (
             <div class="group-filter-bar">
               <button
@@ -309,6 +298,17 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
               ))}
             </div>
           )}
+
+          <header class="tabs-head" style={{ marginBottom: 12 }}>
+            <Tabs
+              value={subTab}
+              onChange={handleTabChange}
+              items={[
+                { key: 'unanswered', label: '未回答', count: list ? todoCount : undefined },
+                { key: 'answered', label: '回答済', count: list ? answeredCount : undefined },
+              ]}
+            />
+          </header>
         </>
       )}
 
