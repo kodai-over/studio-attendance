@@ -1,7 +1,9 @@
 import {
   answerChangeReport,
   answerReport,
+  isRsvpTarget,
   type Answer,
+  type MeView,
   type PracticeView,
 } from '@studio-attendance/shared';
 
@@ -15,6 +17,15 @@ export interface DraftStore {
 
 const DRAFTS_STORAGE_KEY = 'pb:rsvpDrafts';
 
+let currentDraftUserId: string | undefined = undefined;
+
+/**
+ * 現在のユーザーおよび「見え方の確認（actAs）」モードに応じた下書き所有キーを返す。
+ */
+export function getDraftOwnerKey(me: Pick<MeView, 'member' | 'actAs'>): string {
+  return me.actAs && me.actAs !== 'self' ? `${me.member.userId}:${me.actAs}` : me.member.userId;
+}
+
 /**
  * 画面切り替えやアンマウント、LIFF WebView の意図しないクローズでも下書きが失われないよう、
  * モジュールレベルおよび localStorage で保持する。
@@ -25,30 +36,46 @@ export const globalDrafts: DraftStore = {
   answered: new Map(),
 };
 
-export function saveDraftsToStorage(): void {
+export function saveDraftsToStorage(userId: string | undefined = currentDraftUserId): void {
   try {
     if (typeof localStorage === 'undefined' || typeof localStorage.setItem !== 'function') return;
+    if (userId !== undefined) currentDraftUserId = userId;
     const unanswered = Array.from(globalDrafts.unanswered.entries());
     const answered = Array.from(globalDrafts.answered.entries());
     if (unanswered.length === 0 && answered.length === 0) {
       localStorage.removeItem?.(DRAFTS_STORAGE_KEY);
     } else {
-      localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify({ unanswered, answered }));
+      localStorage.setItem(
+        DRAFTS_STORAGE_KEY,
+        JSON.stringify({ userId: currentDraftUserId, unanswered, answered }),
+      );
     }
   } catch {
     /* localStorage が使えない環境でもメモリ上で動作する */
   }
 }
 
-export function loadDraftsFromStorage(): void {
+export function loadDraftsFromStorage(expectedUserId: string | undefined = currentDraftUserId): void {
   try {
     if (typeof localStorage === 'undefined' || typeof localStorage.getItem !== 'function') return;
     const raw = localStorage.getItem(DRAFTS_STORAGE_KEY);
     if (!raw) return;
     const parsed = JSON.parse(raw) as {
+      userId?: string;
       unanswered?: [string, Answer][];
       answered?: [string, Answer][];
     };
+    // アカウントや「見え方の確認」モードが異なる場合は前の下書きを破棄する
+    if (expectedUserId !== undefined && parsed.userId !== expectedUserId) {
+      globalDrafts.specific.clear();
+      globalDrafts.unanswered.clear();
+      globalDrafts.answered.clear();
+      localStorage.removeItem?.(DRAFTS_STORAGE_KEY);
+      return;
+    }
+    if (parsed.userId !== undefined) {
+      currentDraftUserId = parsed.userId;
+    }
     if (Array.isArray(parsed.unanswered)) {
       for (const [k, v] of parsed.unanswered) globalDrafts.unanswered.set(k, v);
     }
@@ -60,12 +87,25 @@ export function loadDraftsFromStorage(): void {
   }
 }
 
-loadDraftsFromStorage();
+/**
+ * 指定されたユーザーIDに合わせて下書きを同期・復元する。
+ * 別アカウントや「見え方の確認」に切り替わった場合は、前の人の下書きを破棄する。
+ */
+export function syncDraftsForUser(userId: string): void {
+  if (currentDraftUserId !== userId) {
+    globalDrafts.specific.clear();
+    globalDrafts.unanswered.clear();
+    globalDrafts.answered.clear();
+    currentDraftUserId = userId;
+  }
+  loadDraftsFromStorage(userId);
+}
 
 export function clearGlobalDrafts() {
   globalDrafts.specific.clear();
   globalDrafts.unanswered.clear();
   globalDrafts.answered.clear();
+  currentDraftUserId = undefined;
   saveDraftsToStorage();
 }
 
@@ -472,35 +512,133 @@ export function generateSpecificReport(changes: Iterable<SpecificChange>): strin
   return parts.join('\n\n');
 }
 
+export interface UnansweredGroupCount {
+  id: string;
+  name: string;
+  unansweredCount: number;
+}
+
+export interface UnansweredSummary {
+  totalCount: number;
+  groups: UnansweredGroupCount[];
+  initialGroupId: string;
+}
+
+/**
+ * 下部メニュー（NavBar）のバッジとRSVP画面のグループ別未回答件数を一貫したロジックで算出する。
+ * 複数グループ所属時は未回答がある最初のグループを初期選択グループ（initialGroupId）として返す。
+ */
+export function getUnansweredSummary(
+  practices: PracticeView[] | null | undefined,
+  me: Pick<MeView, 'member' | 'groups' | 'settings'>,
+  today: string,
+  currentTime?: string,
+): UnansweredSummary {
+  const allGroups = me.groups && me.groups.length > 0 ? me.groups : me.settings?.groups || [];
+  const myGroupIds = new Set(me.member.groups);
+  const userGroups = allGroups.filter((g) => myGroupIds.has(g.id));
+
+  if (!practices) {
+    return {
+      totalCount: 0,
+      groups: userGroups.map((g) => ({ id: g.id, name: g.name, unansweredCount: 0 })),
+      initialGroupId: userGroups[0]?.id || '',
+    };
+  }
+
+  const rsvpTargets = practices.filter((v) =>
+    isRsvpTarget(v, me.member.userId, me.member.groups, today, currentTime),
+  );
+  const totalCount = rsvpTargets.filter((v) => v.myAnswer == null).length;
+
+  const groups = userGroups.map((g) => {
+    const unansweredCount = filterGroupPractices(
+      rsvpTargets,
+      g.id,
+      me.member.userId,
+      myGroupIds,
+    ).filter((v) => v.myAnswer == null).length;
+    return { id: g.id, name: g.name, unansweredCount };
+  });
+
+  const firstWithUnanswered = groups.find((g) => g.unansweredCount > 0);
+  const initialGroupId = firstWithUnanswered?.id ?? userGroups[0]?.id ?? '';
+
+  return {
+    totalCount,
+    groups,
+    initialGroupId,
+  };
+}
+
 /**
  * 回答保存中（Infinity）・保存完了直後（完了時刻）の練習マップと一覧取得開始時刻（fetchStartedAt）を比較し、
- * 今回の再取得で保護すべきID一覧を抽出する。
- * 保存中（Infinity）または取得開始以降に保存完了した練習（touchedAt >= fetchStartedAt）は保護を継続し、
- * 保存完了後に開始された再取得（touchedAt < fetchStartedAt）でのみ保護を解除する。
+ * 今回の再取得で保護すべきID一覧を純粋関数として抽出する（引数 touched の変更は行わない）。
+ * 保存中（Infinity）または取得開始以降に保存完了した練習（touchedAt >= fetchStartedAt）は保護対象となる。
  */
 export function resolveKeepIds(
-  touched: Map<string, number>,
+  touched: ReadonlyMap<string, number>,
   fetchStartedAt: number,
 ): Set<string> {
   const keep = new Set<string>();
   for (const [id, touchedAt] of touched.entries()) {
     if (touchedAt >= fetchStartedAt) {
       keep.add(id);
-    } else {
-      touched.delete(id);
     }
   }
   return keep;
 }
 
 /**
+ * 保存完了後に開始された再取得（touchedAt < fetchStartedAt）が完了した際、
+ * ステート更新関数の外で安全に保護マップから解除する。
+ */
+export function pruneResolvedTouches(
+  touched: Map<string, number>,
+  fetchStartedAt: number,
+): void {
+  for (const [id, touchedAt] of touched.entries()) {
+    if (touchedAt < fetchStartedAt) {
+      touched.delete(id);
+    }
+  }
+}
+
+/**
+ * 回答保存中（Infinity）・保存完了直後の巻き戻り防止トラッカー。
+ * ステート更新関数の外で保護IDの解決と不要エントリの削除を行う。
+ */
+export function createPracticeSyncTracker(nowFn: () => number = () => Date.now()) {
+  const touched = new Map<string, number>();
+  return {
+    touched,
+    touchPractice(id: string) {
+      touched.set(id, Infinity);
+    },
+    untouchPractice(id: string) {
+      touched.delete(id);
+    },
+    markUpdated(id: string, revert = false) {
+      if (revert) touched.delete(id);
+      else touched.set(id, nowFn());
+    },
+    prepareMerge(fetchStartedAt: number): Set<string> {
+      const keepIds = resolveKeepIds(touched, fetchStartedAt);
+      pruneResolvedTouches(touched, fetchStartedAt);
+      return keepIds;
+    },
+  };
+}
+
+/**
  * サーバーからの一覧再取得時、回答操作中・操作済みの練習を現在の内容で保護してマージする。
  * （古いサーバー結果で、ユーザーが押した回答が「未回答」に戻るのを防止する）
+ * ステート更新関数内でも安全に呼べるよう純粋関数として動作する。
  */
 export function mergePracticesWithKeep(
   incoming: PracticeView[],
   current: PracticeView[] | null | undefined,
-  keepIds: Set<string> | Map<string, number> | null | undefined,
+  keepIds: ReadonlySet<string> | ReadonlyMap<string, number> | null | undefined,
   fetchStartedAt = 0,
 ): PracticeView[] {
   if (!current || !keepIds || keepIds.size === 0) return incoming;

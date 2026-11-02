@@ -3,6 +3,7 @@ import { DEFAULT_STUDIOS, isAdmin, type ActAs, type CancelRule, type FeeDays, ty
 import { api, setActAs } from '../api';
 import { getProfile, logoutApp, type UserProfile } from '../liff';
 import { Avatar, Icon, Spinner, Tabs, TopBar, go, useApp, useRunner } from '../ui';
+import { clearGlobalDrafts } from './answerLogic';
 
 const ACT_AS_LABEL: Record<ActAs, string> = { self: '自分（管理者）', member: '自分（一般）', test: '確認用アカウント「admin」' };
 
@@ -12,6 +13,7 @@ function ActAsSwitch() {
   const [run, busy] = useRunner();
   const change = async (v: ActAs) => {
     setActAs(v);
+    clearGlobalDrafts();
     const home = await run(() => api('home'));
     if (!home) return;
     setMe(home.me);

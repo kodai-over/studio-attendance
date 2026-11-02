@@ -1,6 +1,7 @@
 import { createContext, type ComponentChildren } from 'preact';
 import { useCallback, useContext, useEffect, useState } from 'preact/hooks';
-import { canRegister, computeCancelDeadline, isActive, isHoliday, isPastPractice, isRsvpTarget, labelDate, shouldNotifyPracticeCancellation, toJstDate, toJstTime, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
+import { canRegister, computeCancelDeadline, isActive, isHoliday, isPastPractice, labelDate, shouldNotifyPracticeCancellation, toJstDate, toJstTime, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
+import { getUnansweredSummary } from './pages/answerLogic';
 import { applyTheme, getTheme, type ThemeMode } from './theme';
 
 // ---------------------------------------------------------------- ルーティング（ハッシュ）
@@ -12,29 +13,49 @@ export function parseHash(): { path: string[]; query: URLSearchParams } {
 
 export type NavigationGuard = (toPath: string) => boolean;
 let currentGuard: NavigationGuard | null = null;
-let isRevertingGuard = false;
 
 export function setNavigationGuard(guard: NavigationGuard | null) {
   currentGuard = guard;
+}
+
+/**
+ * hashchange 発生時（ブラウザやLINEの「戻る」等）のナビゲーションガード判定。
+ * キャンセルされた場合は history.replaceState で履歴を増やさず・再度の hashchange を起こさずに元のハッシュへ戻す。
+ */
+export function handleHashChangeGuard(oldURL?: string): {
+  allowed: boolean;
+  parsed: { path: string[]; query: URLSearchParams };
+} {
+  const newParsed = parseHash();
+  const toPath = '/' + newParsed.path.join('/');
+  if (currentGuard && !currentGuard(toPath)) {
+    let oldHash = '#/';
+    if (oldURL) {
+      try {
+        const base = typeof location !== 'undefined' && location.href ? location.href : 'http://localhost/';
+        oldHash = new URL(oldURL, base).hash || '#/';
+      } catch {
+        const idx = oldURL.indexOf('#');
+        oldHash = idx >= 0 ? oldURL.slice(idx) : '#/';
+      }
+    }
+    if (typeof history !== 'undefined' && typeof history.replaceState === 'function') {
+      history.replaceState(null, '', oldHash);
+    } else {
+      location.hash = oldHash;
+    }
+    return { allowed: false, parsed: parseHash() };
+  }
+  return { allowed: true, parsed: newParsed };
 }
 
 export function useRoute() {
   const [route, setRoute] = useState(parseHash);
   useEffect(() => {
     const on = (e: HashChangeEvent) => {
-      if (isRevertingGuard) {
-        isRevertingGuard = false;
-        return;
-      }
-      const newParsed = parseHash();
-      const toPath = '/' + newParsed.path.join('/');
-      if (currentGuard && !currentGuard(toPath)) {
-        isRevertingGuard = true;
-        const oldHash = new URL(e.oldURL).hash || '#/';
-        location.hash = oldHash;
-        return;
-      }
-      setRoute(newParsed);
+      const { allowed, parsed } = handleHashChangeGuard(e.oldURL);
+      if (!allowed) return;
+      setRoute(parsed);
       window.scrollTo(0, 0);
     };
     window.addEventListener('hashchange', on);
@@ -249,11 +270,7 @@ export function NavBar() {
   const now = new Date();
   const today = toJstDate(now);
   const currentTime = toJstTime(now);
-  const todoCount = practices
-    ? practices.filter(
-        (v) => isRsvpTarget(v, me.member.userId, me.member.groups, today, currentTime) && v.myAnswer == null,
-      ).length
-    : 0;
+  const { totalCount: todoCount } = getUnansweredSummary(practices, me, today, currentTime);
 
   const items: { to: string; key: string; icon: IconName; label: string; badge?: number }[] = [
     { to: '/', key: '', icon: 'ticket', label: '予定' },

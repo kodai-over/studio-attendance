@@ -4,18 +4,22 @@ import {
   cleanupAfterCommit,
   clearGlobalDrafts,
   computeDisplayedPractices,
+  createPracticeSyncTracker,
   createRsvpNavigationGuard,
   executeStageAnswer,
   filterGroupPractices,
   filterTargetModifiedItems,
   generateSpecificReport,
   getDraftGroupStatus,
+  getDraftOwnerKey,
   getModifiedItems,
+  getUnansweredSummary,
   globalDrafts,
   loadDraftsFromStorage,
   mergePendingTellItems,
   mergePracticesWithKeep,
   processCommitItems,
+  pruneResolvedTouches,
   pruneStaleDrafts,
   recordSpecificChange,
   resolveKeepIds,
@@ -23,6 +27,7 @@ import {
   runTellWorkflow,
   saveDraftsToStorage,
   stageAnswer,
+  syncDraftsForUser,
   type ModifiedItem,
 } from '../src/pages/answerLogic';
 
@@ -564,16 +569,27 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
         clearGlobalDrafts();
         globalDrafts.unanswered.set('p1', '行く');
         globalDrafts.answered.set('p2', '行かない');
-        saveDraftsToStorage();
+        saveDraftsToStorage('user-1');
 
-        // メモリ上の下書きを一度空にして（WebView再起動をシミュレート）、ストレージから復元
+        // メモリ上の下書きを一度空にして（WebView再起動をシミュレート）、同一ユーザーでストレージから復元
         globalDrafts.unanswered.clear();
         globalDrafts.answered.clear();
         expect(globalDrafts.unanswered.size).toBe(0);
 
-        loadDraftsFromStorage();
+        loadDraftsFromStorage('user-1');
         expect(globalDrafts.unanswered.get('p1')).toBe('行く');
         expect(globalDrafts.answered.get('p2')).toBe('行かない');
+
+        // 別アカウントや「見え方の確認（admin）」に切り替わった場合は、前の人の下書きが破棄される
+        const adminKey = getDraftOwnerKey({
+          member: { userId: 'admin', name: 'admin', role: 'admin', groups: ['group-a'] },
+          actAs: 'test',
+        });
+        expect(adminKey).toBe('admin:test');
+        syncDraftsForUser(adminKey);
+        expect(globalDrafts.unanswered.size).toBe(0);
+        expect(globalDrafts.answered.size).toBe(0);
+        expect(store.has('pb:rsvpDrafts')).toBe(false);
 
         // clearGlobalDrafts でストレージからも消える
         clearGlobalDrafts();
@@ -581,6 +597,35 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       } finally {
         globalThis.localStorage = originalLocalStorage;
       }
+    });
+  });
+
+  describe('getUnansweredSummary (下部メニューバッジとRSVP画面のグループ別未回答件数の一貫性)', () => {
+    it('複数グループ所属時に全体の未回答数・グループ別の未回答数・最初に開くべき未回答ありグループを返す', () => {
+      const me = {
+        member: { userId: 'u1', name: '山田', role: 'member' as const, groups: ['group-a', 'group-b'] },
+        groups: [
+          { id: 'group-a', name: 'チームA' },
+          { id: 'group-b', name: 'チームB' },
+        ],
+        settings: { groups: [] },
+      } as any;
+
+      // チームAは回答済（未回答0）、チームBは未回答2件のケース
+      const list: PracticeView[] = [
+        { practice: { ...mockPractice1, id: 'pa', date: '2026-11-20', groups: ['group-a'] }, myAnswer: '行く', attendees: [] },
+        { practice: { ...mockPractice2, id: 'pb1', date: '2026-11-21', groups: ['group-b'] }, myAnswer: null, attendees: [] },
+        { practice: { ...mockPractice2, id: 'pb2', date: '2026-11-22', groups: ['group-b'] }, myAnswer: null, attendees: [] },
+      ];
+
+      const summary = getUnansweredSummary(list, me, '2026-11-01', '12:00');
+      expect(summary.totalCount).toBe(2);
+      expect(summary.groups).toEqual([
+        { id: 'group-a', name: 'チームA', unansweredCount: 0 },
+        { id: 'group-b', name: 'チームB', unansweredCount: 2 },
+      ]);
+      // 先頭のチームAが未回答0件でも、未回答があるチームBが初期選択される
+      expect(summary.initialGroupId).toBe('group-b');
     });
   });
 
@@ -1153,9 +1198,13 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       expect(merged.find((x) => x.practice.id === 'p1')?.myAnswer).toBeNull();
     });
 
-    it('反映中（Infinity）や保存完了直後に2回連続で取り直し（loadHome）が走っても、古い応答で回答が巻き戻らない', () => {
+    it('resolveKeepIds は引数の touched を変更しない純粋関数であり、pruneResolvedTouches と createPracticeSyncTracker で更新関数の外で安全に掃除される', () => {
+      let now = 1000;
+      const tracker = createPracticeSyncTracker(() => now);
       // p1 の保存開始（touchPractice により Infinity がセットされる）
-      const touched = new Map<string, number>([['p1', Infinity]]);
+      tracker.touchPractice('p1');
+      expect(tracker.touched.get('p1')).toBe(Infinity);
+
       let currentList: PracticeView[] = [
         { practice: mockPractice1, myAnswer: '行く', attendees: [] },
         { practice: mockPractice2, myAnswer: '保留', attendees: [] },
@@ -1166,30 +1215,40 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       ];
 
       // 1回目の取り直し（t = 1000 に開始した loadHome が完了）
-      currentList = mergePracticesWithKeep(staleServerList, currentList, touched, 1000);
+      const keep1 = tracker.prepareMerge(1000);
+      currentList = mergePracticesWithKeep(staleServerList, currentList, keep1);
       expect(currentList.find((x) => x.practice.id === 'p1')?.myAnswer).toBe('行く');
       // 保存中（Infinity）のため 1回目の loadHome が終わっても保護は消えない
-      expect(touched.get('p1')).toBe(Infinity);
+      expect(tracker.touched.get('p1')).toBe(Infinity);
 
-      // 2回目の取り直しが t = 1200 に開始し、その直後の t = 1500 に p1 の保存が完了（updatePractice）
-      touched.set('p1', 1500);
+      // 2回目の取り直しが t = 1200 に開始し、その直後の t = 1500 に p1 の保存が完了（markUpdated）
+      now = 1500;
+      tracker.markUpdated('p1');
+      expect(tracker.touched.get('p1')).toBe(1500);
 
       // 2回目の取り直し（t = 1200 に開始していた古い応答）が t = 1600 に到着
       // touchedAt(1500) >= fetchStartedAt(1200) のため、2回目でも保護が効いて巻き戻らない
-      currentList = mergePracticesWithKeep(staleServerList, currentList, touched, 1200);
+      const keep2 = tracker.prepareMerge(1200);
+      currentList = mergePracticesWithKeep(staleServerList, currentList, keep2);
       expect(currentList.find((x) => x.practice.id === 'p1')?.myAnswer).toBe('行く');
-      expect(touched.has('p1')).toBe(true);
+      expect(tracker.touched.has('p1')).toBe(true);
 
-      // 3回目の取り直し（保存完了後の t = 2000 に開始した新しい loadHome）が到着
+      // resolveKeepIds 単体は fetchStartedAt = 2000 でも touched を破壊しない（純粋関数）
+      const pureKeep = resolveKeepIds(tracker.touched, 2000);
+      expect(pureKeep.size).toBe(0);
+      expect(tracker.touched.has('p1')).toBe(true);
+
+      // 3回目の取り直し（保存完了後の t = 2000 に開始した新しい loadHome）が到着し、prepareMerge で掃除される
       const freshServerList: PracticeView[] = [
         { practice: mockPractice1, myAnswer: '行く', attendees: ['佐藤'] },
         { practice: mockPractice2, myAnswer: '保留', attendees: [] },
       ];
-      currentList = mergePracticesWithKeep(freshServerList, currentList, touched, 2000);
+      const keep3 = tracker.prepareMerge(2000);
+      currentList = mergePracticesWithKeep(freshServerList, currentList, keep3);
       expect(currentList.find((x) => x.practice.id === 'p1')?.myAnswer).toBe('行く');
       expect(currentList.find((x) => x.practice.id === 'p1')?.attendees).toEqual(['佐藤']);
-      // 保存完了後に開始された取り直しが完了したため、保護マップから安全に解除される
-      expect(touched.has('p1')).toBe(false);
+      // 保存完了後に開始された取り直しが完了したため、ステート更新関数の外で安全に解除される
+      expect(tracker.touched.has('p1')).toBe(false);
     });
   });
 });

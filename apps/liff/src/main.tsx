@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { HomeView, MeView, PracticeView } from '@studio-attendance/shared';
 import { api } from './api';
 import { initLiff, loginApp } from './liff';
-import { mergePracticesWithKeep } from './pages/answerLogic';
+import { createPracticeSyncTracker, mergePracticesWithKeep } from './pages/answerLogic';
 import { AnswerPage } from './pages/Answer';
 import { DetailPage } from './pages/Detail';
 import { FeedbackPage } from './pages/Feedback';
@@ -64,7 +64,7 @@ function App() {
   const [loggedOut, setLoggedOut] = useState(false);
   const [toast, toastNode] = useToast();
   // 回答保存中（Infinity）や保存・編集直後（完了時刻）の練習。それより前に始まった一覧取得で戻さない
-  const touched = useRef<Map<string, number>>(new Map());
+  const syncTracker = useRef(createPracticeSyncTracker());
   // 削除した（している）練習。あとから届いた一覧（削除より前に読んだもの）で戻さない
   const removed = useRef(new Set<string>());
   const clean = (list: PracticeView[]) => list.filter((v) => !removed.current.has(v.practice.id));
@@ -75,9 +75,11 @@ function App() {
   const loadHome = async () => {
     const fetchStartedAt = Date.now();
     const home = await api('home', entry.current);
+    // ステート更新関数の外で保護対象IDの算出と完了済みエントリの掃除を行う
+    const keepIds = syncTracker.current.prepareMerge(fetchStartedAt);
     setMe(home.me);
     setPracticesState((cur) => {
-      const list = mergePracticesWithKeep(home.practices, cur?.list, touched.current, fetchStartedAt);
+      const list = mergePracticesWithKeep(home.practices, cur?.list, keepIds);
       return { list: clean(list), at: Date.now() };
     });
     saveCache(home);
@@ -180,8 +182,7 @@ function App() {
     // 削除した練習は、あとから届いた結果（取り直し・回答）で戻さない
     if (removed.current.has(v.practice.id)) return;
     // 失敗して元に戻したときは保護を外し、成功時は保存完了時刻を記録してその時刻以前に始まった取り直しから守る
-    if (revert) touched.current.delete(v.practice.id);
-    else touched.current.set(v.practice.id, Date.now());
+    syncTracker.current.markUpdated(v.practice.id, revert);
     setPracticesState((cur) => {
       if (!cur) return cur;
       const has = cur.list.some((x) => x.practice.id === v.practice.id);
@@ -190,10 +191,10 @@ function App() {
   };
   const touchPractice = (id: string) => {
     // 保存処理開始時は Infinity をセットし、保存が終わるまで何回 loadHome が走っても戻されないようにする
-    touched.current.set(id, Infinity);
+    syncTracker.current.touchPractice(id);
   };
   const untouchPractice = (id: string) => {
-    touched.current.delete(id);
+    syncTracker.current.untouchPractice(id);
   };
 
   return (

@@ -23,7 +23,9 @@ import {
   filterTargetModifiedItems,
   generateSpecificReport,
   getDraftGroupStatus,
+  getDraftOwnerKey,
   getModifiedItems,
+  getUnansweredSummary,
   globalDrafts,
   mergePendingTellItems,
   processCommitItems,
@@ -33,6 +35,7 @@ import {
   runTellWorkflow,
   saveDraftsToStorage,
   stageAnswer,
+  syncDraftsForUser,
   type ModifiedItem,
   type SpecificChangeMap,
   type StageMap,
@@ -45,12 +48,16 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   const { me, practices: list, practicesAt, startupFailed, loadHome, updatePractice, touchPractice, untouchPractice, toast } = useApp();
   const ids = [...new Set(raw)];
   const isSpecific = ids.length > 0;
+  const draftOwnerKey = getDraftOwnerKey(me);
 
   // 通常表示のタブ（未回答／回答済）
   const [subTab, setSubTab] = useState<RsvpSubTab>('unanswered');
 
-  // 下書き管理: 画面切り替えで消えないよう globalDrafts と同期
-  const [specificStaged, setSpecificStaged] = useState<StageMap>(() => new Map(globalDrafts.specific));
+  // 下書き管理: ユーザーIDごとに同期し、画面切り替えで消えないよう globalDrafts と同期
+  const [specificStaged, setSpecificStaged] = useState<StageMap>(() => {
+    syncDraftsForUser(draftOwnerKey);
+    return new Map(globalDrafts.specific);
+  });
   const [unansweredStaged, setUnansweredStaged] = useState<StageMap>(() => new Map(globalDrafts.unanswered));
   const [answeredStaged, setAnsweredStaged] = useState<StageMap>(() => new Map(globalDrafts.answered));
 
@@ -63,19 +70,25 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   const [run, busy] = useRunner();
   const [saving, setSaving] = useState(false);
 
+  // 現在時刻と未回答サマリーの判定
+  const now = new Date();
+  const today = toJstDate(now);
+  const currentTime = toJstTime(now);
+  const unansweredSummary = getUnansweredSummary(list, me, today, currentTime);
+
   // ユーザーの所属グループ一覧
   const allGroups = me.groups && me.groups.length > 0 ? me.groups : me.settings.groups || [];
   const myGroupIds = new Set(me.member.groups);
   const userGroups = allGroups.filter((g) => myGroupIds.has(g.id));
 
-  // 所属グループ選択（'all' は廃止し、グループごとに作業）
+  // 所属グループ選択（'all' は廃止し、グループごとに作業。通常表示時は未回答がある最初のグループを優先選択）
   const [selectedGroup, setSelectedGroup] = useState<string>(() => {
     if (isSpecific && list) {
       const target = list.find((v) => ids.includes(v.practice.id));
       const matched = target?.practice.groups.find((gid) => myGroupIds.has(gid));
       if (matched) return matched;
     }
-    return userGroups[0]?.id || '';
+    return unansweredSummary.initialGroupId || userGroups[0]?.id || '';
   });
 
   // 最新の一覧を取り終えたか。前回の表示の回答のまま送らないよう、取れるまでは答えも送信も止める。
@@ -93,13 +106,14 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   }, []);
 
   useEffect(() => {
+    syncDraftsForUser(draftOwnerKey);
     if (list) {
       pruneStaleDrafts(list);
-      setSpecificStaged(new Map(globalDrafts.specific));
-      setUnansweredStaged(new Map(globalDrafts.unanswered));
-      setAnsweredStaged(new Map(globalDrafts.answered));
     }
-  }, [list]);
+    setSpecificStaged(new Map(globalDrafts.specific));
+    setUnansweredStaged(new Map(globalDrafts.unanswered));
+    setAnsweredStaged(new Map(globalDrafts.answered));
+  }, [draftOwnerKey, list]);
 
   useEffect(() => {
     if (load !== 'wait') return;
@@ -110,11 +124,6 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   const fresh = load === 'ok';
   const [draft, setDraft] = useState<string | null>(null);
   const latest = useRef('');
-
-  // 現在時刻と対象予約の判定
-  const now = new Date();
-  const today = toJstDate(now);
-  const currentTime = toJstTime(now);
 
   // 対象となる予約情報全体
   let allTargets: PracticeView[] = [];
@@ -233,7 +242,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
           const targetMap = subTab === 'unanswered' ? unansweredStaged : answeredStaged;
           const next = stageAnswer(targetMap, id, a, originalAnswer);
           globalDrafts[key] = next;
-          saveDraftsToStorage();
+          saveDraftsToStorage(draftOwnerKey);
           setCurrentStaged(next);
         },
       });
@@ -308,7 +317,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
       setAnsweredStaged((prev) => {
         const next = cleanupAfterCommit(prev, succeededIds);
         globalDrafts.answered = next;
-        saveDraftsToStorage();
+        saveDraftsToStorage(draftOwnerKey);
         return next;
       });
       if (failed === 0) {
@@ -465,25 +474,31 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
 
       {!isSpecific && (
         <>
-          {/* 複数グループに所属している場合のグループ切り替え（大分類を上に配置） */}
+          {/* 複数グループに所属している場合のグループ切り替え（下部メニューバッジとの対応が分かるようグループ別未回答件数を表示） */}
           {userGroups.length > 1 && (
-            <div class="group-filter-bar">
-              {userGroups.map((g) => {
-                const gCount = filterGroupPractices(allTargets, g.id, me.member.userId, myGroupIds).filter(
-                  (v) => v.myAnswer == null,
-                ).length;
-                return (
+            <>
+              <div class="group-filter-bar">
+                {unansweredSummary.groups.map((g) => (
                   <button
                     key={g.id}
                     class={`group-pill ${selectedGroup === g.id ? 'active' : ''}`}
                     onClick={() => handleGroupFilterChange(g.id)}
                   >
                     <span>{g.name}</span>
-                    {gCount > 0 && <span class="nav-badge" style={{ marginLeft: 6 }}>{gCount}</span>}
+                    <span class="muted" style={{ marginLeft: 6, fontSize: 12 }}>
+                      未回答{g.unansweredCount}
+                    </span>
+                    {g.unansweredCount > 0 && <span class="nav-badge" style={{ marginLeft: 4 }}>{g.unansweredCount}</span>}
                   </button>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+              {unansweredSummary.totalCount > 0 && (
+                <p class="note" style={{ margin: '0 0 8px', fontSize: 12 }}>
+                  未回答 合計 {unansweredSummary.totalCount}件（
+                  {unansweredSummary.groups.map((g) => `${g.name}: ${g.unansweredCount}件`).join(' / ')}）
+                </p>
+              )}
+            </>
           )}
 
           <header class="tabs-head" style={{ marginBottom: 12 }}>
@@ -513,7 +528,9 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
           {isSpecific
             ? '予約情報が見つかりません（終了した・削除された・見られない予約情報です）'
             : subTab === 'unanswered'
-            ? '未回答の募集はありません。すべて回答済です。'
+            ? userGroups.length > 1 && unansweredSummary.totalCount > 0
+              ? 'このグループの未回答の募集はありません（他のグループに未回答の募集があります）'
+              : '未回答の募集はありません。すべて回答済です。'
             : '回答済の今後の予約情報はありません。'}
         </div>
       ) : (
