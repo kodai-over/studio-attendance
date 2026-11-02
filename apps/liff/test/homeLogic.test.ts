@@ -15,6 +15,7 @@ import {
   updatePracticeSnapshot,
 } from '../src/pages/homeLogic';
 import { resolveActiveNavKey } from '../src/ui';
+import { resolveInitialHash } from '../src/route';
 
 function createMockMe(partial?: Partial<MeView['member']>, actAs: MeView['actAs'] = 'self'): MeView {
   return {
@@ -551,6 +552,28 @@ describe('ホーム画面ロジック（homeLogic）', () => {
       expect(resolveActiveNavKey(['settings'])).toBe('settings');
       expect(resolveActiveNavKey(['admin'])).toBe('settings');
       expect(resolveActiveNavKey(['feedback'])).toBe('settings');
+    });
+
+    it('resolveInitialHash は LINE 外（isInClient: false）でも ?p= や ?r= がある場合は /home に上書きせず既存の配布リンク先を開く', () => {
+      // 予約詳細の共有リンク（?p=p123）
+      expect(
+        resolveInitialHash(new URLSearchParams('p=p123'), { currentHash: '', isInClient: false }),
+      ).toBe('/p/p123');
+
+      // RSVP回答依頼の配布リンク（?r=p1）
+      expect(
+        resolveInitialHash(new URLSearchParams('r=p1'), { currentHash: '', isInClient: false }),
+      ).toBe('/answer?r=p1');
+
+      // 募集管理リンク（?manage=p123）
+      expect(
+        resolveInitialHash(new URLSearchParams('manage=p123'), { currentHash: '', isInClient: false }),
+      ).toBe('/recruit/p123');
+
+      // パラメータなしの外部ブラウザ通常起動時のみ /home が返る
+      expect(
+        resolveInitialHash(new URLSearchParams(''), { currentHash: '', isInClient: false }),
+      ).toBe('/home');
     });
   });
 });

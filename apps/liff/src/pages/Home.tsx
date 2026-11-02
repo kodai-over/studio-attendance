@@ -131,7 +131,7 @@ export function HomePage() {
                 <span>{nextGoing.going.length}人参加</span>
               </span>
               <span class="gh-meta-stat">
-                1人あたり {yen(nextGoing.practice.fee ? Math.ceil(nextGoing.practice.fee / Math.max(1, nextGoing.going.length)) : 0)}
+                1人あたり {nextGoing.perPerson != null ? yen(nextGoing.perPerson) : '—'}
               </span>
               {nextGoing.bookerName && (
                 <span class="gh-meta-stat">
