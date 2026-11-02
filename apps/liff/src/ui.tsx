@@ -415,7 +415,8 @@ export function DeleteConfirmDialog({
         </p>
         {answered > 0 ? (
           <p class="muted" style={{ margin: '0 0 12px', fontSize: '0.8rem', lineHeight: 1.4 }}>
-            回答している人がいます（行く{v.goingCount}人・未定{v.maybe.length}人）。回答も削除されます。
+            回答している人がいます（行く{v.goingCount}人・未定{v.maybe.length}人）。<br />
+            回答も一緒に削除されます。
           </p>
         ) : (
           <p class="muted" style={{ margin: '0 0 12px', fontSize: '0.8rem' }}>
