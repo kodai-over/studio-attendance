@@ -158,6 +158,18 @@ describe('LIFF 初期化 & 画面遷移ロジック', () => {
       expect(resolveInitialHash(new URLSearchParams('r=p1&r=p2'))).toBe('/answer?r=p1&r=p2');
     });
 
+    it('外部ブラウザ・ホーム画面（isInClient: false）であっても、パラメータ付きURL（?p=, ?r=, ?manage=）があるときは /home に上書きされず指定先が返る', () => {
+      expect(
+        resolveInitialHash(new URLSearchParams('p=p123'), { currentHash: '', isInClient: false }),
+      ).toBe('/p/p123');
+      expect(
+        resolveInitialHash(new URLSearchParams('r=r1&r=r2'), { currentHash: '#/', isInClient: false }),
+      ).toBe('/answer?r=r1&r=r2');
+      expect(
+        resolveInitialHash(new URLSearchParams('manage=p123'), { currentHash: '', isInClient: false }),
+      ).toBe('/recruit/p123');
+    });
+
     it('draft パラメータおよび recruit=1 の組み合わせを正しく振り分ける', () => {
       expect(resolveInitialHash(new URLSearchParams('draft=d1'))).toBe('/register?draft=d1');
       expect(resolveInitialHash(new URLSearchParams('draft=d1&recruit=1'))).toBe('/register?draft=d1&recruit=1');

@@ -150,7 +150,6 @@ function App() {
   // fresh でないときは取った時刻を変えない（前回の表示を「最新」と取り違えないように）
   const setPractices = (list: PracticeView[], fresh = false) => {
     const cleaned = clean(list);
-    if (me) syncPracticeNotices(cleaned, me);
     setPracticesState((cur) => ({
       list: cleaned,
       at: fresh ? Date.now() : (cur?.at ?? 0),

@@ -259,6 +259,45 @@ describe('ホーム画面ロジック（homeLogic）', () => {
       expect(notices[0].title).toContain('の予約情報が中止になりました');
     });
 
+    it('自分が予約者（booker === me.userId）の予約情報が変更・中止された場合、自分宛てには変更・中止通知を生成しない', () => {
+      const me = createMockMe(); // userId: 'Ume'
+      const initial = createMockPracticeView({
+        id: 'p-my-booking',
+        booker: 'Ume',
+        groups: ['G1'],
+        room: '201',
+        fee: 4000,
+        status: '募集中',
+      });
+      syncPracticeNotices([initial], me, '2026-11-02T10:00:00.000Z');
+
+      // 部屋・料金を変更
+      const changed = createMockPracticeView({
+        id: 'p-my-booking',
+        booker: 'Ume',
+        groups: ['G1'],
+        room: '202',
+        fee: 5000,
+        status: '募集中',
+      });
+      syncPracticeNotices([changed], me, '2026-11-02T11:00:00.000Z');
+      let notices = buildHomeNotices([changed], me, '2026-11-02');
+      expect(notices).toHaveLength(0);
+
+      // さらに中止に変更
+      const canceled = createMockPracticeView({
+        id: 'p-my-booking',
+        booker: 'Ume',
+        groups: ['G1'],
+        room: '202',
+        fee: 5000,
+        status: '中止',
+      });
+      syncPracticeNotices([canceled], me, '2026-11-02T12:00:00.000Z');
+      notices = buildHomeNotices([canceled], me, '2026-11-02');
+      expect(notices).toHaveLength(0);
+    });
+
     it('自分が関係しない予約情報（他グループの予約で未回答）の変更は通知しない', () => {
       const me = createMockMe({ groups: ['G1'] });
       const unrelated = createMockPracticeView({

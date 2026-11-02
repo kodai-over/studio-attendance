@@ -342,8 +342,8 @@ export function syncPracticeNotices(
 
     const pLabel = `${labelDate(p.date)} ${p.start}–${p.end}`;
 
-    // 1. 自分が関係する予約情報の変更・中止の検知
-    if (isRelatedForNotice(v, me)) {
+    // 1. 自分が関係する予約情報の変更・中止の検知（予約者自身が変更・中止した予約情報は自分宛てに通知しない）
+    if (p.booker !== me.member.userId && isRelatedForNotice(v, me)) {
       if (prev.status !== '中止' && p.status === '中止') {
         newlyDetected.push({
           id: `cancel:${p.id}:${nowIso}`,

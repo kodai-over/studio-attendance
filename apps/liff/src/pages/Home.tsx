@@ -13,6 +13,7 @@ import {
   getNoticeReadAt,
   markNoticesRead,
   markReleaseNotesRead,
+  syncPracticeNotices,
 } from './homeLogic';
 import { PracticeCard } from './List';
 
@@ -35,7 +36,11 @@ export function HomePage() {
 
   useEffect(() => {
     if (practicesAt > 0 && Date.now() - practicesAt > FRESH_MS) {
-      run(() => api('listPractices')).then((r) => r && setPractices(r, true));
+      run(() => api('listPractices')).then((r) => {
+        if (!r) return;
+        syncPracticeNotices(r, me);
+        setPractices(r, true);
+      });
     }
   }, []);
 
