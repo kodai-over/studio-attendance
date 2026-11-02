@@ -140,7 +140,8 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
     ];
 
     it('選択中グループの予約情報に加え、groupsが空（登録のみ等）の予約情報も含まれる（他グループの予約は除外される）', () => {
-      const filtered = filterGroupPractices(listWithNoGroup, 'group-a');
+      const myGroupIds = new Set(['group-a', 'group-b']);
+      const filtered = filterGroupPractices(listWithNoGroup, 'group-a', undefined, myGroupIds);
       const ids = filtered.map((v) => v.practice.id);
       expect(ids).toContain('p1');
       expect(ids).toContain('p-no-group');
@@ -152,6 +153,20 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       const filtered = filterGroupPractices(listWithNoGroup, 'group-a', 'user-me');
       const ids = filtered.map((v) => v.practice.id);
       expect(ids).toContain('p-other-mine');
+    });
+
+    it('参加リンク回答や脱退後など、所属外グループであっても自分が回答済みの予約情報は抽出される（未回答は除外）', () => {
+      const myGroupIds = new Set(['group-a']);
+      const listWithAnsweredExternal: PracticeView[] = [
+        // group-b 宛で自分は group-a のみ所属。しかし参加リンク等ですでに「行く」と回答済み
+        { practice: practiceOtherUnanswered, myAnswer: '行く', attendees: [] },
+        // group-b 宛で未回答
+        { practice: { ...practiceOtherUnanswered, id: 'p-external-no-answer' }, myAnswer: null, attendees: [] },
+      ];
+      const filtered = filterGroupPractices(listWithAnsweredExternal, 'group-a', 'user-me', myGroupIds);
+      const ids = filtered.map((v) => v.practice.id);
+      expect(ids).toContain('p-other-unanswered'); // 回答済みなので回答変更できるよう抽出される
+      expect(ids).not.toContain('p-external-no-answer'); // 未回答なので混ざらず除外される
     });
 
     it('グループが未選択（空文字）の場合は全件が返る', () => {
@@ -178,21 +193,30 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       ];
       const displayedIds = new Set(['p1', 'p2', 'p-none', 'p-other-mine']);
 
+      const myGroupIds = new Set(['group-a', 'group-b']);
       // group-a のみ選択時: p1 (group-a), p-none (groups空), p-other-mine (予約者) が抽出され、p2 は除外される
-      const filteredA = filterTargetModifiedItems(items, displayedIds, 'group-a', 'user-me');
+      const filteredA = filterTargetModifiedItems(items, displayedIds, 'group-a', 'user-me', myGroupIds);
       expect(filteredA.map((x) => x.id)).toEqual(['p1', 'p-none', 'p-other-mine']);
 
       // group-b のみ選択時: p2 (group-b) と p-none (groups空) が抽出される
-      const filteredB = filterTargetModifiedItems(items, displayedIds, 'group-b');
+      const filteredB = filterTargetModifiedItems(items, displayedIds, 'group-b', undefined, myGroupIds);
       expect(filteredB.map((x) => x.id)).toEqual(['p2', 'p-none']);
 
       // 非表示の項目は除外される
-      const filteredPartial = filterTargetModifiedItems(items, new Set(['p2']), 'group-b');
+      const filteredPartial = filterTargetModifiedItems(items, new Set(['p2']), 'group-b', undefined, myGroupIds);
       expect(filteredPartial.map((x) => x.id)).toEqual(['p2']);
 
       // displayedIds が null の場合、表示タブに関係なく全項目からグループ対象を抽出する（「完了」ボタン用）
-      const allTabsGroupA = filterTargetModifiedItems(items, null, 'group-a', 'user-me');
+      const allTabsGroupA = filterTargetModifiedItems(items, null, 'group-a', 'user-me', myGroupIds);
       expect(allTabsGroupA.map((x) => x.id)).toEqual(['p1', 'p-none', 'p-other-mine']);
+
+      // 所属外グループであっても、回答済みの練習を変更した項目（originalAnswer != null）は反映対象として抽出される
+      const externalAnsweredItem = [
+        { id: 'p-ext', answer: '行かない' as const, originalAnswer: '行く' as const, practice: mockPractice2 }, // group-b
+      ];
+      const onlyGroupA = new Set(['group-a']);
+      const filteredExt = filterTargetModifiedItems(externalAnsweredItem, new Set(['p-ext']), 'group-a', undefined, onlyGroupA);
+      expect(filteredExt.map((x) => x.id)).toEqual(['p-ext']);
     });
   });
 
@@ -806,6 +830,111 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       });
       expect(outcomeNotFresh).toBe('guarded');
       expect(apiSave).not.toHaveBeenCalled();
+    });
+
+    it('素早い2連打が発生した場合、同期的フラグによって2回目のタップが即座にブロックされ二重送信が防止される', async () => {
+      const original: PracticeView = { practice: mockPractice1, myAnswer: null, attendees: [] };
+      const updated: PracticeView = { practice: mockPractice1, myAnswer: '行く', attendees: [] };
+      let resolveApi: (v: PracticeView) => void;
+      const apiPromise = new Promise<PracticeView>((resolve) => {
+        resolveApi = resolve;
+      });
+      const apiSave = vi.fn().mockReturnValue(apiPromise);
+      const isOperating = { current: false };
+
+      // 1回目のタップ処理シミュレーション
+      const tap1 = async () => {
+        if (isOperating.current) return 'blocked_sync';
+        isOperating.current = true;
+        try {
+          return await executeStageAnswer({
+            id: 'p1',
+            answer: '行く',
+            isSpecific: true,
+            fresh: true,
+            busy: false,
+            saving: false,
+            originalPractice: original,
+            apiSave,
+            touchPractice: vi.fn(),
+            updatePractice: vi.fn(),
+            toast: vi.fn(),
+            onSpecificSaved: vi.fn(),
+            onDraftStaged: vi.fn(),
+          });
+        } finally {
+          isOperating.current = false;
+        }
+      };
+
+      // 2回目のタップ処理シミュレーション（1回目の完了前）
+      const tap2 = async () => {
+        if (isOperating.current) return 'blocked_sync';
+        isOperating.current = true;
+        try {
+          return await executeStageAnswer({
+            id: 'p1',
+            answer: '行く',
+            isSpecific: true,
+            fresh: true,
+            busy: false,
+            saving: false,
+            originalPractice: original,
+            apiSave,
+            touchPractice: vi.fn(),
+            updatePractice: vi.fn(),
+            toast: vi.fn(),
+            onSpecificSaved: vi.fn(),
+            onDraftStaged: vi.fn(),
+          });
+        } finally {
+          isOperating.current = false;
+        }
+      };
+
+      const p1 = tap1();
+      const p2 = tap2(); // 1回目がAPI待機中に即座に2回目が実行される
+
+      expect(await p2).toBe('blocked_sync'); // 2回目は同期フラグで即座に遮断される
+      expect(apiSave).toHaveBeenCalledTimes(1); // APIは1回しか呼ばれない
+
+      resolveApi!(updated);
+      expect(await p1).toBe('saved');
+    });
+  });
+
+  describe('commitItems と mergePracticesWithKeep の連携（反映中の古い一覧到着による巻き戻り防止）', () => {
+    it('複数回答の反映中、各練習の保存開始時に touchPractice が呼ばれ、古いサーバー一覧が到着しても巻き戻らない', async () => {
+      const items = [
+        { id: 'p1', answer: '行く' as const, originalAnswer: null, practice: mockPractice1 },
+        { id: 'p2', answer: '行かない' as const, originalAnswer: '保留' as const, practice: mockPractice2 },
+      ];
+
+      const touchedIds = new Set<string>();
+      const touchPractice = vi.fn().mockImplementation((id: string) => touchedIds.add(id));
+      const currentList: PracticeView[] = [
+        { practice: mockPractice1, myAnswer: '行く', attendees: [] },
+        { practice: mockPractice2, myAnswer: '行かない', attendees: [] },
+      ];
+
+      // commitItems 実行シミュレーション（各項目の保存前に touchPractice を呼ぶ）
+      await processCommitItems(items, async (item) => {
+        touchPractice(item.id);
+      });
+
+      expect(touchPractice).toHaveBeenCalledWith('p1');
+      expect(touchPractice).toHaveBeenCalledWith('p2');
+
+      // 反映中に届いた古いサーバー一覧（p1, p2 が未回答のまま）
+      const staleIncoming: PracticeView[] = [
+        { practice: mockPractice1, myAnswer: null, attendees: [] },
+        { practice: mockPractice2, myAnswer: '保留', attendees: [] },
+      ];
+
+      // mergePracticesWithKeep により、touchedIds の練習はローカルの最新状態が保持される
+      const merged = mergePracticesWithKeep(staleIncoming, currentList, touchedIds);
+      expect(merged.find((x) => x.practice.id === 'p1')?.myAnswer).toBe('行く');
+      expect(merged.find((x) => x.practice.id === 'p2')?.myAnswer).toBe('行かない');
     });
   });
 

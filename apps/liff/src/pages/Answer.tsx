@@ -120,7 +120,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   // 所属グループ選択によるチケット絞り込み（groupsが空の予約情報や自分が予約者の予約情報は全グループで表示）
   const groupFiltered = isSpecific
     ? allTargets
-    : filterGroupPractices(allTargets, selectedGroup, me.member.userId);
+    : filterGroupPractices(allTargets, selectedGroup, me.member.userId, myGroupIds);
 
   // 未回答・回答済の分類（タブ分類の基準は元の回答 myAnswer に固定し、回答変更してもチケットが消えないようにする）
   const todos = groupFiltered.filter((v) => v.myAnswer == null);
@@ -174,6 +174,9 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   const hasAnyChangesRef = useRef(false);
   hasAnyChangesRef.current = hasAnyChanges;
 
+  // 素早い連続タップによる二重保存を同期的に防ぐためのフラグ
+  const isOperatingRef = useRef(false);
+
   // ナビゲーションガード（下部メニューや戻るなどの遷移時に未保存変更があれば確認し、キャンセルなら画面遷移を阻止）
   useEffect(() => {
     setNavigationGuard((toPath) => {
@@ -206,6 +209,8 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
 
   // 個別の回答変更（特定予約指定時は即時保存、通常画面では下書き更新）
   const handleStageAnswer = async (id: string, a: Answer) => {
+    if (isOperatingRef.current || !fresh || busy || saving) return;
+    isOperatingRef.current = true;
     const original = list?.find((x) => x.practice.id === id);
     if (isSpecific) setSaving(true);
     try {
@@ -245,6 +250,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     } catch {
       /* トースト通知済み */
     } finally {
+      isOperatingRef.current = false;
       if (isSpecific) setSaving(false);
     }
   };
@@ -265,13 +271,13 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   const displayedIds = new Set(displayed.map((v) => v.practice.id));
   const targetModifiedItems = isSpecific
     ? modifiedItems
-    : filterTargetModifiedItems(modifiedItems, displayedIds, selectedGroup, me.member.userId);
+    : filterTargetModifiedItems(modifiedItems, displayedIds, selectedGroup, me.member.userId, myGroupIds);
   const hasTargetChanges = targetModifiedItems.length > 0;
 
   // 選択中グループに属する全タブの変更項目（「完了」ボタンでまとめて保存する対象）
   const groupAllModifiedItems = isSpecific
     ? modifiedItems
-    : filterTargetModifiedItems(allModifiedItems, null, selectedGroup, me.member.userId);
+    : filterTargetModifiedItems(allModifiedItems, null, selectedGroup, me.member.userId, myGroupIds);
   const hasGroupAllChanges = groupAllModifiedItems.length > 0;
 
   // 複数件の回答保存処理（1件ずつ反映し、成功分は下書きから削除、失敗分は下書きに残して安全に再試行可能にする）
@@ -280,6 +286,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     const { succeeded, failed, succeededIds, lastError } = await processCommitItems(
       items,
       async (item) => {
+        touchPractice(item.id);
         const updated = await api('rsvp', { id: item.id, answer: item.answer });
         updatePractice(updated);
       },
@@ -404,11 +411,11 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   };
 
   const handleBack = () => {
-    // 詳細画面からの遷移時は確実に詳細画面に戻る（LIFF内でのアプリ終了を防ぐ）
-    if (ids.length === 1) {
-      go(`/p/${encodeURIComponent(ids[0])}`);
-    } else if (history.length > 1) {
+    // 履歴があるときは history.back() を優先し、ないとき（直接URLを開いた場合等）だけ詳細画面またはトップへ戻る
+    if (history.length > 1) {
       history.back();
+    } else if (ids.length === 1) {
+      go(`/p/${encodeURIComponent(ids[0])}`);
     } else {
       go('/');
     }
@@ -448,7 +455,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
           {userGroups.length > 1 && (
             <div class="group-filter-bar">
               {userGroups.map((g) => {
-                const gCount = filterGroupPractices(allTargets, g.id, me.member.userId).filter(
+                const gCount = filterGroupPractices(allTargets, g.id, me.member.userId, myGroupIds).filter(
                   (v) => v.myAnswer == null,
                 ).length;
                 return (

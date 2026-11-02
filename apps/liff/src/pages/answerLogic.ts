@@ -242,17 +242,23 @@ export async function runTellWorkflow({
 /**
  * 選択中グループに合致する予約情報を抽出する。
  * groups が空の予約情報（登録のみ等）や、自分が予約者の予約情報はどのグループ選択時にも表示する。
+ * また、参加リンク回答やグループ脱退後など、所属外グループ宛でも自分が回答済みの予約情報は回答変更できるよう表示する。
  */
 export function filterGroupPractices(
   practices: PracticeView[],
   selectedGroup: string,
   myUserId?: string,
+  userGroupIds?: Set<string>,
 ): PracticeView[] {
   if (!selectedGroup) return practices;
   return practices.filter((v) => {
     if (v.practice.groups.length === 0) return true;
     if (v.practice.groups.includes(selectedGroup)) return true;
     if (myUserId && v.practice.booker === myUserId) return true;
+    // 所属グループ宛ではないが回答済みの練習（参加リンク回答やグループ脱退後等）は回答変更できるよう表示
+    if (v.myAnswer != null && (!userGroupIds || !v.practice.groups.some((gid) => userGroupIds.has(gid)))) {
+      return true;
+    }
     return false;
   });
 }
@@ -295,12 +301,17 @@ export function filterTargetModifiedItems(
   displayedIds: Set<string> | null | undefined,
   selectedGroup: string,
   myUserId?: string,
+  userGroupIds?: Set<string>,
 ): ModifiedItem[] {
   return modifiedItems.filter((item) => {
     if (displayedIds && !displayedIds.has(item.id)) return false;
     if (!selectedGroup || item.practice.groups.length === 0) return true;
     if (item.practice.groups.includes(selectedGroup)) return true;
     if (myUserId && item.practice.booker === myUserId) return true;
+    // 所属グループ宛ではないが回答済みの練習を変更した項目も反映対象に含める
+    if (item.originalAnswer != null && (!userGroupIds || !item.practice.groups.some((gid) => userGroupIds.has(gid)))) {
+      return true;
+    }
     return false;
   });
 }
