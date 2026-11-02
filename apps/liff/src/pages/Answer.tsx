@@ -17,14 +17,25 @@ import { PracticeCard } from './List';
 
 type RsvpSubTab = 'unanswered' | 'answered';
 
-/** 募集カードの「回答」または下のメニュー「RSVP」から開く画面。まとめて変更して、完了またはメッセージ送信で一括反映 */
+/** 募集カードの「回答」またはメニューの「RSVP」から開く画面。まとめて変更して、完了またはメッセージ送信で一括反映 */
 export function AnswerPage({ ids: raw }: { ids: string[] }) {
   const { me, practices: list, practicesAt, startupFailed, loadHome, updatePractice, toast } = useApp();
   const ids = [...new Set(raw)];
   const isSpecific = ids.length > 0;
-  const [subTab, setSubTab] = useState<RsvpSubTab>('unanswered');
-  // 画面上での変更（保存前の一時状態）。保存または送信時にまとめて反映
-  const [stagedAnswers, setStagedAnswers] = useState<Map<string, Answer>>(new Map());
+
+  // 特定予約の指定時は、その予約の既存回答に応じて初期タブを自動判定
+  const [subTab, setSubTab] = useState<RsvpSubTab>(() => {
+    if (isSpecific && list) {
+      const target = list.find((v) => ids.includes(v.practice.id));
+      if (target && target.myAnswer != null) return 'answered';
+    }
+    return 'unanswered';
+  });
+
+  // 未回答タブと回答済タブで下書き（ドラフト）を完全分離
+  const [unansweredStaged, setUnansweredStaged] = useState<Map<string, Answer>>(new Map());
+  const [answeredStaged, setAnsweredStaged] = useState<Map<string, Answer>>(new Map());
+
   const [run, busy] = useRunner();
   const [saving, setSaving] = useState(false);
 
@@ -75,27 +86,37 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     allTargets = list.filter((v) => isRsvpTarget(v, me.member.userId, me.member.groups, today, currentTime));
   }
 
-  // 所属グループ選択によるチケット絞り込み
+  // 所属グループ選択によるチケット絞り込み（特定指定時はグループ絞り込みで消えないようにする）
   const groupFiltered =
-    selectedGroup === 'all'
+    isSpecific || selectedGroup === 'all'
       ? allTargets
       : allTargets.filter((v) => v.practice.groups.includes(selectedGroup));
 
-  // 未回答・回答済みの分類（タブ分類の基準は元の回答 myAnswer に固定し、回答変更してもチケットが消えないようにする）
+  // 未回答・回答済の分類（タブ分類の基準は元の回答 myAnswer に固定し、回答変更してもチケットが消えないようにする）
   const todos = groupFiltered.filter((v) => v.myAnswer == null);
   const answereds = groupFiltered.filter((v) => v.myAnswer != null);
   const todoCount = todos.length;
   const answeredCount = answereds.length;
-  const baseList = subTab === 'unanswered' ? todos : answereds;
 
-  // 画面上の現在の回答（stagedAnswers を反映した表示用リスト）
+  // 特定指定時は指定された全件をそのまま表示（回答済でも消えないようにする）
+  const baseList = isSpecific ? allTargets : (subTab === 'unanswered' ? todos : answereds);
+
+  // 現在のタブの判定（特定指定時は対象予約が回答済なら回答済として扱う）
+  const activeTab: RsvpSubTab = isSpecific
+    ? (allTargets[0]?.myAnswer != null ? 'answered' : 'unanswered')
+    : subTab;
+
+  const currentStaged = activeTab === 'unanswered' ? unansweredStaged : answeredStaged;
+  const setCurrentStaged = activeTab === 'unanswered' ? setUnansweredStaged : setAnsweredStaged;
+
+  // 画面上の現在の回答（現在のタブのドラフトを反映した表示用リスト）
   const displayed = baseList.map((v) => {
-    const answer = stagedAnswers.has(v.practice.id) ? stagedAnswers.get(v.practice.id)! : v.myAnswer;
+    const answer = currentStaged.has(v.practice.id) ? currentStaged.get(v.practice.id)! : v.myAnswer;
     return answer !== v.myAnswer ? { ...v, myAnswer: answer } : v;
   });
 
-  // 変更がある項目（元の回答と下書きが異なる項目）
-  const modifiedItems = Array.from(stagedAnswers.entries())
+  // 現在のタブで変更がある項目
+  const modifiedItems = Array.from(currentStaged.entries())
     .map(([id, answer]) => {
       const original = list?.find((x) => x.practice.id === id);
       return original && original.myAnswer !== answer
@@ -105,9 +126,9 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     .filter((x): x is { id: string; answer: Answer; originalAnswer: Answer | null; practice: Practice } => x != null);
   const hasChanges = modifiedItems.length > 0;
 
-  // 個別の回答変更（即時保存せず画面上のみ変更）
+  // 個別の回答変更（現在のタブのドラフトのみ更新）
   const handleStageAnswer = (id: string, a: Answer) => {
-    setStagedAnswers((prev) => {
+    setCurrentStaged((prev) => {
       const next = new Map(prev);
       const original = list?.find((x) => x.practice.id === id);
       if (original && original.myAnswer === a) {
@@ -135,14 +156,14 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     setDraft(null);
   };
 
-  // 変更内容を一括でサーバーに送信して保存
+  // 変更内容を一括でサーバーに送信して保存（現在のタブの変更のみコミット）
   const commitAnswers = async () => {
     if (modifiedItems.length === 0) return;
     for (const item of modifiedItems) {
       const updated = await api('rsvp', { id: item.id, answer: item.answer });
       updatePractice(updated);
     }
-    setStagedAnswers(new Map());
+    setCurrentStaged(new Map());
   };
 
   // 送信先グループによる絞り込み
@@ -152,14 +173,14 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
 
   // 送信文の生成
   let report = '';
-  if (subTab === 'unanswered') {
+  if (activeTab === 'unanswered') {
     // 未回答タブ: 「回答しました」形式（回答が入力された項目のみ）
     const activeUnanswered = displayed
       .filter((v) => v.practice.status !== '中止' && messagePracticeFilter(v.practice))
       .filter((v) => v.myAnswer != null);
     report = answerReport(activeUnanswered.map((v) => ({ practice: v.practice, answer: v.myAnswer }))) ?? '';
   } else {
-    // 回答済みタブ: 「回答を変更しました」形式（どういう変更をしたかを明示）
+    // 回答済タブ: 「回答を変更しました」形式（どういう変更をしたかを明示）
     const activeModified = modifiedItems.filter(
       (item) => item.practice.status !== '中止' && messagePracticeFilter(item.practice),
     );
@@ -173,7 +194,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   latest.current = text;
   const chat = canSendToChat();
 
-  // 回答を反映してグループに伝える（一括保存してから送信）
+  // 回答を反映してグループに伝える（現在のタブの変更を一括保存してから送信）
   const handleTell = async () => {
     setSaving(true);
     try {
@@ -198,7 +219,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     }
   };
 
-  // 回答を反映して完了（変更があれば保存して完了）
+  // 回答を反映して完了（現在のタブの変更があれば保存して完了）
   const handleDone = async () => {
     if (hasChanges) {
       setSaving(true);
@@ -238,7 +259,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
               onChange={handleTabChange}
               items={[
                 { key: 'unanswered', label: '未回答', count: list ? todoCount : undefined },
-                { key: 'answered', label: '回答済み', count: list ? answeredCount : undefined },
+                { key: 'answered', label: '回答済', count: list ? answeredCount : undefined },
               ]}
             />
           </header>
@@ -279,9 +300,9 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
         <div class="empty">
           {isSpecific
             ? '予約情報が見つかりません（終了した・削除された・見られない予約情報です）'
-            : subTab === 'unanswered'
-            ? '未回答の募集はありません。すべて回答済みです！'
-            : '回答済みの今後の予約情報はありません。'}
+            : activeTab === 'unanswered'
+            ? '未回答の募集はありません。すべて回答済です！'
+            : '回答済の今後の予約情報はありません。'}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -354,7 +375,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
                   rows={Math.max(3, text.split('\n').length + 1)}
                   value={text}
                   placeholder={
-                    subTab === 'unanswered'
+                    activeTab === 'unanswered'
                       ? '○ △ ✕ を選ぶと、ここに文ができます'
                       : '回答を変更すると、ここに文ができます'
                   }
@@ -376,7 +397,10 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
                 <Icon name="send" size={18} />
                 {hasChanges ? `回答を反映してグループに伝える（${modifiedItems.length}件）` : 'グループに伝える'}
               </button>
-              <p class="note">押すと、回答が反映され、あなたの発言としてグループに送ります</p>
+              <p class="note">
+                押すと、回答が反映され、あなたの発言として開いているトークに送ります。
+                {userGroups.length > 1 && '（他のグループにも伝えたいときは、文をコピーしてそのトークに貼り付けてください）'}
+              </p>
             </>
           )}
         </section>

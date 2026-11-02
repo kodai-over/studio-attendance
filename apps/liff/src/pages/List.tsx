@@ -16,12 +16,12 @@ function readTab(): Tab {
   }
 }
 
-/** 自分の回答状況を示すバッジ */
+/** 自分の回答状況を示すバッジ（シンプルな記号表示） */
 export function MyAnswerBadge({ answer }: { answer: Answer | null }) {
-  if (answer === '行く') return <span class="my-answer-badge going">○ 行く</span>;
-  if (answer === '保留') return <span class="my-answer-badge maybe">△ 未定</span>;
-  if (answer === '行かない') return <span class="my-answer-badge not-going">✕ 行かない</span>;
-  return <span class="my-answer-badge none">未回答</span>;
+  if (answer === '行く') return <span class="my-answer-badge going" title="行く" aria-label="行く">○</span>;
+  if (answer === '保留') return <span class="my-answer-badge maybe" title="未定" aria-label="未定">△</span>;
+  if (answer === '行かない') return <span class="my-answer-badge not-going" title="行かない" aria-label="行かない">✕</span>;
+  return <span class="my-answer-badge none" title="未回答" aria-label="未回答">—</span>;
 }
 
 export function ListPage({ initialTab }: { initialTab?: string | null }) {
@@ -84,7 +84,7 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
             ))}
           </div>
           <p class="note" style={{ textAlign: 'center', marginTop: 16 }}>
-            ※出欠の回答や変更は、下のメニューの「RSVP」からまとめて行えます
+            ※出欠の回答や変更は、メニューの「RSVP」からまとめて行えます
           </p>
         </>
       )}

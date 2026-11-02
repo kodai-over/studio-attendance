@@ -2224,13 +2224,15 @@ details > summary {
 .my-answer-badge {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  padding: 1px 7px;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
   border-radius: 999px;
   font-size: 11px;
-  font-weight: 600;
-  line-height: 1.4;
-  white-space: nowrap;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  flex-shrink: 0;
 }
 .my-answer-badge.going {
   background: var(--ink);
