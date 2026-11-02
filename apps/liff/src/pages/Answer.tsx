@@ -25,6 +25,7 @@ import {
   processCommitItems,
   pruneStaleDrafts,
   recordSpecificChange,
+  runDoneWorkflow,
   runTellWorkflow,
   stageAnswer,
   type ModifiedItem,
@@ -257,6 +258,12 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     : filterTargetModifiedItems(modifiedItems, displayedIds, selectedGroup, me.member.userId);
   const hasTargetChanges = targetModifiedItems.length > 0;
 
+  // 選択中グループに属する全タブの変更項目（「完了」ボタンでまとめて保存する対象）
+  const groupAllModifiedItems = isSpecific
+    ? modifiedItems
+    : filterTargetModifiedItems(allModifiedItems, null, selectedGroup, me.member.userId);
+  const hasGroupAllChanges = groupAllModifiedItems.length > 0;
+
   // 複数件の回答保存処理（1件ずつ反映し、成功分は下書きから削除、失敗分は下書きに残して安全に再試行可能にする）
   const commitItems = async (items: ModifiedItem[]) => {
     if (items.length === 0) return { succeeded: 0, failed: 0 };
@@ -284,7 +291,9 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
         globalDrafts.answered = next;
         return next;
       });
-      setDraft(null); // 手動編集した下書きをリセットして古い文の二重送信を防止
+      if (failed === 0) {
+        setDraft(null); // 全件成功時のみ手動編集した文面をリセット（失敗で中断時は編集内容を保持）
+      }
     }
 
     if (failed > 0) {
@@ -365,20 +374,17 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     }
   };
 
-  // 回答を反映して完了（選択中グループの変更があれば保存。予定画面へは切り替えずそのまま留まる）
+  // 回答を反映して完了（選択中グループの全タブの変更をまとめて保存。予定画面へは切り替えずそのまま留まる）
   const handleDone = async () => {
-    if (hasTargetChanges) {
+    if (hasGroupAllChanges) {
       setSaving(true);
       try {
-        const count = targetModifiedItems.length;
-        const { failed } = await commitItems(targetModifiedItems);
-        if (failed === 0) {
-          if (draftGroupStatus.otherDraftGroupNames.length > 0) {
-            toast(`${count}件の回答を反映しました（「${draftGroupStatus.otherDraftGroupNames.join('、')}」の下書きが残っています）`);
-          } else {
-            toast(`${count}件の回答を反映しました（グループには送信されていません）`);
-          }
-        }
+        await runDoneWorkflow({
+          groupAllModifiedItems,
+          commitItems,
+          otherDraftGroupNames: draftGroupStatus.otherDraftGroupNames,
+          onSuccess: (msg) => toast(msg),
+        });
       } catch (e) {
         toast(e instanceof Error ? e.message : '保存に失敗しました', true);
       } finally {
@@ -594,15 +600,20 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
 
       {!isSpecific && displayed.length > 0 && (
         <>
+          {hasGroupAllChanges && (
+            <p class="note" style={{ textAlign: 'center', marginBottom: 8, color: 'var(--color-primary, #2563eb)', fontWeight: 600 }}>
+              ※まだ保存されていません。「完了」または「グループに伝える」を押して回答を反映してください
+            </p>
+          )}
           <button
-            class={`btn ${hasTargetChanges ? 'primary' : 'ghost'} block rsvp-done-btn`}
+            class={`btn ${hasGroupAllChanges ? 'primary' : 'ghost'} block rsvp-done-btn`}
             disabled={saving}
             onClick={handleDone}
           >
             {saving
               ? '保存中...'
-              : hasTargetChanges
-              ? `回答を反映して完了（${targetModifiedItems.length}件）`
+              : hasGroupAllChanges
+              ? `回答を反映して完了（${groupAllModifiedItems.length}件）`
               : '完了'}
           </button>
           <p class="note rsvp-tell-note" style={{ textAlign: 'center', marginTop: 8 }}>

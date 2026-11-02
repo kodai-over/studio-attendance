@@ -13,6 +13,7 @@ import {
   processCommitItems,
   pruneStaleDrafts,
   recordSpecificChange,
+  runDoneWorkflow,
   runTellWorkflow,
   stageAnswer,
 } from '../src/pages/answerLogic';
@@ -187,6 +188,10 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       // 非表示の項目は除外される
       const filteredPartial = filterTargetModifiedItems(items, new Set(['p2']), 'group-b');
       expect(filteredPartial.map((x) => x.id)).toEqual(['p2']);
+
+      // displayedIds が null の場合、表示タブに関係なく全項目からグループ対象を抽出する（「完了」ボタン用）
+      const allTabsGroupA = filterTargetModifiedItems(items, null, 'group-a', 'user-me');
+      expect(allTabsGroupA.map((x) => x.id)).toEqual(['p1', 'p-none', 'p-other-mine']);
     });
   });
 
@@ -414,9 +419,9 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       expect(draft?.trim().length).toBeGreaterThan(0);
     });
 
-    it('commitItems で一部保存に失敗した場合（failed > 0）、sendToChat へ進まず送信が中断される', async () => {
+    it('commitItems で一部保存に失敗した場合（failed > 0）、sendToChat へ進まず送信が中断され、手動編集した draft も破棄されず維持される', async () => {
       const sendToChatMock = vi.fn();
-      let draft: string | null = null;
+      let draft: string | null = 'ユーザーが手動編集した送信文';
       let staged = new Map([['p1', '行く' as const], ['p2', '行かない' as const]]);
 
       const simulateHandleTellWithPartialFailure = async () => {
@@ -433,6 +438,10 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
 
         if (succeededIds.length > 0) {
           staged = cleanupAfterCommit(staged, succeededIds);
+          // 失敗が 0 件のときのみ手動編集下書きをリセットする
+          if (failed === 0) {
+            draft = null;
+          }
         }
 
         if (failed > 0) {
@@ -452,6 +461,9 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       // p1 のみ下書きから消え、p2 は下書きに残る（再試行可能）
       expect(staged.has('p1')).toBe(false);
       expect(staged.has('p2')).toBe(true);
+
+      // 手動編集した文面がリセットされずに保持されている
+      expect(draft).toBe('ユーザーが手動編集した送信文');
     });
   });
 
@@ -611,6 +623,75 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
           send,
         }),
       ).rejects.toThrow('LINE送信エラー');
+    });
+  });
+
+  describe('runDoneWorkflow (回答を反映して完了の画面連携ロジック)', () => {
+    it('変更項目がない場合、noop を返して保存処理を行わない', async () => {
+      const commitItems = vi.fn();
+      const onSuccess = vi.fn();
+
+      const result = await runDoneWorkflow({
+        groupAllModifiedItems: [],
+        commitItems,
+        otherDraftGroupNames: [],
+        onSuccess,
+      });
+
+      expect(result).toBe('noop');
+      expect(commitItems).not.toHaveBeenCalled();
+      expect(onSuccess).not.toHaveBeenCalled();
+    });
+
+    it('保存処理で失敗（failed > 0）した場合、onSuccess を呼ばず failed を返す', async () => {
+      const commitItems = vi.fn().mockResolvedValue({ succeeded: 1, failed: 1 });
+      const onSuccess = vi.fn();
+
+      const result = await runDoneWorkflow({
+        groupAllModifiedItems: [{ id: 'p1', answer: '行く' as const, practice: mockPractice1 }],
+        commitItems,
+        otherDraftGroupNames: [],
+        onSuccess,
+      });
+
+      expect(result).toBe('failed');
+      expect(commitItems).toHaveBeenCalledTimes(1);
+      expect(onSuccess).not.toHaveBeenCalled();
+    });
+
+    it('全件成功し他グループの下書きがない場合、通常メッセージで onSuccess が呼ばれ saved を返す', async () => {
+      const commitItems = vi.fn().mockResolvedValue({ succeeded: 2, failed: 0 });
+      const onSuccess = vi.fn();
+
+      const result = await runDoneWorkflow({
+        groupAllModifiedItems: [
+          { id: 'p1', answer: '行く' as const, practice: mockPractice1 },
+          { id: 'p2', answer: '行かない' as const, practice: mockPractice2 },
+        ],
+        commitItems,
+        otherDraftGroupNames: [],
+        onSuccess,
+      });
+
+      expect(result).toBe('saved');
+      expect(commitItems).toHaveBeenCalledTimes(1);
+      expect(onSuccess).toHaveBeenCalledWith('2件の回答を反映しました（グループには送信されていません）');
+    });
+
+    it('全件成功し他グループの下書きが残っている場合、他グループ名を併記して onSuccess が呼ばれる', async () => {
+      const commitItems = vi.fn().mockResolvedValue({ succeeded: 1, failed: 0 });
+      const onSuccess = vi.fn();
+
+      const result = await runDoneWorkflow({
+        groupAllModifiedItems: [{ id: 'p1', answer: '行く' as const, practice: mockPractice1 }],
+        commitItems,
+        otherDraftGroupNames: ['チームB'],
+        onSuccess,
+      });
+
+      expect(result).toBe('saved');
+      expect(commitItems).toHaveBeenCalledTimes(1);
+      expect(onSuccess).toHaveBeenCalledWith('1件の回答を反映しました（「チームB」の下書きが残っています）');
     });
   });
 

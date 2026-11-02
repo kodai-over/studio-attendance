@@ -258,17 +258,46 @@ export function filterGroupPractices(
 }
 
 /**
- * 表示中かつ選択中グループに合致する変更項目のみをフィルタリングする。
+ * 「回答を反映して完了」のワークフロー。
+ * 選択中グループの変更項目（全タブ分）を保存し、完了時のトースト文面を決定する。
+ */
+export async function runDoneWorkflow({
+  groupAllModifiedItems,
+  commitItems,
+  otherDraftGroupNames,
+  onSuccess,
+}: {
+  groupAllModifiedItems: ModifiedItem[];
+  commitItems: (items: ModifiedItem[]) => Promise<{ succeeded: number; failed: number }>;
+  otherDraftGroupNames: string[];
+  onSuccess: (message: string) => void;
+}): Promise<'saved' | 'failed' | 'noop'> {
+  if (groupAllModifiedItems.length === 0) return 'noop';
+  const count = groupAllModifiedItems.length;
+  const { failed } = await commitItems(groupAllModifiedItems);
+  if (failed > 0) return 'failed';
+
+  const message =
+    otherDraftGroupNames.length > 0
+      ? `${count}件の回答を反映しました（「${otherDraftGroupNames.join('、')}」の下書きが残っています）`
+      : `${count}件の回答を反映しました（グループには送信されていません）`;
+  onSuccess(message);
+  return 'saved';
+}
+
+/**
+ * 選択中グループに合致する変更項目をフィルタリングする。
+ * displayedIds が指定されている場合は表示中タブの項目に絞り込み、省略時は全タブの項目を対象とする。
  * groups が空の予約情報や自分が予約者の予約情報はどのグループ選択時にも対象に含める。
  */
 export function filterTargetModifiedItems(
   modifiedItems: ModifiedItem[],
-  displayedIds: Set<string>,
+  displayedIds: Set<string> | null | undefined,
   selectedGroup: string,
   myUserId?: string,
 ): ModifiedItem[] {
   return modifiedItems.filter((item) => {
-    if (!displayedIds.has(item.id)) return false;
+    if (displayedIds && !displayedIds.has(item.id)) return false;
     if (!selectedGroup || item.practice.groups.length === 0) return true;
     if (item.practice.groups.includes(selectedGroup)) return true;
     if (myUserId && item.practice.booker === myUserId) return true;
