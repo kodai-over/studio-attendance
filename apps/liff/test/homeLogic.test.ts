@@ -486,8 +486,8 @@ describe('ホーム画面ロジック（homeLogic）', () => {
       expect(statusAllRead.totalBadgeCount).toBe(0);
     });
 
-    it('CHANGELOG.md から自動生成されたリリースノートに最新バージョン v1.4.0〜v1.0.0 が含まれ、** などの記号や空項目が残らず、見出し付き入れ子箇条書きがすべて親見出しを引き継ぐ', () => {
-      expect(RELEASE_NOTES[0].version).toBe('v1.4.0');
+    it('CHANGELOG.md から自動生成されたリリースノートに最新バージョン v1.5.0〜v1.0.0 が含まれ、** などの記号や空項目が残らず、見出し付き入れ子箇条書きがすべて親見出しを引き継ぐ', () => {
+      expect(RELEASE_NOTES[0].version).toBe('v1.5.0');
       expect(RELEASE_NOTES[RELEASE_NOTES.length - 1].version).toBe('v1.0.0');
       for (const rel of RELEASE_NOTES) {
         expect(rel.version).toMatch(/^v\d+\.\d+\.\d+$/);
