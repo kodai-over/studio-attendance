@@ -347,7 +347,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
       )}
 
       {fresh && displayed.length > 0 && (
-        <section style={{ marginTop: 20 }}>
+        <section style={{ marginTop: 28 }}>
           <div class="sec-head">
             <Icon name="chat" size={18} />
             グループに伝える
@@ -355,7 +355,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
 
           {/* メッセージ送信先グループの選択（全表示かつ所属グループが複数の場合） */}
           {userGroups.length > 1 && selectedGroup === 'all' && (
-            <div class="target-group-field">
+            <div class="target-group-field" style={{ marginBottom: 14 }}>
               <span class="target-group-label">送り先グループ:</span>
               <select
                 class="target-group-select"
@@ -378,10 +378,12 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
 
           {chat === 'outside' ? (
             <>
-              <p class="note">グループのトークから開くと、回答をまとめてグループに送信できます</p>
+              <p class="note" style={{ lineHeight: 1.5 }}>
+                グループのトークから開くと、回答をまとめてグループに送信できます
+              </p>
               <button
                 class="btn ghost block"
-                style={{ marginTop: 8 }}
+                style={{ marginTop: 14 }}
                 disabled={!text.trim() || saving || !fresh || (activeTab === 'answered' && !hasTargetChanges)}
                 onClick={handleTell}
               >
@@ -390,7 +392,9 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
               </button>
             </>
           ) : chat === 'noScope' ? (
-            <p class="note">回答は記録されます。グループに送る設定がまだのため、伝えられません（管理者に知らせてください）</p>
+            <p class="note" style={{ lineHeight: 1.5 }}>
+              回答は記録されます。グループに送る設定がまだのため、伝えられません（管理者に知らせてください）
+            </p>
           ) : (
             <>
               <label class="field">
@@ -410,7 +414,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
                 />
               </label>
               {draft != null && draft !== report && (
-                <button class="btn ghost block" style={{ marginBottom: 8 }} onClick={() => setDraft(null)} disabled={saving}>
+                <button class="btn ghost block" style={{ marginBottom: 12 }} onClick={() => setDraft(null)} disabled={saving}>
                   回答から作り直す
                 </button>
               )}
@@ -422,7 +426,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
                 <Icon name="send" size={18} />
                 {hasTargetChanges ? `回答を反映してグループに伝える（${targetModifiedItems.length}件）` : 'グループに伝える'}
               </button>
-              <p class="note">
+              <p class="note" style={{ marginTop: 14, lineHeight: 1.5 }}>
                 押すと、回答が反映され、あなたの発言として開いているトークに送ります。
                 {userGroups.length > 1 && '（他のグループにも伝えたいときは、文をコピーしてそのトークに貼り付けてください）'}
               </p>
@@ -434,7 +438,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
       {displayed.length > 0 && (
         <button
           class={`btn ${hasChanges ? 'primary' : 'ghost'} block`}
-          style={{ marginTop: 16 }}
+          style={{ marginTop: 24, marginBottom: 28 }}
           disabled={saving}
           onClick={handleDone}
         >

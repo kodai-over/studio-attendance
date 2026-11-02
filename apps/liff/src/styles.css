@@ -131,8 +131,8 @@ a {
 .app {
   max-width: 560px;
   margin: 0 auto;
-  /* 下のスリムなナビに最後の行が隠れないよう、下に余白をとる */
-  padding: 0 var(--pad-x) calc(64px + env(safe-area-inset-bottom));
+  /* 下のナビに最後の行やボタンが隠れないよう、下に十分な余白をとる */
+  padding: 0 var(--pad-x) calc(88px + env(safe-area-inset-bottom));
 }
 
 .icon {
@@ -1781,16 +1781,34 @@ details > summary {
   margin-bottom: 12px;
 }
 .feedback-form .muted {
-  margin: 10px 0 0;
+  margin: 14px 0 0;
   text-align: center;
+  font-size: 12px;
 }
 .note {
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   color: var(--sub);
   font-size: 13px;
+  line-height: 1.5;
 }
 .sec-head + .note {
   margin-top: 0;
+}
+/* ボタンと補足文章（.note / .muted / p）の間の十分な余白 */
+.btn + .note,
+.btn-group + .note,
+button + .note,
+.btn + .muted,
+button + .muted {
+  margin-top: 14px;
+}
+.note + .btn,
+.note + button,
+.note + .btn-group {
+  margin-top: 14px;
+}
+.btn.block + .btn.block {
+  margin-top: 10px;
 }
 /* 「グループに伝える」で送る文の見本 */
 .report {
@@ -2329,6 +2347,30 @@ details > summary {
   background: var(--paper);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
+}
+.detail-rsvp-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.detail-rsvp-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* ---------- 予定一覧の最下部案内 ---------- */
+.list-rsvp-note {
+  text-align: center;
+  margin: 20px auto 28px;
+  padding: 0 16px;
+  font-size: 12px;
+  line-height: 1.6;
+  word-break: break-all;
+  max-width: 480px;
 }
 
 /* ---------- グループ切り替えピル（RSVP） ---------- */

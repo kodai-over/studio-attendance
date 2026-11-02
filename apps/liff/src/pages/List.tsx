@@ -83,7 +83,7 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
               <PracticeCard key={v.practice.id} v={v} />
             ))}
           </div>
-          <p class="note" style={{ textAlign: 'center', marginTop: 16 }}>
+          <p class="note list-rsvp-note">
             ※出欠の回答や変更は、メニューの「RSVP」からまとめて行えます
           </p>
         </>

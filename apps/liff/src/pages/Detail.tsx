@@ -130,8 +130,8 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
           <PracticePass v={v} />
 
           <div class="detail-rsvp-box">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div class="detail-rsvp-row">
+              <div class="detail-rsvp-status">
                 <span class="muted" style={{ fontSize: '0.85rem' }}>あなたの回答:</span>
                 <MyAnswerBadge answer={v.myAnswer} />
               </div>
@@ -139,17 +139,17 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
                 <button
                   class="btn small primary"
                   onClick={() => go(`/answer?r=${encodeURIComponent(p.id)}`)}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}
                 >
                   <Icon name="check" size={14} />
-                  <span>RSVPで回答・変更</span>
+                  <span>{v.myAnswer == null ? 'RSVPで回答' : 'RSVPで変更'}</span>
                 </button>
               )}
             </div>
           </div>
 
           {going && (
-            <div ref={calRef} class="cal-inline">
+            <div ref={calRef} class="cal-inline" style={{ marginBottom: 20 }}>
               {calendar}
             </div>
           )}
@@ -172,7 +172,7 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
 
           {/* 古いお知らせのリンクなどから開いた予約者が、直す・消す場所に迷わないように */}
           {v.canEdit && (
-            <p class="note" style={{ marginTop: 16 }}>
+            <p class="note" style={{ marginTop: 20 }}>
               編集・削除は{' '}
               <a href={`#/recruit/${encodeURIComponent(p.id)}`}>「募集」のこの予約情報</a>
               から
@@ -335,7 +335,7 @@ export function EditForm({
           </button>
           <button
             class="btn danger block"
-            style={{ marginTop: 8 }}
+            style={{ marginTop: 12 }}
             disabled={busy}
             onClick={() => setConfirming(true)}
           >
