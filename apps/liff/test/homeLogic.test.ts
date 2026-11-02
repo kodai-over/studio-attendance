@@ -495,6 +495,52 @@ describe('ホーム画面ロジック（homeLogic）', () => {
       expect(formatNoticeTime('invalid')).toBe('');
     });
 
+    it('壊れたスナップショット（answers 欠落や不正 JSON）が localStorage にあっても例外にならず安全に同期できる', () => {
+      const me = createMockMe();
+      const p1 = createMockPracticeView({
+        id: 'p1',
+        booker: me.member.userId,
+        going: [createAttendee('U2', 'メンバー2', '行く')],
+      });
+
+      // answers プロパティが存在しない壊れたスナップショット
+      localStorage.setItem(
+        'pb:practiceSnapshots:Ume_self',
+        JSON.stringify({
+          p1: {
+            status: '募集中',
+            date: '2026-11-10',
+            start: '18:00',
+            end: '21:00',
+            studio: 'worcle',
+            room: '202',
+            fee: 4400,
+            // answers が欠落している
+          },
+        }),
+      );
+
+      // syncPracticeNotices が TypeError を起こさずに安全に実行完了すること
+      expect(() => {
+        syncPracticeNotices([p1], me);
+      }).not.toThrow();
+
+      // 不正な JSON 文字列が localStorage にある場合
+      localStorage.setItem('pb:practiceSnapshots:Ume_self', '{ invalid json syntax');
+      expect(() => {
+        syncPracticeNotices([p1], me);
+      }).not.toThrow();
+    });
+
+    it('syncPracticeNotices は予期せぬ引数や例外時にも例外を外に漏らさず空配列を返す（アプリ起動時の安全性を保証）', () => {
+      const me = createMockMe();
+      // practices に null や undefined が紛れ込んだ場合でもクラッシュせず空配列を返す
+      expect(() => {
+        const result = syncPracticeNotices(null as unknown as PracticeView[], me);
+        expect(result).toEqual([]);
+      }).not.toThrow();
+    });
+
     it('resolveActiveNavKey が各画面パスに対して正しい下部ナビのタブキーを返す（/feedback や /admin はアカウント扱い）', () => {
       expect(resolveActiveNavKey(['home'])).toBe('home');
       expect(resolveActiveNavKey([])).toBe('');

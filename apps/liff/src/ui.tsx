@@ -1,5 +1,5 @@
 import { createContext, type ComponentChildren } from 'preact';
-import { useCallback, useContext, useEffect, useState } from 'preact/hooks';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'preact/hooks';
 import { canRegister, computeCancelDeadline, isActive, isHoliday, isPastPractice, labelDate, shouldNotifyPracticeCancellation, toJstDate, toJstTime, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
 import { getUnansweredSummary } from './pages/answerLogic';
 import { HOME_READ_EVENT, getHomeUnreadStatus } from './pages/homeLogic';
@@ -274,7 +274,7 @@ export function resolveActiveNavKey(path: string[]): string {
 export function NavBar() {
   const { me, practices } = useApp();
   const { path } = useRoute();
-  const [, setReadTick] = useState(0);
+  const [readTick, setReadTick] = useState(0);
 
   useEffect(() => {
     const onRead = () => setReadTick((x) => x + 1);
@@ -282,11 +282,14 @@ export function NavBar() {
     return () => window.removeEventListener(HOME_READ_EVENT, onRead);
   }, []);
 
-  const now = new Date();
-  const today = toJstDate(now);
-  const currentTime = toJstTime(now);
-  const { totalCount: todoCount } = getUnansweredSummary(practices, me, today, currentTime);
-  const { totalBadgeCount: homeBadgeCount } = getHomeUnreadStatus(practices, me, today, currentTime);
+  const { todoCount, homeBadgeCount } = useMemo(() => {
+    const now = new Date();
+    const today = toJstDate(now);
+    const currentTime = toJstTime(now);
+    const { totalCount } = getUnansweredSummary(practices, me, today, currentTime);
+    const { totalBadgeCount } = getHomeUnreadStatus(practices, me, today, currentTime);
+    return { todoCount: totalCount, homeBadgeCount: totalBadgeCount };
+  }, [practices, me, readTick]);
 
   const items: { to: string; key: string; icon: IconName; label: string; badge?: number }[] = [
     { to: '/home', key: 'home', icon: 'home', label: 'ホーム', badge: homeBadgeCount },

@@ -122,7 +122,7 @@ export function HomePage() {
                   {labelDate(nextGoing.practice.date)} {nextGoing.practice.start}–{nextGoing.practice.end}
                 </span>
               </div>
-              <span class="gh-pill-badge">参加確定</span>
+              <span class="gh-pill-badge">行く</span>
             </div>
             <p class="gh-pinned-body">{place(nextGoing.practice)}</p>
             <div class="gh-pinned-footer">
@@ -161,7 +161,8 @@ export function HomePage() {
             },
             {
               key: 'releases',
-              label: unreadStatus.hasUnreadReleaseNote ? `リリースノート ●` : 'リリースノート',
+              label: 'リリースノート',
+              count: unreadStatus.hasUnreadReleaseNote ? 1 : undefined,
             },
           ]}
         />
@@ -226,7 +227,7 @@ export function HomePage() {
                     <div class="gh-timeline-header">
                       <div class="gh-release-title-row">
                         <span class="gh-release-version">{rel.version}</span>
-                        {isLatest && <span class="gh-pill-badge latest">Latest</span>}
+                        {isLatest && <span class="gh-pill-badge latest">最新</span>}
                       </div>
                       <span class="gh-timeline-time">{rel.date}</span>
                     </div>

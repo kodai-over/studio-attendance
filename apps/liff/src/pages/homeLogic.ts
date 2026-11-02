@@ -220,6 +220,23 @@ function toSnapshot(v: PracticeView): PracticeSnapshot {
   };
 }
 
+function isValidSnapshot(x: unknown): x is PracticeSnapshot {
+  if (!x || typeof x !== 'object' || Array.isArray(x)) return false;
+  const s = x as Record<string, unknown>;
+  return (
+    typeof s.status === 'string' &&
+    typeof s.date === 'string' &&
+    typeof s.start === 'string' &&
+    typeof s.end === 'string' &&
+    typeof s.studio === 'string' &&
+    typeof s.room === 'string' &&
+    typeof s.fee === 'number' &&
+    s.answers != null &&
+    typeof s.answers === 'object' &&
+    !Array.isArray(s.answers)
+  );
+}
+
 function loadSnapshots(ownerKey: string): Record<string, PracticeSnapshot> | null {
   try {
     if (typeof localStorage === 'undefined' || typeof localStorage.getItem !== 'function') return null;
@@ -227,7 +244,13 @@ function loadSnapshots(ownerKey: string): Record<string, PracticeSnapshot> | nul
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-    return parsed as Record<string, PracticeSnapshot>;
+    const validMap: Record<string, PracticeSnapshot> = {};
+    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+      if (isValidSnapshot(v)) {
+        validMap[k] = v;
+      }
+    }
+    return validMap;
   } catch {
     return null;
   }
@@ -250,11 +273,15 @@ export function updatePracticeSnapshot(
   v: PracticeView,
   me: Pick<MeView, 'member' | 'actAs'>,
 ): void {
-  const ownerKey = getDraftOwnerKey(me);
-  const prevMap = loadSnapshots(ownerKey);
-  if (!prevMap) return;
-  prevMap[v.practice.id] = toSnapshot(v);
-  saveSnapshots(ownerKey, prevMap);
+  try {
+    const ownerKey = getDraftOwnerKey(me);
+    const prevMap = loadSnapshots(ownerKey);
+    if (!prevMap) return;
+    prevMap[v.practice.id] = toSnapshot(v);
+    saveSnapshots(ownerKey, prevMap);
+  } catch {
+    /* 失敗しても本体操作を妨げない */
+  }
 }
 
 function isValidStoredNotice(x: unknown): x is HomeNoticeItem {
@@ -312,123 +339,128 @@ export function syncPracticeNotices(
   me: MeView,
   nowIso = new Date().toISOString(),
 ): HomeNoticeItem[] {
-  const ownerKey = getDraftOwnerKey(me);
-  const prevMap = loadSnapshots(ownerKey);
-  const stored = loadStoredNotices(ownerKey);
-  const nextMap: Record<string, PracticeSnapshot> = {};
-  const newlyDetected: HomeNoticeItem[] = [];
+  try {
+    const ownerKey = getDraftOwnerKey(me);
+    const prevMap = loadSnapshots(ownerKey);
+    const stored = loadStoredNotices(ownerKey);
+    const nextMap: Record<string, PracticeSnapshot> = {};
+    const newlyDetected: HomeNoticeItem[] = [];
 
-  // 初回起動時（既読時刻が未保存 かつ 前回スナップショットなし）は、過去の全回答が未読にならないようベースライン既読時刻を設定する
-  if (!prevMap && !getNoticeReadAt(me)) {
-    let latestExisting = nowIso;
+    // 初回起動時（既読時刻が未保存 かつ 前回スナップショットなし）は、過去の全回答が未読にならないようベースライン既読時刻を設定する
+    if (!prevMap && !getNoticeReadAt(me)) {
+      let latestExisting = nowIso;
+      for (const v of practices) {
+        if (v.practice.createdAt > latestExisting) latestExisting = v.practice.createdAt;
+        for (const a of collectAttendees(v)) {
+          if (a.updatedAt && a.updatedAt > latestExisting) latestExisting = a.updatedAt;
+        }
+      }
+      try {
+        if (typeof localStorage !== 'undefined' && typeof localStorage.setItem === 'function') {
+          localStorage.setItem(NOTICE_READ_AT_KEY_PREFIX + ownerKey, latestExisting);
+        }
+      } catch {
+        /* 保存できなくても動作する */
+      }
+    }
+
     for (const v of practices) {
-      if (v.practice.createdAt > latestExisting) latestExisting = v.practice.createdAt;
-      for (const a of collectAttendees(v)) {
-        if (a.updatedAt && a.updatedAt > latestExisting) latestExisting = a.updatedAt;
-      }
-    }
-    try {
-      if (typeof localStorage !== 'undefined' && typeof localStorage.setItem === 'function') {
-        localStorage.setItem(NOTICE_READ_AT_KEY_PREFIX + ownerKey, latestExisting);
-      }
-    } catch {
-      /* 保存できなくても動作する */
-    }
-  }
+      const p = v.practice;
+      const snap = toSnapshot(v);
+      nextMap[p.id] = snap;
 
-  for (const v of practices) {
-    const p = v.practice;
-    const snap = toSnapshot(v);
-    nextMap[p.id] = snap;
+      if (!prevMap) continue;
+      const prev = prevMap[p.id];
+      if (!prev) continue;
 
-    if (!prevMap) continue;
-    const prev = prevMap[p.id];
-    if (!prev) continue;
+      const pLabel = `${labelDate(p.date)} ${p.start}–${p.end}`;
 
-    const pLabel = `${labelDate(p.date)} ${p.start}–${p.end}`;
-
-    // 1. 自分が関係する予約情報の変更・中止の検知（予約者自身が変更・中止した予約情報は自分宛てに通知しない）
-    if (p.booker !== me.member.userId && isRelatedForNotice(v, me)) {
-      if (prev.status !== '中止' && p.status === '中止') {
-        newlyDetected.push({
-          id: `cancel:${p.id}:${nowIso}`,
-          kind: 'practice_canceled',
-          practiceId: p.id,
-          updatedAt: nowIso,
-          title: `${labelDate(p.date)} の予約情報が中止になりました`,
-          detail: `${pLabel} ${placeText(p)}`,
-        });
-      } else {
-        const changes: string[] = [];
-        if (prev.date !== p.date) {
-          changes.push(`日付: ${labelDate(prev.date)} → ${labelDate(p.date)}`);
-        }
-        if (prev.start !== p.start || prev.end !== p.end) {
-          changes.push(`時間: ${prev.start}–${prev.end} → ${p.start}–${p.end}`);
-        }
-        if (prev.studio !== p.studio || prev.room !== p.room) {
-          changes.push(`場所: ${placeText(prev)} → ${placeText(p)}`);
-        }
-        if (prev.fee !== p.fee) {
-          changes.push(`スタジオ代: ${yen(prev.fee)} → ${yen(p.fee)}`);
-        }
-        if ((prev.memo ?? '') !== (p.memo ?? '')) {
-          changes.push('メモ更新');
-        }
-        if (changes.length > 0) {
+      // 1. 自分が関係する予約情報の変更・中止の検知（予約者自身が変更・中止した予約情報は自分宛てに通知しない）
+      if (p.booker !== me.member.userId && isRelatedForNotice(v, me)) {
+        if (prev.status !== '中止' && p.status === '中止') {
           newlyDetected.push({
-            id: `change:${p.id}:${nowIso}`,
-            kind: 'practice_changed',
+            id: `cancel:${p.id}:${nowIso}`,
+            kind: 'practice_canceled',
             practiceId: p.id,
             updatedAt: nowIso,
-            title: `${labelDate(p.date)} の予約情報が変更されました`,
-            detail: `${changes.join(' / ')}（${placeText(p)}）`,
-          });
-        }
-      }
-    }
-
-    // 2. 自分が予約者の予約情報に対するメンバーの回答変更の検知
-    if (p.booker === me.member.userId) {
-      for (const a of collectAttendees(v)) {
-        if (a.participant === me.member.userId) continue;
-        const prevAtt = prev.answers[a.participant];
-        if (prevAtt && prevAtt.answer !== a.answer) {
-          const ts = a.updatedAt ?? nowIso;
-          newlyDetected.push({
-            id: `ans:${p.id}:${a.participant}:${ts}`,
-            kind: 'answer',
-            practiceId: p.id,
-            participant: a.participant,
-            updatedAt: ts,
-            title: `${a.name}さんが回答を変更しました（${ANSWER_UI_TEXT[prevAtt.answer]} → ${ANSWER_UI_TEXT[a.answer]}）`,
+            title: `${labelDate(p.date)} の予約情報が中止になりました`,
             detail: `${pLabel} ${placeText(p)}`,
-            answer: a.answer,
           });
+        } else {
+          const changes: string[] = [];
+          if (prev.date !== p.date) {
+            changes.push(`日付: ${labelDate(prev.date)} → ${labelDate(p.date)}`);
+          }
+          if (prev.start !== p.start || prev.end !== p.end) {
+            changes.push(`時間: ${prev.start}–${prev.end} → ${p.start}–${p.end}`);
+          }
+          if (prev.studio !== p.studio || prev.room !== p.room) {
+            changes.push(`場所: ${placeText(prev)} → ${placeText(p)}`);
+          }
+          if (prev.fee !== p.fee) {
+            changes.push(`スタジオ代: ${yen(prev.fee)} → ${yen(p.fee)}`);
+          }
+          if ((prev.memo ?? '') !== (p.memo ?? '')) {
+            changes.push('メモ更新');
+          }
+          if (changes.length > 0) {
+            newlyDetected.push({
+              id: `change:${p.id}:${nowIso}`,
+              kind: 'practice_changed',
+              practiceId: p.id,
+              updatedAt: nowIso,
+              title: `${labelDate(p.date)} の予約情報が変更されました`,
+              detail: `${changes.join(' / ')}（${placeText(p)}）`,
+            });
+          }
+        }
+      }
+
+      // 2. 自分が予約者の予約情報に対するメンバーの回答変更の検知
+      if (p.booker === me.member.userId) {
+        for (const a of collectAttendees(v)) {
+          if (a.participant === me.member.userId) continue;
+          const prevAtt = prev.answers?.[a.participant];
+          if (prevAtt && prevAtt.answer !== a.answer) {
+            const ts = a.updatedAt ?? nowIso;
+            newlyDetected.push({
+              id: `ans:${p.id}:${a.participant}:${ts}`,
+              kind: 'answer',
+              practiceId: p.id,
+              participant: a.participant,
+              updatedAt: ts,
+              title: `${a.name}さんが回答を変更しました（${ANSWER_UI_TEXT[prevAtt.answer]} → ${ANSWER_UI_TEXT[a.answer]}）`,
+              detail: `${pLabel} ${placeText(p)}`,
+              answer: a.answer,
+            });
+          }
         }
       }
     }
-  }
 
-  saveSnapshots(ownerKey, nextMap);
+    saveSnapshots(ownerKey, nextMap);
 
-  if (newlyDetected.length > 0) {
-    const byId = new Map<string, HomeNoticeItem>();
-    const seenParticipantKey = new Set<string>();
-    for (const item of [...newlyDetected, ...stored]) {
-      if (item.kind === 'answer' && item.participant) {
-        const pKey = `${item.practiceId}\0${item.participant}`;
-        if (seenParticipantKey.has(pKey)) continue;
-        seenParticipantKey.add(pKey);
+    if (newlyDetected.length > 0) {
+      const byId = new Map<string, HomeNoticeItem>();
+      const seenParticipantKey = new Set<string>();
+      for (const item of [...newlyDetected, ...stored]) {
+        if (item.kind === 'answer' && item.participant) {
+          const pKey = `${item.practiceId}\0${item.participant}`;
+          if (seenParticipantKey.has(pKey)) continue;
+          seenParticipantKey.add(pKey);
+        }
+        if (!byId.has(item.id)) byId.set(item.id, item);
       }
-      if (!byId.has(item.id)) byId.set(item.id, item);
+      const merged = Array.from(byId.values()).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      saveStoredNotices(ownerKey, merged);
+      return merged;
     }
-    const merged = Array.from(byId.values()).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-    saveStoredNotices(ownerKey, merged);
-    return merged;
-  }
 
-  return stored;
+    return stored;
+  } catch {
+    // お知らせは付加機能のため、localStorage破損や例外時でも本体の起動・一覧取得を巻き込まない
+    return [];
+  }
 }
 
 /**

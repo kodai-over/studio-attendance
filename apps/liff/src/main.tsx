@@ -80,7 +80,11 @@ function App() {
     const home = await api('home', entry.current);
     // ステート更新関数の外で保護対象IDの算出と完了済みエントリの掃除を行う
     const keepIds = syncTracker.current.prepareMerge(fetchStartedAt);
-    syncPracticeNotices(home.practices, home.me);
+    try {
+      syncPracticeNotices(home.practices, home.me);
+    } catch (err) {
+      console.warn('syncPracticeNotices error in loadHome:', err);
+    }
     setMe(home.me);
     setPracticesState((cur) => {
       const list = mergePracticesWithKeep(home.practices, cur?.list, keepIds);
