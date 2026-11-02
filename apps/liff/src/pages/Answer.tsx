@@ -155,6 +155,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
         if (!window.confirm('回答の変更が反映されていません。破棄して移動しますか？')) {
           return false;
         }
+        hasAnyChangesRef.current = false;
         clearGlobalDrafts();
       }
       return true;
@@ -196,14 +197,32 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
-  // 個別の回答変更（現在のタブのドラフトおよび globalDrafts を更新）
-  const handleStageAnswer = (id: string, a: Answer) => {
+  // 個別の回答変更（特定予約指定時は即時保存、通常画面ではドラフト更新）
+  const handleStageAnswer = async (id: string, a: Answer) => {
     const original = list?.find((x) => x.practice.id === id);
-    const key = isSpecific ? 'specific' : subTab;
-    const targetMap = isSpecific ? specificStaged : subTab === 'unanswered' ? unansweredStaged : answeredStaged;
-    const next = stageAnswer(targetMap, id, a, original ? original.myAnswer : null);
-    globalDrafts[key] = next;
-    setCurrentStaged(next);
+    if (isSpecific) {
+      setSaving(true);
+      try {
+        const updated = await api('rsvp', { id, answer: a });
+        updatePractice(updated);
+        setSpecificStaged((prev) => {
+          const next = new Map(prev);
+          next.set(id, a);
+          return next;
+        });
+        toast('回答を記録しました');
+      } catch (e) {
+        toast(e instanceof Error ? e.message : '保存に失敗しました', true);
+      } finally {
+        setSaving(false);
+      }
+    } else {
+      const key = subTab;
+      const targetMap = subTab === 'unanswered' ? unansweredStaged : answeredStaged;
+      const next = stageAnswer(targetMap, id, a, original ? original.myAnswer : null);
+      globalDrafts[key] = next;
+      setCurrentStaged(next);
+    }
     setDraft(null); // 手動編集をリセットして再生成
   };
 
@@ -389,15 +408,21 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
           {/* 複数グループに所属している場合のグループ切り替え（大分類を上に配置） */}
           {userGroups.length > 1 && (
             <div class="group-filter-bar">
-              {userGroups.map((g) => (
-                <button
-                  key={g.id}
-                  class={`group-pill ${selectedGroup === g.id ? 'active' : ''}`}
-                  onClick={() => handleGroupFilterChange(g.id)}
-                >
-                  <span>{g.name}</span>
-                </button>
-              ))}
+              {userGroups.map((g) => {
+                const gCount = allTargets.filter(
+                  (v) => (v.practice.groups.length === 0 || v.practice.groups.includes(g.id)) && v.myAnswer == null,
+                ).length;
+                return (
+                  <button
+                    key={g.id}
+                    class={`group-pill ${selectedGroup === g.id ? 'active' : ''}`}
+                    onClick={() => handleGroupFilterChange(g.id)}
+                  >
+                    <span>{g.name}</span>
+                    {gCount > 0 && <span class="nav-badge" style={{ marginLeft: 6 }}>{gCount}</span>}
+                  </button>
+                );
+              })}
             </div>
           )}
 
@@ -458,7 +483,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
           {chat === 'outside' ? (
             <>
               <p class="note" style={{ lineHeight: 1.5 }}>
-                グループのトークから開くと、回答をまとめてグループに送信できます
+                グループのトークから開くと、回答をまとめてグループに伝えられます
               </p>
               <button
                 class="btn ghost block"
@@ -540,7 +565,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
         </section>
       )}
 
-      {displayed.length > 0 && (
+      {!isSpecific && displayed.length > 0 && (
         <>
           <button
             class={`btn ${hasTargetChanges ? 'primary' : 'ghost'} block rsvp-done-btn`}

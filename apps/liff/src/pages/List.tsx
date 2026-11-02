@@ -6,7 +6,7 @@ import { AvatarStack, CancelDeadlineBadge, FRESH_MS, Fee, Icon, RsvpButtons, Spi
 type Tab = 'all' | 'mine';
 const TAB_KEY = 'pb:tab';
 
-function readTab(): Tab {
+export function readTab(): Tab {
   try {
     const t = localStorage.getItem(TAB_KEY);
     return t === 'mine' ? t : 'all';
