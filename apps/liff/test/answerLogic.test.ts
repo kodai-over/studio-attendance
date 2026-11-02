@@ -12,6 +12,7 @@ import {
   getDraftGroupStatus,
   getModifiedItems,
   globalDrafts,
+  loadDraftsFromStorage,
   mergePendingTellItems,
   mergePracticesWithKeep,
   processCommitItems,
@@ -20,6 +21,7 @@ import {
   resolveKeepIds,
   runDoneWorkflow,
   runTellWorkflow,
+  saveDraftsToStorage,
   stageAnswer,
   type ModifiedItem,
 } from '../src/pages/answerLogic';
@@ -544,6 +546,41 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       expect(screenUnanswered.has('deleted')).toBe(false);
       expect(screenUnanswered.size).toBe(0);
       clearGlobalDrafts();
+    });
+
+    it('saveDraftsToStorage / loadDraftsFromStorage により、LIFF WebView を誤って閉じた後でも次回起動時に下書きが復元される', () => {
+      const store = new Map<string, string>();
+      const originalLocalStorage = globalThis.localStorage;
+      globalThis.localStorage = {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, val: string) => store.set(key, val),
+        removeItem: (key: string) => store.delete(key),
+        clear: () => store.clear(),
+        length: 0,
+        key: () => null,
+      };
+
+      try {
+        clearGlobalDrafts();
+        globalDrafts.unanswered.set('p1', '行く');
+        globalDrafts.answered.set('p2', '行かない');
+        saveDraftsToStorage();
+
+        // メモリ上の下書きを一度空にして（WebView再起動をシミュレート）、ストレージから復元
+        globalDrafts.unanswered.clear();
+        globalDrafts.answered.clear();
+        expect(globalDrafts.unanswered.size).toBe(0);
+
+        loadDraftsFromStorage();
+        expect(globalDrafts.unanswered.get('p1')).toBe('行く');
+        expect(globalDrafts.answered.get('p2')).toBe('行かない');
+
+        // clearGlobalDrafts でストレージからも消える
+        clearGlobalDrafts();
+        expect(store.has('pb:rsvpDrafts')).toBe(false);
+      } finally {
+        globalThis.localStorage = originalLocalStorage;
+      }
     });
   });
 

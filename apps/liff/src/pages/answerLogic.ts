@@ -13,8 +13,11 @@ export interface DraftStore {
   answered: StageMap;
 }
 
+const DRAFTS_STORAGE_KEY = 'pb:rsvpDrafts';
+
 /**
- * 画面切り替えやアンマウントで下書きが失われないよう、モジュールレベルで保持
+ * 画面切り替えやアンマウント、LIFF WebView の意図しないクローズでも下書きが失われないよう、
+ * モジュールレベルおよび localStorage で保持する。
  */
 export const globalDrafts: DraftStore = {
   specific: new Map(),
@@ -22,10 +25,48 @@ export const globalDrafts: DraftStore = {
   answered: new Map(),
 };
 
+export function saveDraftsToStorage(): void {
+  try {
+    if (typeof localStorage === 'undefined' || typeof localStorage.setItem !== 'function') return;
+    const unanswered = Array.from(globalDrafts.unanswered.entries());
+    const answered = Array.from(globalDrafts.answered.entries());
+    if (unanswered.length === 0 && answered.length === 0) {
+      localStorage.removeItem?.(DRAFTS_STORAGE_KEY);
+    } else {
+      localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify({ unanswered, answered }));
+    }
+  } catch {
+    /* localStorage が使えない環境でもメモリ上で動作する */
+  }
+}
+
+export function loadDraftsFromStorage(): void {
+  try {
+    if (typeof localStorage === 'undefined' || typeof localStorage.getItem !== 'function') return;
+    const raw = localStorage.getItem(DRAFTS_STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as {
+      unanswered?: [string, Answer][];
+      answered?: [string, Answer][];
+    };
+    if (Array.isArray(parsed.unanswered)) {
+      for (const [k, v] of parsed.unanswered) globalDrafts.unanswered.set(k, v);
+    }
+    if (Array.isArray(parsed.answered)) {
+      for (const [k, v] of parsed.answered) globalDrafts.answered.set(k, v);
+    }
+  } catch {
+    /* 破損データは無視 */
+  }
+}
+
+loadDraftsFromStorage();
+
 export function clearGlobalDrafts() {
   globalDrafts.specific.clear();
   globalDrafts.unanswered.clear();
   globalDrafts.answered.clear();
+  saveDraftsToStorage();
 }
 
 /**
@@ -42,6 +83,7 @@ export function pruneStaleDrafts(list: PracticeView[]): void {
       }
     }
   }
+  saveDraftsToStorage();
 }
 
 export interface SpecificChange {

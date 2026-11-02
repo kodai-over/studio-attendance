@@ -31,6 +31,7 @@ import {
   recordSpecificChange,
   runDoneWorkflow,
   runTellWorkflow,
+  saveDraftsToStorage,
   stageAnswer,
   type ModifiedItem,
   type SpecificChangeMap,
@@ -232,6 +233,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
           const targetMap = subTab === 'unanswered' ? unansweredStaged : answeredStaged;
           const next = stageAnswer(targetMap, id, a, originalAnswer);
           globalDrafts[key] = next;
+          saveDraftsToStorage();
           setCurrentStaged(next);
         },
       });
@@ -306,6 +308,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
       setAnsweredStaged((prev) => {
         const next = cleanupAfterCommit(prev, succeededIds);
         globalDrafts.answered = next;
+        saveDraftsToStorage();
         return next;
       });
       if (failed === 0) {
