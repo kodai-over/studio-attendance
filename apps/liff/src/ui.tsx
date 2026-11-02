@@ -1,6 +1,7 @@
 import { createContext, type ComponentChildren } from 'preact';
 import { useCallback, useContext, useEffect, useState } from 'preact/hooks';
 import { canRegister, computeCancelDeadline, isActive, isHoliday, isPastPractice, labelDate, shouldNotifyPracticeCancellation, toJstDate, toJstTime, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
+import { getUnansweredSummary } from './pages/answerLogic';
 import { applyTheme, getTheme, type ThemeMode } from './theme';
 
 // ---------------------------------------------------------------- ルーティング（ハッシュ）
@@ -10,11 +11,51 @@ export function parseHash(): { path: string[]; query: URLSearchParams } {
   return { path: p.split('/').filter(Boolean).map(decodeURIComponent), query: new URLSearchParams(q) };
 }
 
+export type NavigationGuard = (toPath: string) => boolean;
+let currentGuard: NavigationGuard | null = null;
+
+export function setNavigationGuard(guard: NavigationGuard | null) {
+  currentGuard = guard;
+}
+
+/**
+ * hashchange 発生時（ブラウザやLINEの「戻る」等）のナビゲーションガード判定。
+ * キャンセルされた場合は history.replaceState で履歴を増やさず・再度の hashchange を起こさずに元のハッシュへ戻す。
+ */
+export function handleHashChangeGuard(oldURL?: string): {
+  allowed: boolean;
+  parsed: { path: string[]; query: URLSearchParams };
+} {
+  const newParsed = parseHash();
+  const toPath = '/' + newParsed.path.join('/');
+  if (currentGuard && !currentGuard(toPath)) {
+    let oldHash = '#/';
+    if (oldURL) {
+      try {
+        const base = typeof location !== 'undefined' && location.href ? location.href : 'http://localhost/';
+        oldHash = new URL(oldURL, base).hash || '#/';
+      } catch {
+        const idx = oldURL.indexOf('#');
+        oldHash = idx >= 0 ? oldURL.slice(idx) : '#/';
+      }
+    }
+    if (typeof history !== 'undefined' && typeof history.replaceState === 'function') {
+      history.replaceState(null, '', oldHash);
+    } else {
+      location.hash = oldHash;
+    }
+    return { allowed: false, parsed: parseHash() };
+  }
+  return { allowed: true, parsed: newParsed };
+}
+
 export function useRoute() {
   const [route, setRoute] = useState(parseHash);
   useEffect(() => {
-    const on = () => {
-      setRoute(parseHash());
+    const on = (e: HashChangeEvent) => {
+      const { allowed, parsed } = handleHashChangeGuard(e.oldURL);
+      if (!allowed) return;
+      setRoute(parsed);
       window.scrollTo(0, 0);
     };
     window.addEventListener('hashchange', on);
@@ -24,6 +65,7 @@ export function useRoute() {
 }
 
 export const go = (path: string) => {
+  if (currentGuard && !currentGuard(path)) return;
   location.hash = path;
 };
 
@@ -39,10 +81,13 @@ interface AppState {
   /** 起動時のまとめ取得に失敗した（practicesAt が 0 のまま最新が来ない） */
   startupFailed: boolean;
   /** 一覧を置き換える。fresh なら「今取った最新」として扱う（一覧に戻っても取り直さない） */
-  /** startedAt: 取り直しを始めた時刻。そのあと回答を押した練習は、今の内容を残す */
-  setPractices(list: PracticeView[], fresh?: boolean, startedAt?: number): void;
-  /** 1件だけ差し替える（出欠や修正の結果をすぐ一覧に反映する） */
+  setPractices(list: PracticeView[], fresh?: boolean): void;
+  /** 1件だけ差し替える（回答や修正の結果をすぐ一覧に反映する） */
   updatePractice(v: PracticeView, opts?: { revert?: boolean }): void;
+  /** 回答操作中の練習をマークし、一覧の再取得で上書き・巻き戻されないよう保護する */
+  touchPractice(id: string): void;
+  /** 回答保存失敗時などに練習の保護マークを解除する */
+  untouchPractice?(id: string): void;
   /** 練習を削除する（すぐ一覧から消し、失敗したら戻す）。消せたら true */
   deletePractice(v: PracticeView, opts?: { notifyGroups?: boolean }): Promise<boolean>;
   /** 起動時と同じまとめ取得をやり直す（グループのカードから開いたときは、そのグループのメンバーとしても覚えてもらう） */
@@ -163,12 +208,32 @@ export function ThemeToggle() {
   );
 }
 
-export function TopBar({ title, back, children, showTheme }: { title?: string; back?: boolean; children?: ComponentChildren; showTheme?: boolean }) {
+export function TopBar({
+  title,
+  back,
+  onBack,
+  children,
+  showTheme,
+}: {
+  title?: string;
+  back?: boolean;
+  onBack?: () => void;
+  children?: ComponentChildren;
+  showTheme?: boolean;
+}) {
   if (!title && !back && children === undefined && !showTheme) return null;
   return (
     <header class="topbar">
       {back && (
-        <button class="back-btn" aria-label="戻る" onClick={() => (history.length > 1 ? history.back() : go('/'))}>
+        <button
+          class="back-btn"
+          aria-label="戻る"
+          onClick={() => {
+            if (onBack) onBack();
+            else if (history.length > 1) history.back();
+            else go('/');
+          }}
+        >
           <Icon name="back" size={20} />
         </button>
       )}
@@ -195,16 +260,22 @@ export function Tabs<K extends string>({ items, value, onChange }: { items: { ke
   );
 }
 
-/** 画面下の浮いたナビ。どの画面からでも主な画面と要望に移れる */
+/** 画面下のナビゲーション。どの画面からでも主要画面に移れる */
 export function NavBar() {
-  const { me } = useApp();
+  const { me, practices } = useApp();
   const { path } = useRoute();
-  // 練習の画面は「予定」、募集の画面（/recruit/:id）と登録の画面は「募集」を光らせる
-  const here = path[0] === 'p' || path[0] === 'answer' ? '' : path[0] === 'register' ? 'recruit' : (path[0] ?? '');
-  const items: { to: string; key: string; icon: IconName; label: string }[] = [
+  // 予約詳細（/p/:id）は「予定」、登録画面（/register）は「募集」を光らせる
+  const here = path[0] === 'p' ? '' : path[0] === 'register' ? 'recruit' : (path[0] ?? '');
+
+  const now = new Date();
+  const today = toJstDate(now);
+  const currentTime = toJstTime(now);
+  const { totalCount: todoCount } = getUnansweredSummary(practices, me, today, currentTime);
+
+  const items: { to: string; key: string; icon: IconName; label: string; badge?: number }[] = [
     { to: '/', key: '', icon: 'ticket', label: '予定' },
     ...(canRegister(me.member) ? ([{ to: '/recruit', key: 'recruit', icon: 'send', label: '募集' }] as const) : []),
-    { to: '/feedback', key: 'feedback', icon: 'chat', label: '要望' },
+    { to: '/answer', key: 'answer', icon: 'check', label: 'RSVP', badge: todoCount },
     { to: '/settings', key: 'settings', icon: 'user', label: 'アカウント' },
   ];
   const active = here === 'admin' ? 'settings' : here;
@@ -212,7 +283,14 @@ export function NavBar() {
     <nav class="navbar">
       {items.map((it) => (
         <button aria-current={active === it.key ? 'page' : undefined} onClick={() => go(it.to)}>
-          <Icon name={it.icon} />
+          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name={it.icon} />
+            {it.badge != null && it.badge > 0 && (
+              <span class="nav-badge" style={{ position: 'absolute', top: -5, right: -8 }}>
+                {it.badge}
+              </span>
+            )}
+          </div>
           <span>{it.label}</span>
         </button>
       ))}
@@ -245,17 +323,20 @@ const ANSWER_MARK: Record<Answer, string> = { 行く: '○', 保留: '△', 行�
 /** 画面に出す回答の名前（シートの値は「保留」のまま、画面では「未定」と出す） */
 export const ANSWER_LABEL: Record<Answer, string> = { 行く: '行く', 保留: '未定', 行かない: '行かない' };
 
-/** 出欠。文字は出さず、日本の出欠表どおり ○ △ ✕ の記号だけで選ぶ */
+/** 回答ボタン。文字は出さず、日本の回答表どおり ○ △ ✕ の記号だけで選ぶ */
 export function RsvpButtons({
   value,
   status,
   onAnswer,
+  onBlocked,
   busy,
   solo,
 }: {
   value: Answer | null;
   status: string;
   onAnswer: (a: Answer) => void;
+  /** 満員や締切などで選択がブロックされたときの通知コールバック */
+  onBlocked?: (reason: 'full' | 'closed') => void;
   busy?: boolean;
   /** チケットの外に単独で置く（大きなボタンにする） */
   solo?: boolean;
@@ -264,21 +345,31 @@ export function RsvpButtons({
   const full = status === '満員' && value !== '行く';
   return (
     <div class={`rsvp${solo ? ' solo' : ''}`} role="radiogroup" aria-label="回答">
-      {(['行く', '保留', '行かない'] as const).map((a) => (
-        <button
-          role="radio"
-          class={a === '行く' ? 'yes' : a === '保留' ? 'maybe' : 'no'}
-          aria-checked={value === a}
-          aria-label={a === '行く' && full ? '満員' : ANSWER_LABEL[a]}
-          title={ANSWER_LABEL[a]}
-          disabled={busy || closed || (a === '行く' && full)}
-          onClick={() => value !== a && onAnswer(a)}
-        >
-          <span class="mark" aria-hidden="true">
-            {ANSWER_MARK[a]}
-          </span>
-        </button>
-      ))}
+      {(['行く', '保留', '行かない'] as const).map((a) => {
+        const isGoingBlocked = a === '行く' && full;
+        return (
+          <button
+            type="button"
+            role="radio"
+            class={`${a === '行く' ? 'yes' : a === '保留' ? 'maybe' : 'no'}${isGoingBlocked ? ' is-blocked-full' : ''}`}
+            aria-checked={value === a}
+            aria-label={isGoingBlocked ? '満員（選択不可）' : ANSWER_LABEL[a]}
+            title={isGoingBlocked ? '満員のため「行く」は選べません' : ANSWER_LABEL[a]}
+            disabled={busy || closed}
+            onClick={() => {
+              if (isGoingBlocked) {
+                onBlocked?.('full');
+                return;
+              }
+              if (value !== a) onAnswer(a);
+            }}
+          >
+            <span class="mark" aria-hidden="true">
+              {ANSWER_MARK[a]}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

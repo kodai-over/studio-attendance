@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { checkLiffRedirect, decideLiffInitAction } from '../src/liff';
+import { readTab } from '../src/pages/List';
 import { resolveInitialHash } from '../src/route';
-import { shouldNotifyInitially } from '../src/ui';
+import { RsvpButtons, shouldNotifyInitially } from '../src/ui';
 import { shouldNotifyPracticeCancellation, type PracticeView } from '@studio-attendance/shared';
 
 describe('LIFF 初期化 & 画面遷移ロジック', () => {
@@ -123,6 +124,11 @@ describe('LIFF 初期化 & 画面遷移ロジック', () => {
       expect(hash).toBe('/register');
     });
 
+    it('リッチメニューや外部導線の ?view=answer で /answer（RSVP画面）に振り分けられる', () => {
+      const hash = resolveInitialHash(new URLSearchParams('view=answer'));
+      expect(hash).toBe('/answer');
+    });
+
     it('パラメータがない通常起動時は undefined（トップ＝予定タブ）になる', () => {
       const hash = resolveInitialHash(new URLSearchParams(''));
       expect(hash).toBeUndefined();
@@ -131,6 +137,7 @@ describe('LIFF 初期化 & 画面遷移ロジック', () => {
     it('過去の ?view= パラメータも互換性を保って振り分けられる', () => {
       expect(resolveInitialHash(new URLSearchParams('view=recruit'))).toBe('/recruit');
       expect(resolveInitialHash(new URLSearchParams('view=mine'))).toBe('/?tab=mine');
+      expect(resolveInitialHash(new URLSearchParams('view=answer'))).toBe('/answer');
       expect(resolveInitialHash(new URLSearchParams('view=feedback'))).toBe('/feedback');
     });
 
@@ -217,6 +224,36 @@ describe('LIFF 初期化 & 画面遷移ロジック', () => {
     it('view が null の場合は false になる', () => {
       expect(shouldNotifyInitially(null, '2026-11-02')).toBe(false);
       expect(shouldNotifyPracticeCancellation(null, '2026-11-02')).toBe(false);
+    });
+  });
+
+  describe('旧タブ設定（pb:tab=todo）の互換性と満員時の RsvpButtons ガード', () => {
+    it('localStorage に旧タブ pb:tab=todo が残っていても readTab() は安全に all へ戻す', () => {
+      const store = new Map<string, string>([['pb:tab', 'todo']]);
+      const originalLocalStorage = globalThis.localStorage;
+      globalThis.localStorage = {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, val: string) => store.set(key, val),
+        removeItem: (key: string) => store.delete(key),
+        clear: () => store.clear(),
+        length: 0,
+        key: () => null,
+      };
+      try {
+        expect(readTab()).toBe('all');
+      } finally {
+        globalThis.localStorage = originalLocalStorage;
+      }
+    });
+
+    it('満員の予約情報で RsvpButtons の「○ 行く」を押すと onBlocked("full") が呼ばれ、onAnswer は呼ばれない', () => {
+      const onAnswer = vi.fn();
+      const onBlocked = vi.fn();
+      const vnode = RsvpButtons({ value: null, status: '満員', onAnswer, onBlocked });
+      const buttons = vnode.props.children as Array<{ props: { onClick: () => void } }>;
+      buttons[0].props.onClick();
+      expect(onBlocked).toHaveBeenCalledWith('full');
+      expect(onAnswer).not.toHaveBeenCalled();
     });
   });
 });

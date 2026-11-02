@@ -263,7 +263,7 @@ export function RegisterPage({ draftId, recruit = false }: { draftId: string | n
       {textOpen && (
         <div class="card">
           <textarea rows={5} maxLength={5000} placeholder="予約完了メールなどを貼り付け" aria-label="予約内容の文章" value={pasted} onInput={(e) => setPasted(e.currentTarget.value)} />
-          <button class="btn primary block" style={{ marginTop: 10 }} disabled={busy || !pasted.trim()} onClick={onText}>
+          <button class="btn primary block" style={{ marginTop: 14 }} disabled={busy || !pasted.trim()} onClick={onText}>
             読み取る
           </button>
         </div>

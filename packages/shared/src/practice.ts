@@ -273,3 +273,27 @@ export function skippedNote({ pastCount, duplicateCount = 0 }: { pastCount: numb
   const parts = [duplicateCount > 0 && `登録済みの予約情報${duplicateCount}件`, pastCount > 0 && `終了した予約情報${pastCount}件`].filter(Boolean);
   return parts.length ? `${parts.join('・')}は除きました。` : '';
 }
+
+/** 自分に関係する予約情報か（自分が予約者、所属グループに募集された、回答済み、または参加履歴あり） */
+export function isMinePractice(
+  v: { practice: Pick<Practice, 'booker' | 'groups'>; myAnswer?: unknown; involved?: boolean },
+  userId: string,
+  userGroups: string[],
+): boolean {
+  const p = v.practice;
+  return p.booker === userId || p.groups.some((g) => userGroups.includes(g)) || v.myAnswer != null || Boolean(v.involved);
+}
+
+/** RSVP（回答・変更）の対象となる未来のアクティブな予約情報か */
+export function isRsvpTarget(
+  v: { practice: Pick<Practice, 'booker' | 'groups' | 'status' | 'date'> & Partial<Pick<Practice, 'end'>>; myAnswer?: unknown; involved?: boolean },
+  userId: string,
+  userGroups: string[],
+  today: string,
+  currentTime?: string,
+): boolean {
+  const p = v.practice;
+  if (p.status === '中止') return false;
+  if (isPastPractice(p, today, currentTime)) return false;
+  return isMinePractice(v, userId, userGroups);
+}

@@ -1,30 +1,36 @@
 import { useEffect, useState } from 'preact/hooks';
-import { labelDate, nextStatus, type Answer, type PracticeView } from '@studio-attendance/shared';
+import { isMinePractice, labelDate, type Answer, type PracticeView } from '@studio-attendance/shared';
 import { api } from '../api';
-import { pressedAt, sending, wanted } from '../answering';
 import { AvatarStack, CancelDeadlineBadge, FRESH_MS, Fee, Icon, RsvpButtons, Spinner, StatusBadge, Stub, Syncing, Tabs, go, place, useApp, useRunner } from '../ui';
 
-type Tab = 'all' | 'mine' | 'todo';
+type Tab = 'all' | 'mine';
 const TAB_KEY = 'pb:tab';
 
-function readTab(): Tab {
+export function readTab(): Tab {
   try {
     const t = localStorage.getItem(TAB_KEY);
-    return t === 'mine' || t === 'todo' ? t : 'all';
+    return t === 'mine' ? t : 'all';
   } catch {
     return 'all';
   }
 }
 
+/** 自分の回答状況を示すバッジ（シンプルな記号表示） */
+export function MyAnswerBadge({ answer }: { answer: Answer | null }) {
+  if (answer === '行く') return <span class="my-answer-badge going" title="行く" aria-label="行く">○</span>;
+  if (answer === '保留') return <span class="my-answer-badge maybe" title="未定" aria-label="未定">△</span>;
+  if (answer === '行かない') return <span class="my-answer-badge not-going" title="行かない" aria-label="行かない">✕</span>;
+  return <span class="my-answer-badge none" title="未回答" aria-label="未回答">—</span>;
+}
+
 export function ListPage({ initialTab }: { initialTab?: string | null }) {
   const { me, practices: list, practicesAt, setPractices } = useApp();
-  const [tab, setTab] = useState<Tab>(() => (initialTab === 'mine' || initialTab === 'todo' || initialTab === 'all' ? initialTab : readTab()));
+  const [tab, setTab] = useState<Tab>(() => (initialTab === 'mine' || initialTab === 'all' ? initialTab : readTab()));
   const [run, busy] = useRunner();
 
   useEffect(() => {
     // 起動時のまとめ取得から時間がたっていれば取り直す（前回の表示のときは起動処理が取り直すので待つ）
-    const started = Date.now();
-    if (practicesAt > 0 && started - practicesAt > FRESH_MS) run(() => api('listPractices')).then((r) => r && setPractices(r, false, started));
+    if (practicesAt > 0 && Date.now() - practicesAt > FRESH_MS) run(() => api('listPractices')).then((r) => r && setPractices(r, false));
   }, []);
 
   const selectTab = (t: Tab) => {
@@ -36,18 +42,13 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
     }
   };
 
-  const { answer } = useAnswer();
-
   // 「予定」に出すのは、自分に招待が来た（入っているグループに募集された）練習と、自分が招待を送った（登録した）練習。
   // 答えた・ゲストを足した練習も出す。管理者でも、ほかの練習は「募集」で見る
-  const mine = (list ?? []).filter(
-    (v) => v.practice.booker === me.member.userId || v.practice.groups.some((g) => me.member.groups.includes(g)) || v.myAnswer != null || v.involved,
-  );
+  const mine = (list ?? []).filter((v) => isMinePractice(v, me.member.userId, me.member.groups));
   const active = mine.filter((v) => v.practice.status !== '中止');
   const groups: Record<Tab, PracticeView[]> = {
     all: mine,
     mine: active.filter((v) => v.myAnswer === '行く'),
-    todo: active.filter((v) => v.myAnswer == null || v.myAnswer === '保留'),
   };
   const shown = groups[tab];
 
@@ -60,7 +61,6 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
           items={[
             { key: 'all', label: 'すべて', count: list ? groups.all.length : undefined },
             { key: 'mine', label: '行く', count: list ? groups.mine.length : undefined },
-            { key: 'todo', label: '未定', count: list ? groups.todo.length : undefined },
           ]}
         />
         {(practicesAt === 0 || busy) && <Syncing />}
@@ -70,16 +70,21 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
         <Spinner />
       ) : shown.length === 0 ? (
         <div class="empty">
-          <div>{tab === 'todo' ? '未定の予約情報はありません。' : tab === 'mine' ? '行く予約情報はありません。' : '登録されている予約情報はありません。'}</div>
+          <div>{tab === 'mine' ? '行く予約情報はありません。' : '登録されている予約情報はありません。'}</div>
           {tab === 'all' && <p class="note">所属グループの予約情報が出ないときは、そのグループの募集メッセージの「回答」から一度開いてください</p>}
           {tab === 'all' && <p class="note">スタジオの予約は「募集」の右上の＋から登録できます</p>}
         </div>
       ) : (
-        <div class="ticket-grid">
-          {shown.map((v) => (
-            <PracticeCard key={v.practice.id} v={v} onAnswer={(a) => answer(v.practice.id, a)} />
-          ))}
-        </div>
+        <>
+          <div class="ticket-grid">
+            {shown.map((v) => (
+              <PracticeCard key={v.practice.id} v={v} />
+            ))}
+          </div>
+          <p class="note list-rsvp-note">
+            ※回答・変更は下のメニューの「RSVP」から行います
+          </p>
+        </>
       )}
     </>
   );
@@ -89,73 +94,30 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
  * 押した瞬間の見た目。記号・行く人数・満員かどうかを先に変える
  * （名前の並びと1人あたりはサーバーの結果で差し替える）
  */
-function optimistic(v: PracticeView, a: Answer): PracticeView {
-  const was = v.myAnswer === '行く';
-  const now = a === '行く';
-  const goingCount = Math.max(0, v.goingCount + (now === was ? 0 : now ? 1 : -1));
-  const p = v.practice;
-  const status = nextStatus(p, goingCount);
-  return { ...v, myAnswer: a, goingCount, practice: status === p.status ? p : { ...p, status } };
-}
-
-/**
- * 回答する。押した瞬間に記号を変え、待たずに続けて押し直せる（ボタンは止めない）。
- * サーバーには練習ごとに1つずつ送り、送っている間に押し直したら、終わったあと最後の回答だけを送る。
- * 途中の結果では画面を戻さず、最後の結果で人数なども含めて差し替える（失敗したら取り直すか、最後に記録できた内容に戻す）
- */
-export function useAnswer() {
-  const { practices: list, updatePractice, toast } = useApp();
-  const answer = (id: string, a: Answer) => {
-    const current = (list ?? []).find((x) => x.practice.id === id);
-    if (current) updatePractice(optimistic(current, a));
-    wanted.set(id, a);
-    pressedAt.set(id, Date.now());
-    if (sending.has(id)) return;
-    const loop = (async () => {
-      // 最後にサーバーに記録できた内容。失敗して取り直せなかったときはここに戻す
-      let confirmed = current;
-      try {
-        for (;;) {
-          const target = wanted.get(id)!;
-          try {
-            const r = await api('rsvp', { id, answer: target });
-            confirmed = r;
-            if (wanted.get(id) === target) {
-              wanted.delete(id);
-              updatePractice(r);
-              return;
-            }
-          } catch (e) {
-            // 送っている間に押し直していれば、その回答を送り直す（失敗した途中の回答は知らせない）
-            if (wanted.get(id) !== target) continue;
-            wanted.delete(id);
-            toast(e instanceof Error ? e.message : String(e), true);
-            // 押した時点の控えは古いかもしれないので、取り直して差し替える（取り直している間に押し直したら、それを送る）
-            try {
-              const fresh = await api('getPractice', { id });
-              if (wanted.has(id)) continue;
-              updatePractice(fresh);
-            } catch {
-              if (wanted.has(id)) continue;
-              if (confirmed) updatePractice(confirmed, { revert: true });
-            }
-            return;
-          }
-        }
-      } finally {
-        sending.delete(id);
-      }
-    })();
-    sending.set(id, loop);
-  };
-  return { answer };
-}
-
-export function PracticeCard({ v, onAnswer, busy }: { v: PracticeView; onAnswer: (a: Answer) => void; busy?: boolean }) {
+export function PracticeCard({
+  v,
+  onAnswer,
+  busy,
+}: {
+  v: PracticeView;
+  onAnswer?: (a: Answer) => void;
+  busy?: boolean;
+}) {
+  const { toast } = useApp();
+  const [shaking, setShaking] = useState(false);
   const p = v.practice;
   const open = () => go(`/p/${encodeURIComponent(p.id)}`);
+
+  const handleBlocked = (reason: 'full' | 'closed') => {
+    if (reason === 'full') {
+      setShaking(true);
+      toast('満員のため「○ 行く」は選べません（未定または行かないを選択できます）', true);
+      setTimeout(() => setShaking(false), 450);
+    }
+  };
+
   return (
-    <article class="ticket" data-answer={v.myAnswer ?? 'none'} data-status={p.status}>
+    <article class={`ticket${shaking ? ' is-shaking' : ''}`} data-answer={v.myAnswer ?? 'none'} data-status={p.status}>
       <Stub date={p.date} onClick={open} />
       <button class="ticket-main" onClick={open}>
         <span class="sr">{labelDate(p.date)}</span>
@@ -180,9 +142,18 @@ export function PracticeCard({ v, onAnswer, busy }: { v: PracticeView; onAnswer:
             {p.status === '満員' && <span class="badge-full">FULL</span>}
           </span>
           <Fee v={v} />
+          <MyAnswerBadge answer={v.myAnswer} />
         </div>
       </button>
-      <RsvpButtons value={v.myAnswer} status={p.status} busy={busy} onAnswer={onAnswer} />
+      {onAnswer && (
+        <RsvpButtons
+          value={v.myAnswer}
+          status={p.status}
+          busy={busy}
+          onAnswer={onAnswer}
+          onBlocked={handleBlocked}
+        />
+      )}
     </article>
   );
 }

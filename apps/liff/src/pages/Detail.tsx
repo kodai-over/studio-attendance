@@ -3,9 +3,8 @@ import { computeCancelDeadline, endAfterStart, labelDate, roomInfo, yen, type An
 import { api } from '../api';
 import { RoomSelect } from '../components/StudioRoom';
 import { openCalendar, prefersIcs, shareLink } from '../liff';
-import { Avatar, DeleteConfirmDialog, FRESH_MS, Icon, Pass, RsvpButtons, Spinner, Syncing, TopBar, shareData, useApp, useRunner } from '../ui';
-import { isAnswering } from '../answering';
-import { useAnswer } from './List';
+import { Avatar, DeleteConfirmDialog, FRESH_MS, Icon, Pass, Spinner, Syncing, TopBar, go, shareData, useApp, useRunner } from '../ui';
+import { MyAnswerBadge } from './List';
 
 /**
  * 一覧にある内容ですぐ表示し、最新の内容は裏で取り直す（取り直している間もボタンは押せる）。
@@ -28,11 +27,8 @@ export function usePractice(id: string) {
     setV(null);
     if (fresh()) return setLoading(false);
     setLoading(true);
-    const started = Date.now();
     api('getPractice', { id })
       .then((r) => {
-        // 取り直している間に回答を押していれば、押す前に読んだかもしれないので使わない（結果は回答の処理が入れる）
-        if (isAnswering(id, started)) return;
         setV(r);
         updatePractice(r);
       })
@@ -43,11 +39,8 @@ export function usePractice(id: string) {
   const update = async (fn: () => Promise<PracticeView>, done?: string) => {
     const r = await run(fn, done);
     if (r) {
-      // 回答を送っている途中なら、押した回答はそのまま出す（人数などは回答の結果で差し替わる）
-      const cur = latest.current;
-      const next = isAnswering(id) && cur ? { ...r, myAnswer: cur.myAnswer } : r;
-      setV(next);
-      updatePractice(next); // 一覧にもすぐ反映する
+      setV(r);
+      updatePractice(r); // 一覧にもすぐ反映する
     }
     return r;
   };
@@ -91,10 +84,9 @@ export function PracticePass({ v }: { v: PracticeView }) {
   );
 }
 
-/** 「予定」から開く練習の画面。見るのと出欠・カレンダーだけ（編集・削除・募集は「募集」から） */
+/** 「予定」から開く練習の画面。見るのと回答・カレンダーだけ（編集・削除・募集は「募集」から） */
 export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null }) {
   const { v, inList, loading, busy, update } = usePractice(id);
-  const { answer } = useAnswer();
   const { toast } = useApp();
   const calRef = useRef<HTMLDivElement>(null);
   const going = v ? v.myAnswer === '行く' && v.practice.status !== '中止' : false;
@@ -105,7 +97,7 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
 
   if (!v) return <><TopBar back />{loading ? <Spinner /> : <div class="empty">予約情報が見つかりません</div>}</>;
   const p = v.practice;
-  // 行くと答えたら、カレンダーに追加をボタンのすぐ下に出す（答えてそのまま追加できるように）
+  // 行くと答えたら、カレンダーに追加をすぐ下に出す
   const calendar = <CalendarButtons v={v} highlight={going} compact={going} />;
 
   return (
@@ -130,20 +122,27 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
         <div class="detail-primary">
           <PracticePass v={v} />
 
-          <RsvpButtons
-            solo
-            value={v.myAnswer}
-            status={p.status}
-            busy={busy && !inList}
-            onAnswer={(a: Answer) => {
-              // 一覧にある練習は、待たずに切り替える（結果は一覧に入り、この画面もそれに合わせる）
-              if (inList) answer(id, a);
-              else update(() => api('rsvp', { id, answer: a }));
-            }}
-          />
+          <div class="detail-rsvp-box">
+            <div class="detail-rsvp-row">
+              <div class="detail-rsvp-status">
+                <span class="muted" style={{ fontSize: '0.85rem' }}>あなたの回答:</span>
+                <MyAnswerBadge answer={v.myAnswer} />
+              </div>
+              {p.status !== '中止' && (
+                <button
+                  class="btn small primary"
+                  onClick={() => go(`/answer?r=${encodeURIComponent(p.id)}`)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                >
+                  <Icon name="check" size={14} />
+                  <span>{v.myAnswer == null ? '回答する' : '回答を変更'}</span>
+                </button>
+              )}
+            </div>
+          </div>
 
           {going && (
-            <div ref={calRef} class="cal-inline">
+            <div ref={calRef} class="cal-inline" style={{ marginBottom: 20 }}>
               {calendar}
             </div>
           )}
@@ -166,7 +165,7 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
 
           {/* 古いお知らせのリンクなどから開いた予約者が、直す・消す場所に迷わないように */}
           {v.canEdit && (
-            <p class="note" style={{ marginTop: 16 }}>
+            <p class="note" style={{ marginTop: 20 }}>
               編集・削除は{' '}
               <a href={`#/recruit/${encodeURIComponent(p.id)}`}>「募集」のこの予約情報</a>
               から
@@ -329,7 +328,7 @@ export function EditForm({
           </button>
           <button
             class="btn danger block"
-            style={{ marginTop: 8 }}
+            style={{ marginTop: 12 }}
             disabled={busy}
             onClick={() => setConfirming(true)}
           >

@@ -402,6 +402,33 @@ export function answerReport(items: { practice: Pick<Practice, 'date' | 'start'>
   return lines.length ? ['回答しました', ...lines].join('\n') : null;
 }
 
+/**
+ * 回答画面の「回答済み」タブで、回答を変更したときにグループに送る文。
+ * 変更前と変更後の回答を明示し、どういう変更をしたかがわかるようにする。
+ */
+export function answerChangeReport(
+  items: { practice: Pick<Practice, 'date' | 'start'>; from: Answer | null; to: Answer }[],
+): string | null {
+  if (items.length === 0) return null;
+
+  // 日付ごとの件数を集計（同日に複数練習がある場合のみ開始時刻を併記）
+  const dateCounts = new Map<string, number>();
+  for (const it of items) {
+    const d = it.practice.date;
+    dateCounts.set(d, (dateCounts.get(d) ?? 0) + 1);
+  }
+
+  const label = (p: Pick<Practice, 'date' | 'start'>) =>
+    (dateCounts.get(p.date) ?? 0) > 1 ? `${labelDate(p.date)} ${p.start}` : labelDate(p.date);
+  const text = (a: Answer | null) => (a === '行く' ? '行く' : a === '保留' ? '未定' : a === '行かない' ? '行かない' : '未回答');
+
+  const lines = [...items]
+    .sort((x, y) => (x.practice.date + x.practice.start).localeCompare(y.practice.date + y.practice.start))
+    .map((x) => `・${label(x.practice)}: ${text(x.from)} → ${text(x.to)}`);
+
+  return ['回答を変更しました', ...lines].join('\n');
+}
+
 export function reservationLabel(r: Reservation): string {
   return practiceSummary(r);
 }

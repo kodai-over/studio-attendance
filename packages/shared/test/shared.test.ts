@@ -15,6 +15,8 @@ import {
   formatFeeValue,
   isHoliday,
   isHolidayOrWeekend,
+  isMinePractice,
+  isRsvpTarget,
   jpHolidays,
   parseFeeValue,
   findCancelRule,
@@ -31,6 +33,7 @@ import {
   practiceCancellationMessage,
   practiceListMessage,
   recruitMessages,
+  answerChangeReport,
   answerReport,
   warningCard,
   shouldNotifyPracticeCancellation,
@@ -394,6 +397,35 @@ describe('Flex Message', () => {
     expect(answerReport([{ practice: at('2026-11-01', '13:00'), answer: null }])).toBeNull();
   });
 
+  it('回答画面の回答済みタブで送る文（answerChangeReport）は変更前と変更後の回答を明示する', () => {
+    const at = (date: string, start: string) => ({ date, start });
+    expect(
+      answerChangeReport([
+        { practice: at('2026-11-02', '19:00'), from: '行く', to: '行かない' },
+        { practice: at('2026-11-01', '19:00'), from: '保留', to: '行く' },
+      ]),
+    ).toBe('回答を変更しました\n・11/1(日): 未定 → 行く\n・11/2(月): 行く → 行かない');
+
+    // 同じ日に2つあるときは開始時刻で見分ける
+    const sameDay = answerChangeReport([
+      { practice: at('2026-11-01', '13:00'), from: '行く', to: '保留' },
+      { practice: at('2026-11-01', '19:00'), from: null, to: '行く' },
+    ]);
+    expect(sameDay).toBe('回答を変更しました\n・11/1(日) 13:00: 行く → 未定\n・11/1(日) 19:00: 未回答 → 行く');
+
+    // 引数の配列を変更しない（非破壊的であること）
+    const originalItems = [
+      { practice: at('2026-11-03', '19:00'), from: '行く' as const, to: '行かない' as const },
+      { practice: at('2026-11-01', '19:00'), from: '保留' as const, to: '行く' as const },
+      { practice: at('2026-11-02', '19:00'), from: '保留' as const, to: '行かない' as const },
+    ];
+    const clone = [...originalItems];
+    answerChangeReport(originalItems);
+    expect(originalItems).toEqual(clone);
+
+    expect(answerChangeReport([])).toBeNull();
+  });
+
   it('キャンセル期限前のお知らせは「募集」の練習の画面を開き、グループごとにもう一度募集できる', () => {
     const groups = [{ id: 'C1', name: 'チームA' }, { id: 'C2', name: 'あ'.repeat(30) }];
     const json = JSON.stringify(warningCard({ practice: practice({ id: 'p1' }), going: 1, min: 3, groups, appUrl }));
@@ -514,6 +546,73 @@ describe('Flex Message', () => {
     expect(shouldNotifyPracticeCancellation({ date: '2026-11-01', status: '募集中', groups: ['C1'] }, today)).toBe(false);
     expect(shouldNotifyPracticeCancellation({ date: '2026-11-02', end: '12:00', status: '募集中', groups: ['C1'] }, today, '15:00')).toBe(false);
     expect(shouldNotifyPracticeCancellation(null, today)).toBe(false);
+  });
+
+  it('自分に関係する練習判定（isMinePractice）とRSVP対象判定（isRsvpTarget）', () => {
+    const uid = 'U_ME';
+    const ugroups = ['G1', 'G2'];
+    const today = '2026-11-02';
+
+    // 1. isMinePractice
+    // 予約者本人
+    expect(isMinePractice({ practice: { booker: uid, groups: ['G_OTHER'] } }, uid, ugroups)).toBe(true);
+    // 所属グループに募集されている
+    expect(isMinePractice({ practice: { booker: 'U_OTHER', groups: ['G1'] } }, uid, ugroups)).toBe(true);
+    // 回答済み
+    expect(isMinePractice({ practice: { booker: 'U_OTHER', groups: ['G_OTHER'] }, myAnswer: '行く' }, uid, ugroups)).toBe(true);
+    // 参加履歴あり（involved）
+    expect(isMinePractice({ practice: { booker: 'U_OTHER', groups: ['G_OTHER'] }, involved: true }, uid, ugroups)).toBe(true);
+    // 全く関係ない
+    expect(isMinePractice({ practice: { booker: 'U_OTHER', groups: ['G_OTHER'] }, myAnswer: null, involved: false }, uid, ugroups)).toBe(false);
+
+    // 2. isRsvpTarget
+    // 未来・アクティブ・関係あり
+    expect(
+      isRsvpTarget(
+        { practice: { booker: 'U_OTHER', groups: ['G1'], status: '募集中', date: '2026-11-10', end: '20:00' } },
+        uid,
+        ugroups,
+        today,
+      ),
+    ).toBe(true);
+    // 中止は対象外
+    expect(
+      isRsvpTarget(
+        { practice: { booker: 'U_OTHER', groups: ['G1'], status: '中止', date: '2026-11-10', end: '20:00' } },
+        uid,
+        ugroups,
+        today,
+      ),
+    ).toBe(false);
+    // 過去日は対象外
+    expect(
+      isRsvpTarget(
+        { practice: { booker: 'U_OTHER', groups: ['G1'], status: '募集中', date: '2026-10-30', end: '20:00' } },
+        uid,
+        ugroups,
+        today,
+      ),
+    ).toBe(false);
+    // 当日終了済みは対象外
+    expect(
+      isRsvpTarget(
+        { practice: { booker: 'U_OTHER', groups: ['G1'], status: '募集中', date: today, end: '12:00' } },
+        uid,
+        ugroups,
+        today,
+        '15:00',
+      ),
+    ).toBe(false);
+    // 当日終了前なら対象
+    expect(
+      isRsvpTarget(
+        { practice: { booker: 'U_OTHER', groups: ['G1'], status: '募集中', date: today, end: '18:00' } },
+        uid,
+        ugroups,
+        today,
+        '15:00',
+      ),
+    ).toBe(true);
   });
 
   it('開始を変えたら、終了を開始の1時間後より前にしない', () => {

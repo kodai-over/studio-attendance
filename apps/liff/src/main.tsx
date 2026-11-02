@@ -2,8 +2,8 @@ import { render } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { HomeView, MeView, PracticeView } from '@studio-attendance/shared';
 import { api } from './api';
-import { isAnswering } from './answering';
 import { initLiff, loginApp } from './liff';
+import { createPracticeSyncTracker, mergePracticesWithKeep } from './pages/answerLogic';
 import { AnswerPage } from './pages/Answer';
 import { DetailPage } from './pages/Detail';
 import { FeedbackPage } from './pages/Feedback';
@@ -63,23 +63,23 @@ function App() {
   const [startupFailed, setStartupFailed] = useState(false);
   const [loggedOut, setLoggedOut] = useState(false);
   const [toast, toastNode] = useToast();
-  // 起動中に出欠などで差し替えた練習。あとから届いた起動時の一覧（それより前の状態）で戻さない
-  const touched = useRef<Set<string> | null>(new Set());
+  // 回答保存中（Infinity）や保存・編集直後（完了時刻）の練習。それより前に始まった一覧取得で戻さない
+  const syncTracker = useRef(createPracticeSyncTracker());
   // 削除した（している）練習。あとから届いた一覧（削除より前に読んだもの）で戻さない
   const removed = useRef(new Set<string>());
   const clean = (list: PracticeView[]) => list.filter((v) => !removed.current.has(v.practice.id));
   // グループのカードから開いたときのグループと合言葉（読み込み直すときも、そのグループのメンバーとして覚えてもらう）
   const entry = useRef<{ group?: string; key?: string }>({});
 
-  /** 起動時と同じまとめ取得。起動中に差し替えた練習と、回答を送っている途中の練習は、取得の結果で戻さない */
+  /** 起動時と同じまとめ取得。保存中や、この取得開始以降に更新された練習は、取得の結果で戻さない */
   const loadHome = async () => {
-    const started = Date.now();
+    const fetchStartedAt = Date.now();
     const home = await api('home', entry.current);
+    // ステート更新関数の外で保護対象IDの算出と完了済みエントリの掃除を行う
+    const keepIds = syncTracker.current.prepareMerge(fetchStartedAt);
     setMe(home.me);
     setPracticesState((cur) => {
-      const keep = touched.current;
-      touched.current = null;
-      const list = home.practices.map((v) => (keep?.has(v.practice.id) || isAnswering(v.practice.id, started) ? (cur?.list.find((x) => x.practice.id === v.practice.id) ?? v) : v));
+      const list = mergePracticesWithKeep(home.practices, cur?.list, keepIds);
       return { list: clean(list), at: Date.now() };
     });
     saveCache(home);
@@ -141,10 +141,9 @@ function App() {
   }, []);
 
   // fresh でないときは取った時刻を変えない（前回の表示を「最新」と取り違えないように）
-  // 回答を送っている途中の練習は、取り直した一覧（送る前に読んだかもしれない）で戻さず、今の内容を残す
-  const setPractices = (list: PracticeView[], fresh = false, startedAt?: number) =>
+  const setPractices = (list: PracticeView[], fresh = false) =>
     setPracticesState((cur) => ({
-      list: clean(list).map((v) => (isAnswering(v.practice.id, startedAt) ? (cur?.list.find((x) => x.practice.id === v.practice.id) ?? v) : v)),
+      list: clean(list),
       at: fresh ? Date.now() : (cur?.at ?? 0),
     }));
 
@@ -180,16 +179,22 @@ function App() {
     }
   };
   const updatePractice = (v: PracticeView, { revert = false } = {}) => {
-    // 削除した練習は、あとから届いた結果（取り直し・出欠）で戻さない
+    // 削除した練習は、あとから届いた結果（取り直し・回答）で戻さない
     if (removed.current.has(v.practice.id)) return;
-    // 失敗して元に戻したときは、起動時の一覧の最新の内容を入れてよい
-    if (revert) touched.current?.delete(v.practice.id);
-    else touched.current?.add(v.practice.id);
+    // 失敗して元に戻したときは保護を外し、成功時は保存完了時刻を記録してその時刻以前に始まった取り直しから守る
+    syncTracker.current.markUpdated(v.practice.id, revert);
     setPracticesState((cur) => {
       if (!cur) return cur;
       const has = cur.list.some((x) => x.practice.id === v.practice.id);
       return { ...cur, list: has ? cur.list.map((x) => (x.practice.id === v.practice.id ? v : x)) : [...cur.list, v] };
     });
+  };
+  const touchPractice = (id: string) => {
+    // 保存処理開始時は Infinity をセットし、保存が終わるまで何回 loadHome が走っても戻されないようにする
+    syncTracker.current.touchPractice(id);
+  };
+  const untouchPractice = (id: string) => {
+    syncTracker.current.untouchPractice(id);
   };
 
   return (
@@ -205,7 +210,7 @@ function App() {
       ) : error ? (
         <div class="empty">{error}</div>
       ) : me ? (
-        <AppContext.Provider value={{ me, setMe, toast, practices: practices?.list ?? null, practicesAt: practices?.at ?? 0, startupFailed, setPractices, updatePractice, deletePractice, loadHome }}>
+        <AppContext.Provider value={{ me, setMe, toast, practices: practices?.list ?? null, practicesAt: practices?.at ?? 0, startupFailed, setPractices, updatePractice, touchPractice, untouchPractice, deletePractice, loadHome }}>
           {me.actAs && me.actAs !== 'self' && (
             <button class="acting-banner" onClick={() => go('/settings')}>
               {me.actAs === 'member' ? '一般として表示中' : '確認用アカウント「admin」として操作中'}（「自分」で戻せます）

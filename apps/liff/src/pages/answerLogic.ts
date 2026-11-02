@@ -1,0 +1,735 @@
+import {
+  answerChangeReport,
+  answerReport,
+  isRsvpTarget,
+  type Answer,
+  type MeView,
+  type PracticeView,
+} from '@studio-attendance/shared';
+
+export type StageMap = Map<string, Answer>;
+
+export interface DraftStore {
+  specific: StageMap;
+  unanswered: StageMap;
+  answered: StageMap;
+}
+
+const DRAFTS_STORAGE_KEY = 'pb:rsvpDrafts';
+const VALID_ANSWERS = new Set<Answer>(['行く', '保留', '行かない']);
+
+export function isValidAnswer(v: unknown): v is Answer {
+  return typeof v === 'string' && VALID_ANSWERS.has(v as Answer);
+}
+
+function isValidDraftEntry(entry: unknown): entry is [string, Answer] {
+  return (
+    Array.isArray(entry) &&
+    entry.length === 2 &&
+    typeof entry[0] === 'string' &&
+    entry[0].length > 0 &&
+    isValidAnswer(entry[1])
+  );
+}
+
+let currentDraftUserId: string | undefined = undefined;
+
+/**
+ * 現在のユーザーおよび「見え方の確認（actAs）」モードに応じた下書き所有キーを返す。
+ */
+export function getDraftOwnerKey(me: Pick<MeView, 'member' | 'actAs'>): string {
+  return me.actAs && me.actAs !== 'self' ? `${me.member.userId}:${me.actAs}` : me.member.userId;
+}
+
+/**
+ * 画面切り替えやアンマウント、LIFF WebView の意図しないクローズでも下書きが失われないよう、
+ * モジュールレベルおよび localStorage で保持する。
+ */
+export const globalDrafts: DraftStore = {
+  specific: new Map(),
+  unanswered: new Map(),
+  answered: new Map(),
+};
+
+export function saveDraftsToStorage(userId: string | undefined = currentDraftUserId): void {
+  try {
+    if (typeof localStorage === 'undefined' || typeof localStorage.setItem !== 'function') return;
+    if (userId !== undefined) currentDraftUserId = userId;
+    const unanswered = Array.from(globalDrafts.unanswered.entries());
+    const answered = Array.from(globalDrafts.answered.entries());
+    if (unanswered.length === 0 && answered.length === 0) {
+      localStorage.removeItem?.(DRAFTS_STORAGE_KEY);
+    } else {
+      localStorage.setItem(
+        DRAFTS_STORAGE_KEY,
+        JSON.stringify({ userId: currentDraftUserId, unanswered, answered }),
+      );
+    }
+  } catch {
+    /* localStorage が使えない環境でもメモリ上で動作する */
+  }
+}
+
+export function loadDraftsFromStorage(expectedUserId: string | undefined = currentDraftUserId): void {
+  try {
+    if (typeof localStorage === 'undefined' || typeof localStorage.getItem !== 'function') return;
+    const raw = localStorage.getItem(DRAFTS_STORAGE_KEY);
+    if (!raw) return;
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      localStorage.removeItem?.(DRAFTS_STORAGE_KEY);
+      return;
+    }
+    const record = parsed as {
+      userId?: unknown;
+      unanswered?: unknown;
+      answered?: unknown;
+    };
+    // アカウントや「見え方の確認」モードが異なる場合、または古い形式（userId なし）の場合は破棄する
+    if (expectedUserId !== undefined && record.userId !== expectedUserId) {
+      globalDrafts.specific.clear();
+      globalDrafts.unanswered.clear();
+      globalDrafts.answered.clear();
+      localStorage.removeItem?.(DRAFTS_STORAGE_KEY);
+      return;
+    }
+    if (typeof record.userId === 'string') {
+      currentDraftUserId = record.userId;
+    }
+    if (Array.isArray(record.unanswered)) {
+      for (const item of record.unanswered) {
+        if (isValidDraftEntry(item)) {
+          globalDrafts.unanswered.set(item[0], item[1]);
+        }
+      }
+    }
+    if (Array.isArray(record.answered)) {
+      for (const item of record.answered) {
+        if (isValidDraftEntry(item)) {
+          globalDrafts.answered.set(item[0], item[1]);
+        }
+      }
+    }
+  } catch {
+    /* 破損データは無視し、壊れたキーが残らないよう安全に除去を試みる */
+    try {
+      localStorage.removeItem?.(DRAFTS_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/**
+ * 指定されたユーザーIDに合わせて下書きを同期・復元する。
+ * 別アカウントや「見え方の確認」に切り替わった場合は、前の人の下書きを破棄する。
+ */
+export function syncDraftsForUser(userId: string): void {
+  if (currentDraftUserId !== userId) {
+    globalDrafts.specific.clear();
+    globalDrafts.unanswered.clear();
+    globalDrafts.answered.clear();
+    currentDraftUserId = userId;
+  }
+  loadDraftsFromStorage(userId);
+}
+
+export function clearGlobalDrafts() {
+  globalDrafts.specific.clear();
+  globalDrafts.unanswered.clear();
+  globalDrafts.answered.clear();
+  currentDraftUserId = undefined;
+  saveDraftsToStorage();
+}
+
+/**
+ * サーバーから取得した最新の予約一覧と照合し、
+ * 存在しない予約や、すでに同一の回答になっている下書きを安全に削除する。
+ */
+export function pruneStaleDrafts(list: PracticeView[]): void {
+  const practiceMap = new Map(list.map((v) => [v.practice.id, v.myAnswer]));
+  for (const tab of ['unanswered', 'answered', 'specific'] as const) {
+    const staged = globalDrafts[tab];
+    for (const [id, answer] of staged.entries()) {
+      if (!practiceMap.has(id) || practiceMap.get(id) === answer) {
+        staged.delete(id);
+      }
+    }
+  }
+  saveDraftsToStorage();
+}
+
+export interface SpecificChange {
+  practice: PracticeView['practice'];
+  from: Answer | null;
+  to: Answer;
+}
+
+export type SpecificChangeMap = Map<string, SpecificChange>;
+
+/**
+ * 特定予約モード（?r=）での回答選択時に変更履歴を記録する。
+ * 最初から回答変更を繰り返した場合（例: 未回答 -> 行く -> 行かない）でも、
+ * 最初の元の回答（from）を保持しつつ最新の回答（to）を更新する。
+ * 元の回答と同じ値に戻った場合（例: 行く -> 未定 -> 行く）は履歴から除外する。
+ */
+export function recordSpecificChange(
+  current: SpecificChangeMap,
+  practice: PracticeView['practice'],
+  originalAnswer: Answer | null,
+  newAnswer: Answer,
+): SpecificChangeMap {
+  const next = new Map(current);
+  const existing = next.get(practice.id);
+  const from = existing ? existing.from : originalAnswer;
+  if (from === newAnswer) {
+    next.delete(practice.id);
+  } else {
+    next.set(practice.id, {
+      practice,
+      from,
+      to: newAnswer,
+    });
+  }
+  return next;
+}
+
+export interface ModifiedItem {
+  id: string;
+  answer: Answer;
+  originalAnswer: Answer | null;
+  practice: PracticeView['practice'];
+}
+
+/**
+ * 下書きを更新する純粋関数。
+ * 元の回答と同じ値が選ばれた場合は下書きから削除し、異なれば追加/更新する。
+ */
+export function stageAnswer(
+  staged: StageMap,
+  id: string,
+  answer: Answer,
+  originalAnswer: Answer | null,
+): StageMap {
+  const next = new Map(staged);
+  if (originalAnswer === answer) {
+    next.delete(id);
+  } else {
+    next.set(id, answer);
+  }
+  return next;
+}
+
+/**
+ * 練習一覧に現在のタブ（または特定指定）の下書き回答を適用した表示用リストを生成する。
+ */
+export function computeDisplayedPractices(
+  baseList: PracticeView[],
+  currentStaged: StageMap,
+): PracticeView[] {
+  return baseList.map((v) => {
+    const answer = currentStaged.has(v.practice.id) ? currentStaged.get(v.practice.id)! : v.myAnswer;
+    return answer !== v.myAnswer ? { ...v, myAnswer: answer } : v;
+  });
+}
+
+/**
+ * 現在の下書きから、元の回答と差分がある項目一覧を抽出する。
+ */
+export function getModifiedItems(
+  staged: StageMap,
+  list: PracticeView[] | null | undefined,
+): ModifiedItem[] {
+  if (!list) return [];
+  const items: ModifiedItem[] = [];
+  for (const [id, answer] of staged.entries()) {
+    const original = list.find((x) => x.practice.id === id);
+    if (original && original.myAnswer !== answer) {
+      items.push({
+        id,
+        answer,
+        originalAnswer: original.myAnswer,
+        practice: original.practice,
+      });
+    }
+  }
+  return items;
+}
+
+/**
+ * 保存成功した項目の ID を下書きから除外し、失敗した項目のみを残す。
+ */
+export function cleanupAfterCommit(staged: StageMap, succeededIds: string[]): StageMap {
+  const next = new Map(staged);
+  for (const id of succeededIds) {
+    next.delete(id);
+  }
+  return next;
+}
+
+export interface CommitResult {
+  succeeded: number;
+  failed: number;
+  succeededIds: string[];
+  lastError: Error | null;
+}
+
+/**
+ * 複数件の回答保存処理を実行する。
+ * 各項目を順次保存し、成功数・失敗数・成功したID一覧・最後のエラーを返す。
+ */
+export async function processCommitItems(
+  items: ModifiedItem[],
+  saveItem: (item: ModifiedItem) => Promise<void>,
+): Promise<CommitResult> {
+  let succeeded = 0;
+  let failed = 0;
+  const succeededIds: string[] = [];
+  let lastError: Error | null = null;
+
+  for (const item of items) {
+    try {
+      await saveItem(item);
+      succeeded++;
+      succeededIds.push(item.id);
+    } catch (err) {
+      failed++;
+      lastError = err instanceof Error ? err : new Error(String(err));
+    }
+  }
+
+  return { succeeded, failed, succeededIds, lastError };
+}
+
+/**
+ * 複数グループ環境における下書きの所属グループ状態を判定する。
+ */
+export interface DraftGroupStatus {
+  hasSelectedDraft: boolean;
+  selectedGroupName: string;
+  otherDraftGroupNames: string[];
+}
+
+export function getDraftGroupStatus(
+  allModifiedItems: ModifiedItem[],
+  userGroups: { id: string; name: string }[],
+  selectedGroupId: string,
+  myUserId?: string,
+): DraftGroupStatus {
+  const selectedGroup = userGroups.find((g) => g.id === selectedGroupId);
+  const selectedGroupName = selectedGroup?.name ?? '選択中のグループ';
+
+  const matchesGroup = (item: ModifiedItem, groupId: string) => {
+    if (item.practice.groups.length === 0) return true;
+    if (item.practice.groups.includes(groupId)) return true;
+    if (myUserId && item.practice.booker === myUserId) return true;
+    return false;
+  };
+
+  const hasSelectedDraft = selectedGroupId
+    ? allModifiedItems.some((m) => matchesGroup(m, selectedGroupId))
+    : allModifiedItems.length > 0;
+
+  const otherDraftGroupNames = userGroups
+    .filter((g) => g.id !== selectedGroupId)
+    .filter((g) => allModifiedItems.some((m) => matchesGroup(m, g.id)))
+    .map((g) => g.name);
+
+  return {
+    hasSelectedDraft,
+    selectedGroupName,
+    otherDraftGroupNames,
+  };
+}
+
+/**
+ * RSVP 画面のナビゲーションガードを生成する。
+ * 未反映の下書きがある状態で別画面へ遷移しようとした場合に確認ダイアログを出し、
+ * 承認された場合は下書きをクリアして遷移を許可、キャンセルされた場合は遷移を阻止する。
+ */
+export function createRsvpNavigationGuard(
+  hasAnyChangesRef: { current: boolean },
+  confirmFn: (message: string) => boolean = (msg) => window.confirm(msg),
+): (toPath: string) => boolean {
+  return (toPath: string) => {
+    // RSVP 画面自身への遷移時は確認ダイアログを出さずにそのまま許可
+    if (toPath.startsWith('/answer')) {
+      return true;
+    }
+    if (hasAnyChangesRef.current) {
+      if (!confirmFn('回答の変更が反映されていません。破棄して移動しますか？')) {
+        return false;
+      }
+      hasAnyChangesRef.current = false;
+      clearGlobalDrafts();
+    }
+    return true;
+  };
+}
+
+/**
+ * 「グループに伝える」の途中で保存済になった（が未送信の）項目と、現在の未保存変更項目を統合する。
+ * 一部保存失敗後の再試行時や、pruneStaleDrafts 実行後でも送信文面から成功分が欠けないようにする。
+ */
+export function mergePendingTellItems(
+  pendingItems: ModifiedItem[],
+  currentModifiedItems: ModifiedItem[],
+): ModifiedItem[] {
+  if (pendingItems.length === 0) return currentModifiedItems;
+  const currentMap = new Map(currentModifiedItems.map((item) => [item.id, item]));
+  const merged: ModifiedItem[] = [];
+  for (const p of pendingItems) {
+    merged.push(currentMap.get(p.id) ?? p);
+    currentMap.delete(p.id);
+  }
+  for (const item of currentMap.values()) {
+    merged.push(item);
+  }
+  return merged;
+}
+
+/**
+ * 回答保存・メッセージ送信のワークフロー。
+ * 未保存の変更がある場合は先に保存を実行し、保存失敗（failed > 0）時は送信を中断する。
+ * 一部保存失敗時や送信エラー時には、文面や保存済項目を保持して再試行で文面が欠けないようにする。
+ */
+export async function runTellWorkflow({
+  body,
+  hasTargetChanges,
+  targetModifiedItems,
+  commitItems,
+  send,
+  onPreserveDraft,
+  onPartialCommit,
+  onSent,
+}: {
+  body: string;
+  hasTargetChanges: boolean;
+  targetModifiedItems: ModifiedItem[];
+  commitItems: (items: ModifiedItem[]) => Promise<{ succeeded: number; failed: number; succeededIds?: string[] }>;
+  send: (body: string) => Promise<void>;
+  onPreserveDraft?: (body: string) => void;
+  onPartialCommit?: (succeededItems: ModifiedItem[]) => void;
+  onSent?: () => void;
+}): Promise<'sent' | 'aborted_by_commit_failure'> {
+  if (hasTargetChanges) {
+    const { succeeded, failed, succeededIds } = await commitItems(targetModifiedItems);
+    if (failed > 0) {
+      if (succeeded > 0) {
+        const succeededSet = succeededIds
+          ? new Set(succeededIds)
+          : new Set(targetModifiedItems.slice(0, succeeded).map((i) => i.id));
+        onPartialCommit?.(targetModifiedItems.filter((item) => succeededSet.has(item.id)));
+      }
+      onPreserveDraft?.(body);
+      return 'aborted_by_commit_failure';
+    }
+  }
+  try {
+    await send(body);
+    onSent?.();
+    return 'sent';
+  } catch (err) {
+    if (hasTargetChanges && targetModifiedItems.length > 0) {
+      onPartialCommit?.(targetModifiedItems);
+    }
+    onPreserveDraft?.(body);
+    throw err;
+  }
+}
+
+/**
+ * 選択中グループに合致する予約情報を抽出する。
+ * groups が空の予約情報（登録のみ等）や、自分が予約者の予約情報はどのグループ選択時にも表示する。
+ * また、参加リンク回答やグループ脱退後など、所属外グループ宛でも自分が回答済みの予約情報は回答変更できるよう表示する。
+ */
+export function filterGroupPractices(
+  practices: PracticeView[],
+  selectedGroup: string,
+  myUserId?: string,
+  userGroupIds?: Set<string>,
+): PracticeView[] {
+  if (!selectedGroup) return practices;
+  return practices.filter((v) => {
+    if (v.practice.groups.length === 0) return true;
+    if (v.practice.groups.includes(selectedGroup)) return true;
+    if (myUserId && v.practice.booker === myUserId) return true;
+    // 所属グループ宛ではないが回答済みの練習（参加リンク回答やグループ脱退後等）は回答変更できるよう表示
+    if (v.myAnswer != null && (!userGroupIds || !v.practice.groups.some((gid) => userGroupIds.has(gid)))) {
+      return true;
+    }
+    return false;
+  });
+}
+
+/**
+ * 「回答を反映して完了」のワークフロー。
+ * 選択中グループの変更項目（全タブ分）を保存し、完了時のトースト文面を決定する。
+ */
+export async function runDoneWorkflow({
+  groupAllModifiedItems,
+  commitItems,
+  otherDraftGroupNames,
+  onSuccess,
+}: {
+  groupAllModifiedItems: ModifiedItem[];
+  commitItems: (items: ModifiedItem[]) => Promise<{ succeeded: number; failed: number }>;
+  otherDraftGroupNames: string[];
+  onSuccess: (message: string) => void;
+}): Promise<'saved' | 'failed' | 'noop'> {
+  if (groupAllModifiedItems.length === 0) return 'noop';
+  const count = groupAllModifiedItems.length;
+  const { failed } = await commitItems(groupAllModifiedItems);
+  if (failed > 0) return 'failed';
+
+  const message =
+    otherDraftGroupNames.length > 0
+      ? `${count}件の回答を反映しました（「${otherDraftGroupNames.join('、')}」の下書きが残っています）`
+      : `${count}件の回答を反映しました（グループには送信されていません）`;
+  onSuccess(message);
+  return 'saved';
+}
+
+/**
+ * 選択中グループに合致する変更項目をフィルタリングする。
+ * displayedIds が指定されている場合は表示中タブの項目に絞り込み、省略時は全タブの項目を対象とする。
+ * groups が空の予約情報や自分が予約者の予約情報はどのグループ選択時にも対象に含める。
+ */
+export function filterTargetModifiedItems(
+  modifiedItems: ModifiedItem[],
+  displayedIds: Set<string> | null | undefined,
+  selectedGroup: string,
+  myUserId?: string,
+  userGroupIds?: Set<string>,
+): ModifiedItem[] {
+  return modifiedItems.filter((item) => {
+    if (displayedIds && !displayedIds.has(item.id)) return false;
+    if (!selectedGroup || item.practice.groups.length === 0) return true;
+    if (item.practice.groups.includes(selectedGroup)) return true;
+    if (myUserId && item.practice.booker === myUserId) return true;
+    // 所属グループ宛ではないが回答済みの練習を変更した項目も反映対象に含める
+    if (item.originalAnswer != null && (!userGroupIds || !item.practice.groups.some((gid) => userGroupIds.has(gid)))) {
+      return true;
+    }
+    return false;
+  });
+}
+
+/**
+ * 特定指定（isSpecific）時の送信メッセージを生成する。
+ * 未回答からの新規回答と、回答済からの変更が混在していても正しく結合して生成する。
+ */
+export function generateSpecificReport(changes: Iterable<SpecificChange>): string {
+  const items = Array.from(changes).filter((c) => c.practice.status !== '中止');
+  if (items.length === 0) return '';
+
+  const newAnswers = items.filter((c) => c.from == null);
+  const changedAnswers = items.filter((c) => c.from != null);
+
+  const parts: string[] = [];
+
+  if (newAnswers.length > 0) {
+    const report = answerReport(
+      newAnswers.map((c) => ({ practice: c.practice, answer: c.to })),
+    );
+    if (report) parts.push(report);
+  }
+
+  if (changedAnswers.length > 0) {
+    const report = answerChangeReport(
+      changedAnswers.map((c) => ({ practice: c.practice, from: c.from, to: c.to })),
+    );
+    if (report) parts.push(report);
+  }
+
+  return parts.join('\n\n');
+}
+
+export interface UnansweredGroupCount {
+  id: string;
+  name: string;
+  unansweredCount: number;
+}
+
+export interface UnansweredSummary {
+  totalCount: number;
+  groups: UnansweredGroupCount[];
+  initialGroupId: string;
+}
+
+/**
+ * 下部メニュー（NavBar）のバッジとRSVP画面のグループ別未回答件数を一貫したロジックで算出する。
+ * 複数グループ所属時は未回答がある最初のグループを初期選択グループ（initialGroupId）として返す。
+ */
+export function getUnansweredSummary(
+  practices: PracticeView[] | null | undefined,
+  me: Pick<MeView, 'member' | 'groups' | 'settings'>,
+  today: string,
+  currentTime?: string,
+): UnansweredSummary {
+  const allGroups = me.groups && me.groups.length > 0 ? me.groups : me.settings?.groups || [];
+  const myGroupIds = new Set(me.member.groups);
+  const userGroups = allGroups.filter((g) => myGroupIds.has(g.id));
+
+  if (!practices) {
+    return {
+      totalCount: 0,
+      groups: userGroups.map((g) => ({ id: g.id, name: g.name, unansweredCount: 0 })),
+      initialGroupId: userGroups[0]?.id || '',
+    };
+  }
+
+  const rsvpTargets = practices.filter((v) =>
+    isRsvpTarget(v, me.member.userId, me.member.groups, today, currentTime),
+  );
+  const totalCount = rsvpTargets.filter((v) => v.myAnswer == null).length;
+
+  const groups = userGroups.map((g) => {
+    const unansweredCount = filterGroupPractices(
+      rsvpTargets,
+      g.id,
+      me.member.userId,
+      myGroupIds,
+    ).filter((v) => v.myAnswer == null).length;
+    return { id: g.id, name: g.name, unansweredCount };
+  });
+
+  const firstWithUnanswered = groups.find((g) => g.unansweredCount > 0);
+  const initialGroupId = firstWithUnanswered?.id ?? userGroups[0]?.id ?? '';
+
+  return {
+    totalCount,
+    groups,
+    initialGroupId,
+  };
+}
+
+/**
+ * 回答保存中（Infinity）・保存完了直後（完了時刻）の練習マップと一覧取得開始時刻（fetchStartedAt）を比較し、
+ * 今回の再取得で保護すべきID一覧を純粋関数として抽出する（引数 touched の変更は行わない）。
+ * 保存中（Infinity）または取得開始以降に保存完了した練習（touchedAt >= fetchStartedAt）は保護対象となる。
+ */
+export function resolveKeepIds(
+  touched: ReadonlyMap<string, number>,
+  fetchStartedAt: number,
+): Set<string> {
+  const keep = new Set<string>();
+  for (const [id, touchedAt] of touched.entries()) {
+    if (touchedAt >= fetchStartedAt) {
+      keep.add(id);
+    }
+  }
+  return keep;
+}
+
+/**
+ * 保存完了後に開始された再取得（touchedAt < fetchStartedAt）が完了した際、
+ * ステート更新関数の外で安全に保護マップから解除する。
+ */
+export function pruneResolvedTouches(
+  touched: Map<string, number>,
+  fetchStartedAt: number,
+): void {
+  for (const [id, touchedAt] of touched.entries()) {
+    if (touchedAt < fetchStartedAt) {
+      touched.delete(id);
+    }
+  }
+}
+
+/**
+ * 回答保存中（Infinity）・保存完了直後の巻き戻り防止トラッカー。
+ * ステート更新関数の外で保護IDの解決と不要エントリの削除を行う。
+ */
+export function createPracticeSyncTracker(nowFn: () => number = () => Date.now()) {
+  const touched = new Map<string, number>();
+  return {
+    touched,
+    touchPractice(id: string) {
+      touched.set(id, Infinity);
+    },
+    untouchPractice(id: string) {
+      touched.delete(id);
+    },
+    markUpdated(id: string, revert = false) {
+      if (revert) touched.delete(id);
+      else touched.set(id, nowFn());
+    },
+    prepareMerge(fetchStartedAt: number): Set<string> {
+      const keepIds = resolveKeepIds(touched, fetchStartedAt);
+      pruneResolvedTouches(touched, fetchStartedAt);
+      return keepIds;
+    },
+  };
+}
+
+/**
+ * サーバーからの一覧再取得時、回答操作中・操作済みの練習を現在の内容で保護してマージする。
+ * （古いサーバー結果で、ユーザーが押した回答が「未回答」に戻るのを防止する）
+ * ステート更新関数内でも安全に呼べるよう純粋関数として動作する。
+ */
+export function mergePracticesWithKeep(
+  incoming: PracticeView[],
+  current: PracticeView[] | null | undefined,
+  keepIds: ReadonlySet<string> | ReadonlyMap<string, number> | null | undefined,
+  fetchStartedAt = 0,
+): PracticeView[] {
+  if (!current || !keepIds || keepIds.size === 0) return incoming;
+  const activeKeepIds =
+    keepIds instanceof Map ? resolveKeepIds(keepIds, fetchStartedAt) : keepIds;
+  if (activeKeepIds.size === 0) return incoming;
+  return incoming.map((v) => {
+    if (activeKeepIds.has(v.practice.id)) {
+      return current.find((x) => x.practice.id === v.practice.id) ?? v;
+    }
+    return v;
+  });
+}
+
+/**
+ * 回答選択時の処理ワークフロー。
+ * 特定予約モード（?r=）では従来どおり即時API保存＋トーストを行い、
+ * 通常のメニューからの回答では下書きステートへの追加のみを行う。
+ * 読み込み中や保存中（!fresh || busy || saving）は二重操作を確実にガードする。
+ */
+export interface StageAnswerParams {
+  id: string;
+  answer: Answer;
+  isSpecific: boolean;
+  fresh: boolean;
+  busy: boolean;
+  saving: boolean;
+  originalPractice?: PracticeView;
+  apiSave: (id: string, answer: Answer) => Promise<PracticeView>;
+  touchPractice: (id: string) => void;
+  untouchPractice?: (id: string) => void;
+  updatePractice: (updated: PracticeView) => void;
+  toast: (msg: string, error?: boolean) => void;
+  onSpecificSaved: (updated: PracticeView, originalAnswer: Answer | null) => void;
+  onDraftStaged: (originalAnswer: Answer | null) => void;
+}
+
+export async function executeStageAnswer(
+  params: StageAnswerParams,
+): Promise<'saved' | 'staged' | 'guarded' | 'not_found'> {
+  if (!params.fresh || params.busy || params.saving) return 'guarded';
+  if (!params.originalPractice) return 'not_found';
+
+  if (params.isSpecific) {
+    params.touchPractice(params.id);
+    try {
+      const updated = await params.apiSave(params.id, params.answer);
+      params.updatePractice(updated);
+      params.onSpecificSaved(updated, params.originalPractice.myAnswer);
+      params.toast('回答を記録しました');
+      return 'saved';
+    } catch (e) {
+      params.untouchPractice?.(params.id);
+      params.toast(e instanceof Error ? e.message : '保存に失敗しました', true);
+      throw e;
+    }
+  } else {
+    params.onDraftStaged(params.originalPractice.myAnswer);
+    return 'staged';
+  }
+}
