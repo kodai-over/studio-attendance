@@ -7,14 +7,16 @@ import {
 
 export type StageMap = Map<string, Answer>;
 
-/**
- * 画面切り替えやアンマウントで下書きが失われないよう、モジュールレベルで保持
- */
-export const globalDrafts: {
+export interface DraftStore {
   specific: StageMap;
   unanswered: StageMap;
   answered: StageMap;
-} = {
+}
+
+/**
+ * 画面切り替えやアンマウントで下書きが失われないよう、モジュールレベルで保持
+ */
+export const globalDrafts: DraftStore = {
   specific: new Map(),
   unanswered: new Map(),
   answered: new Map(),
@@ -24,6 +26,51 @@ export function clearGlobalDrafts() {
   globalDrafts.specific.clear();
   globalDrafts.unanswered.clear();
   globalDrafts.answered.clear();
+}
+
+/**
+ * サーバーから取得した最新の予約一覧と照合し、
+ * 存在しない予約や、すでに同一の回答になっている下書きを安全に削除する。
+ */
+export function pruneStaleDrafts(list: PracticeView[]): void {
+  const practiceMap = new Map(list.map((v) => [v.practice.id, v.myAnswer]));
+  for (const tab of ['unanswered', 'answered', 'specific'] as const) {
+    const staged = globalDrafts[tab];
+    for (const [id, answer] of staged.entries()) {
+      if (!practiceMap.has(id) || practiceMap.get(id) === answer) {
+        staged.delete(id);
+      }
+    }
+  }
+}
+
+export interface SpecificChange {
+  practice: PracticeView['practice'];
+  from: Answer | null;
+  to: Answer;
+}
+
+export type SpecificChangeMap = Map<string, SpecificChange>;
+
+/**
+ * 特定予約モード（?r=）での回答選択時に変更履歴を記録する。
+ * 最初から回答変更を繰り返した場合（例: 未回答 -> 行く -> 行かない）でも、
+ * 最初の元の回答（from）を保持しつつ最新の回答（to）を更新する。
+ */
+export function recordSpecificChange(
+  current: SpecificChangeMap,
+  practice: PracticeView['practice'],
+  originalAnswer: Answer | null,
+  newAnswer: Answer,
+): SpecificChangeMap {
+  const next = new Map(current);
+  const existing = next.get(practice.id);
+  next.set(practice.id, {
+    practice,
+    from: existing ? existing.from : originalAnswer,
+    to: newAnswer,
+  });
+  return next;
 }
 
 export interface ModifiedItem {
@@ -127,29 +174,25 @@ export function filterTargetModifiedItems(
  * 特定指定（isSpecific）時の送信メッセージを生成する。
  * 未回答からの新規回答と、回答済からの変更が混在していても正しく結合して生成する。
  */
-export function generateSpecificReport(
-  displayed: PracticeView[],
-  modifiedItems: ModifiedItem[],
-): string {
-  // 中止以外の変更対象
-  const activeItems = modifiedItems.filter((m) => m.practice.status !== '中止');
-  if (activeItems.length === 0) return '';
+export function generateSpecificReport(changes: Iterable<SpecificChange>): string {
+  const items = Array.from(changes).filter((c) => c.practice.status !== '中止');
+  if (items.length === 0) return '';
 
-  const newAnswers = activeItems.filter((m) => m.originalAnswer == null);
-  const changedAnswers = activeItems.filter((m) => m.originalAnswer != null);
+  const newAnswers = items.filter((c) => c.from == null);
+  const changedAnswers = items.filter((c) => c.from != null);
 
   const parts: string[] = [];
 
   if (newAnswers.length > 0) {
     const report = answerReport(
-      newAnswers.map((m) => ({ practice: m.practice, answer: m.answer })),
+      newAnswers.map((c) => ({ practice: c.practice, answer: c.to })),
     );
     if (report) parts.push(report);
   }
 
   if (changedAnswers.length > 0) {
     const report = answerChangeReport(
-      changedAnswers.map((m) => ({ practice: m.practice, from: m.originalAnswer, to: m.answer })),
+      changedAnswers.map((c) => ({ practice: c.practice, from: c.from, to: c.to })),
     );
     if (report) parts.push(report);
   }

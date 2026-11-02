@@ -2,10 +2,14 @@ import { describe, expect, it } from 'vitest';
 import type { PracticeView } from '@studio-attendance/shared';
 import {
   cleanupAfterCommit,
+  clearGlobalDrafts,
   filterGroupPractices,
   filterTargetModifiedItems,
   generateSpecificReport,
   getModifiedItems,
+  globalDrafts,
+  pruneStaleDrafts,
+  recordSpecificChange,
   stageAnswer,
 } from '../src/pages/answerLogic';
 
@@ -176,38 +180,115 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
 
   describe('generateSpecificReport', () => {
     it('未回答からの新規回答のみの場合、answerReport 形式のメッセージが生成される', () => {
-      const modified = [
-        { id: 'p1', answer: '行く' as const, originalAnswer: null, practice: mockPractice1 },
+      const changes = [
+        { practice: mockPractice1, from: null, to: '行く' as const },
       ];
-      const report = generateSpecificReport(mockList, modified);
+      const report = generateSpecificReport(changes);
       expect(report).toContain('○');
       expect(report).toContain('行きます');
     });
 
     it('回答済からの変更のみの場合、answerChangeReport 形式の差分メッセージが生成される', () => {
-      const modified = [
-        { id: 'p2', answer: '行く' as const, originalAnswer: '保留' as const, practice: mockPractice2 },
+      const changes = [
+        { practice: mockPractice2, from: '保留' as const, to: '行く' as const },
       ];
-      const report = generateSpecificReport(mockList, modified);
+      const report = generateSpecificReport(changes);
       expect(report).toContain('未定 → 行く');
     });
 
     it('新規回答と変更が混在する場合、両方を結合したメッセージが生成される', () => {
-      const modified = [
-        { id: 'p1', answer: '行く' as const, originalAnswer: null, practice: mockPractice1 },
-        { id: 'p2', answer: '行かない' as const, originalAnswer: '保留' as const, practice: mockPractice2 },
+      const changes = [
+        { practice: mockPractice1, from: null, to: '行く' as const },
+        { practice: mockPractice2, from: '保留' as const, to: '行かない' as const },
       ];
-      const report = generateSpecificReport(mockList, modified);
+      const report = generateSpecificReport(changes);
       expect(report).toContain('○');
       expect(report).toContain('未定 → 行かない');
     });
 
     it('中止の練習はメッセージから除外される', () => {
-      const modified = [
-        { id: 'p3', answer: '行く' as const, originalAnswer: null, practice: mockPracticeCanceled },
+      const changes = [
+        { practice: mockPracticeCanceled, from: null, to: '行く' as const },
       ];
-      const report = generateSpecificReport(mockList, modified);
+      const report = generateSpecificReport(changes);
       expect(report).toBe('');
+    });
+  });
+
+  describe('recordSpecificChange', () => {
+    it('特定予約での回答選択時に変更履歴が正しく記録される', () => {
+      let changes = new Map();
+      changes = recordSpecificChange(changes, mockPractice1, null, '行く');
+      expect(changes.get('p1')).toEqual({
+        practice: mockPractice1,
+        from: null,
+        to: '行く',
+      });
+
+      // 同じ予約で回答を再度変更した場合、最初の from（null）が維持されて to が更新される
+      changes = recordSpecificChange(changes, mockPractice1, null, '行かない');
+      expect(changes.get('p1')).toEqual({
+        practice: mockPractice1,
+        from: null,
+        to: '行かない',
+      });
+    });
+  });
+
+  describe('pruneStaleDrafts', () => {
+    it('削除された予約や、既にサーバー側と同一の回答になっている下書きを削除する', () => {
+      clearGlobalDrafts();
+      globalDrafts.unanswered.set('p1', '行く'); // サーバー側は null なので保持されるべき
+      globalDrafts.unanswered.set('p2', '保留'); // サーバー側も '保留' なので一致して破棄されるべき
+      globalDrafts.unanswered.set('deleted-p', '行く'); // 存在しない予約なので破棄されるべき
+
+      pruneStaleDrafts(mockList);
+
+      expect(globalDrafts.unanswered.has('p1')).toBe(true);
+      expect(globalDrafts.unanswered.has('p2')).toBe(false);
+      expect(globalDrafts.unanswered.has('deleted-p')).toBe(false);
+      clearGlobalDrafts();
+    });
+  });
+
+  describe('特定予約モード（?r=）の一連のフロー: 選ぶ → 保存 → 送信文生成', () => {
+    it('特定予約カードから回答を選んで即時保存された後、送信メッセージが正しく生成される', () => {
+      // 1. 初期状態: 2件の予約（p1: 未回答, p2: 保留）
+      let currentList = [...mockList];
+      let changes = new Map();
+
+      // 2. 1件目を ○（行く）にする
+      // handleStageAnswer 内での動作をシミュレート
+      const originalP1 = currentList.find((x) => x.practice.id === 'p1')!;
+      expect(originalP1.myAnswer).toBeNull();
+
+      // api('rsvp') 成功によるリスト更新
+      currentList = currentList.map((x) =>
+        x.practice.id === 'p1' ? { ...x, myAnswer: '行く' as const } : x,
+      );
+      // 変更履歴の記録
+      changes = recordSpecificChange(changes, originalP1.practice, originalP1.myAnswer, '行く');
+
+      // 送信文の生成（リストの myAnswer が '行く' に変わった後でも、送信文が空にならず正しく生成される）
+      let report = generateSpecificReport(changes.values());
+      expect(report).not.toBe('');
+      expect(report).toContain('○');
+      expect(report).toContain('行きます');
+
+      // 3. 2件目を ✕（行かない）にする
+      const originalP2 = currentList.find((x) => x.practice.id === 'p2')!;
+      expect(originalP2.myAnswer).toBe('保留');
+
+      currentList = currentList.map((x) =>
+        x.practice.id === 'p2' ? { ...x, myAnswer: '行かない' as const } : x,
+      );
+      changes = recordSpecificChange(changes, originalP2.practice, originalP2.myAnswer, '行かない');
+
+      report = generateSpecificReport(changes.values());
+      expect(report).toContain('○');
+      expect(report).toContain('未定 → 行かない');
+      // 送信文が空でなく、2件まとまった文面が生成されている
+      expect(report.trim().length).toBeGreaterThan(0);
     });
   });
 });

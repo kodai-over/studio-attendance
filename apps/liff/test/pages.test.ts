@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { MyAnswerBadge, readTab } from '../src/pages/List';
+import { RsvpButtons } from '../src/ui';
 
 describe('MyAnswerBadge（予定一覧・詳細の回答ステータスバッジ）', () => {
   it('行く（○）のバッジが正しく返る', () => {
@@ -55,6 +56,86 @@ describe('readTab（予定一覧タブの互換性維持）', () => {
       expect(readTab()).toBe('all');
     } finally {
       globalThis.localStorage = originalLocalStorage;
+    }
+  });
+});
+
+describe('RsvpButtons（出欠選択ボタン）', () => {
+  it('満員の予約情報で未回答の場合、「行く」ボタンは disabled ではなく押下時に onBlocked("full") が呼ばれる', () => {
+    const handleAnswer = vi.fn();
+    const handleBlocked = vi.fn();
+
+    const vnode = RsvpButtons({
+      value: null,
+      status: '満員',
+      onAnswer: handleAnswer,
+      onBlocked: handleBlocked,
+    });
+
+    const buttons = vnode.props.children as Array<{
+      props: {
+        class: string;
+        disabled?: boolean;
+        onClick: () => void;
+      };
+    }>;
+    expect(buttons).toHaveLength(3);
+
+    const [yesBtn, maybeBtn, noBtn] = buttons;
+
+    // 「行く」ボタン: disabled は false で、is-blocked-full クラスが付与される
+    expect(yesBtn.props.disabled).toBeFalsy();
+    expect(yesBtn.props.class).toContain('is-blocked-full');
+
+    // 「行く」をクリックしたとき、onBlocked('full') が呼ばれ、onAnswer は呼ばれない
+    yesBtn.props.onClick();
+    expect(handleBlocked).toHaveBeenCalledWith('full');
+    expect(handleAnswer).not.toHaveBeenCalled();
+
+    // 「保留」や「行かない」は通常どおり onAnswer が呼ばれる
+    maybeBtn.props.onClick();
+    expect(handleAnswer).toHaveBeenCalledWith('保留');
+
+    noBtn.props.onClick();
+    expect(handleAnswer).toHaveBeenCalledWith('行かない');
+  });
+
+  it('自分がすでに「行く」を選択済みの場合は満員でもブロックされない', () => {
+    const handleAnswer = vi.fn();
+    const handleBlocked = vi.fn();
+
+    const vnode = RsvpButtons({
+      value: '行く',
+      status: '満員',
+      onAnswer: handleAnswer,
+      onBlocked: handleBlocked,
+    });
+
+    const buttons = vnode.props.children as Array<{
+      props: {
+        class: string;
+        disabled?: boolean;
+        onClick: () => void;
+      };
+    }>;
+    const [yesBtn] = buttons;
+    expect(yesBtn.props.class).not.toContain('is-blocked-full');
+  });
+
+  it('中止または終了の予約情報では全ボタンが disabled になる', () => {
+    const vnode = RsvpButtons({
+      value: null,
+      status: '中止',
+      onAnswer: vi.fn(),
+    });
+
+    const buttons = vnode.props.children as Array<{
+      props: {
+        disabled?: boolean;
+      };
+    }>;
+    for (const btn of buttons) {
+      expect(btn.props.disabled).toBe(true);
     }
   });
 });

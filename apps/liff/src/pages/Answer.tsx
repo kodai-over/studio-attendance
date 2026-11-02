@@ -22,8 +22,11 @@ import {
   generateSpecificReport,
   getModifiedItems,
   globalDrafts,
+  pruneStaleDrafts,
+  recordSpecificChange,
   stageAnswer,
   type ModifiedItem,
+  type SpecificChangeMap,
   type StageMap,
 } from './answerLogic';
 
@@ -42,6 +45,9 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   const [specificStaged, setSpecificStaged] = useState<StageMap>(() => new Map(globalDrafts.specific));
   const [unansweredStaged, setUnansweredStaged] = useState<StageMap>(() => new Map(globalDrafts.unanswered));
   const [answeredStaged, setAnsweredStaged] = useState<StageMap>(() => new Map(globalDrafts.answered));
+
+  // 特定予約指定時の変更履歴（即時保存された変更を送信文生成に使う）
+  const [specificChanges, setSpecificChanges] = useState<SpecificChangeMap>(new Map());
 
   const [run, busy] = useRunner();
   const [saving, setSaving] = useState(false);
@@ -74,6 +80,12 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   useEffect(() => {
     if (load === 'loading') reload();
   }, []);
+
+  useEffect(() => {
+    if (list) {
+      pruneStaleDrafts(list);
+    }
+  }, [list]);
 
   useEffect(() => {
     if (load !== 'wait') return;
@@ -200,11 +212,16 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   // 個別の回答変更（特定予約指定時は即時保存、通常画面ではドラフト更新）
   const handleStageAnswer = async (id: string, a: Answer) => {
     const original = list?.find((x) => x.practice.id === id);
+    if (!original) return;
+
     if (isSpecific) {
       setSaving(true);
       try {
         const updated = await api('rsvp', { id, answer: a });
         updatePractice(updated);
+        setSpecificChanges((prev) =>
+          recordSpecificChange(prev, updated.practice, original.myAnswer, a),
+        );
         setSpecificStaged((prev) => {
           const next = new Map(prev);
           next.set(id, a);
@@ -219,7 +236,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     } else {
       const key = subTab;
       const targetMap = subTab === 'unanswered' ? unansweredStaged : answeredStaged;
-      const next = stageAnswer(targetMap, id, a, original ? original.myAnswer : null);
+      const next = stageAnswer(targetMap, id, a, original.myAnswer);
       globalDrafts[key] = next;
       setCurrentStaged(next);
     }
@@ -237,10 +254,6 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     setSelectedGroup(gId);
     setDraft(null);
   };
-
-  // メッセージ対象の練習（選択中グループの練習。groupsが空なら全グループ対象）
-  const messagePracticeFilter = (p: Pick<Practice, 'groups'>) =>
-    !selectedGroup || p.groups.length === 0 || p.groups.includes(selectedGroup);
 
   // 表示中かつ選択グループに該当する変更項目（メッセージと件数を完全連動させる）
   const displayedIds = new Set(displayed.map((v) => v.practice.id));
@@ -302,13 +315,11 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   // 送信文の生成
   let report = '';
   if (isSpecific) {
-    report = generateSpecificReport(displayed, targetModifiedItems);
+    report = generateSpecificReport(specificChanges.values());
   } else if (subTab === 'unanswered') {
-    // 未回答タブ: 「回答しました」形式（回答が入力された項目のみ）
-    const activeUnanswered = displayed
-      .filter((v) => v.practice.status !== '中止' && messagePracticeFilter(v.practice))
-      .filter((v) => v.myAnswer != null);
-    report = answerReport(activeUnanswered.map((v) => ({ practice: v.practice, answer: v.myAnswer }))) ?? '';
+    // 未回答タブ: 「回答しました」形式（回答が入力された項目のみ。targetModifiedItems に揃える）
+    const activeUnanswered = targetModifiedItems.filter((item) => item.practice.status !== '中止');
+    report = answerReport(activeUnanswered.map((item) => ({ practice: item.practice, answer: item.answer }))) ?? '';
   } else {
     // 回答済タブ: 「回答を変更しました」形式（どういう変更をしたかを明示）
     const activeModified = targetModifiedItems.filter((item) => item.practice.status !== '中止');
@@ -339,11 +350,11 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
       }
       if (chat === 'ok') {
         await sendToChat(body);
-        toast('回答を反映し、グループに伝えました');
+        toast(isSpecific ? 'グループに伝えました' : '回答を反映し、グループに伝えました');
         closeApp();
       } else {
         await navigator.clipboard.writeText(body);
-        toast('回答を反映し、メッセージをコピーしました');
+        toast(isSpecific ? 'メッセージをコピーしました' : '回答を反映し、メッセージをコピーしました');
       }
     } catch (e) {
       toast(e instanceof Error ? e.message : '送信に失敗しました', true);
@@ -396,7 +407,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
         {(busy || saving || load === 'loading' || load === 'wait') && <Syncing />}
       </TopBar>
 
-      {hasAnyChanges && (
+      {!isSpecific && hasAnyChanges && (
         <div class="rsvp-unsaved-banner">
           <Icon name="check" size={15} />
           <span>下書きがあります。「グループに伝える」または「完了」を押すまで保存されません</span>
