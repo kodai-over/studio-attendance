@@ -352,3 +352,49 @@ export function mergePracticesWithKeep(
     return v;
   });
 }
+
+/**
+ * 回答選択時の処理ワークフロー。
+ * 特定予約モード（?r=）では従来どおり即時API保存＋トーストを行い、
+ * 通常のメニューからの回答では下書きステートへの追加のみを行う。
+ * 読み込み中や保存中（!fresh || busy || saving）は二重操作を確実にガードする。
+ */
+export interface StageAnswerParams {
+  id: string;
+  answer: Answer;
+  isSpecific: boolean;
+  fresh: boolean;
+  busy: boolean;
+  saving: boolean;
+  originalPractice?: PracticeView;
+  apiSave: (id: string, answer: Answer) => Promise<PracticeView>;
+  touchPractice: (id: string) => void;
+  updatePractice: (updated: PracticeView) => void;
+  toast: (msg: string, error?: boolean) => void;
+  onSpecificSaved: (updated: PracticeView, originalAnswer: Answer | null) => void;
+  onDraftStaged: (originalAnswer: Answer | null) => void;
+}
+
+export async function executeStageAnswer(
+  params: StageAnswerParams,
+): Promise<'saved' | 'staged' | 'guarded' | 'not_found'> {
+  if (!params.fresh || params.busy || params.saving) return 'guarded';
+  if (!params.originalPractice) return 'not_found';
+
+  if (params.isSpecific) {
+    params.touchPractice(params.id);
+    try {
+      const updated = await params.apiSave(params.id, params.answer);
+      params.updatePractice(updated);
+      params.onSpecificSaved(updated, params.originalPractice.myAnswer);
+      params.toast('回答を記録しました');
+      return 'saved';
+    } catch (e) {
+      params.toast(e instanceof Error ? e.message : '保存に失敗しました', true);
+      throw e;
+    }
+  } else {
+    params.onDraftStaged(params.originalPractice.myAnswer);
+    return 'staged';
+  }
+}

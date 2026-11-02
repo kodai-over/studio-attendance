@@ -73,7 +73,6 @@ function App() {
 
   /** 起動時と同じまとめ取得。起動中に差し替えた練習と、回答を送っている途中の練習は、取得の結果で戻さない */
   const loadHome = async () => {
-    const started = Date.now();
     const home = await api('home', entry.current);
     setMe(home.me);
     setPracticesState((cur) => {

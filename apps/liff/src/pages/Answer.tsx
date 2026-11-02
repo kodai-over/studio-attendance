@@ -16,6 +16,7 @@ import { PracticeCard } from './List';
 import {
   cleanupAfterCommit,
   clearGlobalDrafts,
+  executeStageAnswer,
   filterGroupPractices,
   filterTargetModifiedItems,
   generateSpecificReport,
@@ -205,38 +206,47 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
 
   // 個別の回答変更（特定予約指定時は即時保存、通常画面では下書き更新）
   const handleStageAnswer = async (id: string, a: Answer) => {
-    if (!fresh || busy || saving) return;
     const original = list?.find((x) => x.practice.id === id);
-    if (!original) return;
-
-    if (isSpecific) {
-      touchPractice(id);
-      setSaving(true);
-      try {
-        const updated = await api('rsvp', { id, answer: a });
-        updatePractice(updated);
-        setSpecificChanges((prev) =>
-          recordSpecificChange(prev, updated.practice, original.myAnswer, a),
-        );
-        setSpecificStaged((prev) => {
-          const next = new Map(prev);
-          next.set(id, a);
-          return next;
-        });
-        toast('回答を記録しました');
-      } catch (e) {
-        toast(e instanceof Error ? e.message : '保存に失敗しました', true);
-      } finally {
-        setSaving(false);
+    if (isSpecific) setSaving(true);
+    try {
+      const outcome = await executeStageAnswer({
+        id,
+        answer: a,
+        isSpecific,
+        fresh,
+        busy,
+        saving,
+        originalPractice: original,
+        apiSave: (pId, pAnswer) => api('rsvp', { id: pId, answer: pAnswer }),
+        touchPractice,
+        updatePractice,
+        toast,
+        onSpecificSaved: (updated, originalAnswer) => {
+          setSpecificChanges((prev) =>
+            recordSpecificChange(prev, updated.practice, originalAnswer, a),
+          );
+          setSpecificStaged((prev) => {
+            const next = new Map(prev);
+            next.set(id, a);
+            return next;
+          });
+        },
+        onDraftStaged: (originalAnswer) => {
+          const key = subTab;
+          const targetMap = subTab === 'unanswered' ? unansweredStaged : answeredStaged;
+          const next = stageAnswer(targetMap, id, a, originalAnswer);
+          globalDrafts[key] = next;
+          setCurrentStaged(next);
+        },
+      });
+      if (outcome === 'saved' || outcome === 'staged') {
+        setDraft(null); // 手動編集をリセットして再生成
       }
-    } else {
-      const key = subTab;
-      const targetMap = subTab === 'unanswered' ? unansweredStaged : answeredStaged;
-      const next = stageAnswer(targetMap, id, a, original.myAnswer);
-      globalDrafts[key] = next;
-      setCurrentStaged(next);
+    } catch {
+      /* トースト通知済み */
+    } finally {
+      if (isSpecific) setSaving(false);
     }
-    setDraft(null); // 手動編集をリセットして再生成
   };
 
   // タブ切り替え
@@ -620,6 +630,18 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
             ※「完了」は回答の保存のみ行います。グループへ知らせたいときは「グループに伝える」を押してください。
           </p>
         </>
+      )}
+
+      {!isSpecific && hasGroupAllChanges && (
+        <div class="rsvp-floating-bar" role="region" aria-label="未反映の下書き">
+          <div class="rsvp-floating-bar-text">
+            <Icon name="check" size={15} />
+            <span>未反映の下書き（{groupAllModifiedItems.length}件）</span>
+          </div>
+          <button class="btn primary" disabled={saving} onClick={handleDone}>
+            {saving ? '保存中...' : '反映して完了'}
+          </button>
+        </div>
       )}
     </>
   );

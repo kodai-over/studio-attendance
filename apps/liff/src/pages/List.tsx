@@ -30,8 +30,7 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
 
   useEffect(() => {
     // 起動時のまとめ取得から時間がたっていれば取り直す（前回の表示のときは起動処理が取り直すので待つ）
-    const started = Date.now();
-    if (practicesAt > 0 && started - practicesAt > FRESH_MS) run(() => api('listPractices')).then((r) => r && setPractices(r, false, started));
+    if (practicesAt > 0 && Date.now() - practicesAt > FRESH_MS) run(() => api('listPractices')).then((r) => r && setPractices(r, false));
   }, []);
 
   const selectTab = (t: Tab) => {

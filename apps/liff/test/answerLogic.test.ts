@@ -3,6 +3,7 @@ import { answerReport, type PracticeView } from '@studio-attendance/shared';
 import {
   cleanupAfterCommit,
   clearGlobalDrafts,
+  executeStageAnswer,
   filterGroupPractices,
   filterTargetModifiedItems,
   generateSpecificReport,
@@ -692,6 +693,119 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       expect(result).toBe('saved');
       expect(commitItems).toHaveBeenCalledTimes(1);
       expect(onSuccess).toHaveBeenCalledWith('1件の回答を反映しました（「チームB」の下書きが残っています）');
+    });
+  });
+
+  describe('executeStageAnswer (特定予約即時記録 / 通常画面下書き更新ワークフロー)', () => {
+    it('特定予約モード（?r=）で回答を選んだ場合、従来通り即座に apiSave が呼ばれて保存され、記録トーストが出る', async () => {
+      const original: PracticeView = { practice: mockPractice1, myAnswer: null, attendees: [] };
+      const updated: PracticeView = { practice: mockPractice1, myAnswer: '行く', attendees: [] };
+      const apiSave = vi.fn().mockResolvedValue(updated);
+      const touchPractice = vi.fn();
+      const updatePractice = vi.fn();
+      const toast = vi.fn();
+      const onSpecificSaved = vi.fn();
+      const onDraftStaged = vi.fn();
+
+      const outcome = await executeStageAnswer({
+        id: 'p1',
+        answer: '行く',
+        isSpecific: true,
+        fresh: true,
+        busy: false,
+        saving: false,
+        originalPractice: original,
+        apiSave,
+        touchPractice,
+        updatePractice,
+        toast,
+        onSpecificSaved,
+        onDraftStaged,
+      });
+
+      expect(outcome).toBe('saved');
+      // 巻き戻り防止のための touch が即時実行される
+      expect(touchPractice).toHaveBeenCalledWith('p1');
+      // 即時API保存が実行される
+      expect(apiSave).toHaveBeenCalledWith('p1', '行く');
+      expect(updatePractice).toHaveBeenCalledWith(updated);
+      expect(onSpecificSaved).toHaveBeenCalledWith(updated, null);
+      expect(toast).toHaveBeenCalledWith('回答を記録しました');
+      // 下書きハンドラは呼ばれない
+      expect(onDraftStaged).not.toHaveBeenCalled();
+    });
+
+    it('通常メニューからの回答の場合、即時API保存は呼ばれず下書きステート更新のみ行われる', async () => {
+      const original: PracticeView = { practice: mockPractice1, myAnswer: null, attendees: [] };
+      const apiSave = vi.fn();
+      const touchPractice = vi.fn();
+      const updatePractice = vi.fn();
+      const toast = vi.fn();
+      const onSpecificSaved = vi.fn();
+      const onDraftStaged = vi.fn();
+
+      const outcome = await executeStageAnswer({
+        id: 'p1',
+        answer: '行く',
+        isSpecific: false,
+        fresh: true,
+        busy: false,
+        saving: false,
+        originalPractice: original,
+        apiSave,
+        touchPractice,
+        updatePractice,
+        toast,
+        onSpecificSaved,
+        onDraftStaged,
+      });
+
+      expect(outcome).toBe('staged');
+      expect(apiSave).not.toHaveBeenCalled();
+      expect(touchPractice).not.toHaveBeenCalled();
+      expect(onSpecificSaved).not.toHaveBeenCalled();
+      expect(onDraftStaged).toHaveBeenCalledWith(null);
+    });
+
+    it('保存中（saving: true）または取得中（fresh: false）の二重タップ時はガードされ何もしない', async () => {
+      const original: PracticeView = { practice: mockPractice1, myAnswer: null, attendees: [] };
+      const apiSave = vi.fn();
+
+      const outcomeSaving = await executeStageAnswer({
+        id: 'p1',
+        answer: '行く',
+        isSpecific: true,
+        fresh: true,
+        busy: false,
+        saving: true, // 保存中
+        originalPractice: original,
+        apiSave,
+        touchPractice: vi.fn(),
+        updatePractice: vi.fn(),
+        toast: vi.fn(),
+        onSpecificSaved: vi.fn(),
+        onDraftStaged: vi.fn(),
+      });
+      expect(outcomeSaving).toBe('guarded');
+      expect(apiSave).not.toHaveBeenCalled();
+
+      const outcomeNotFresh = await executeStageAnswer({
+        id: 'p1',
+        answer: '行く',
+        isSpecific: true,
+        fresh: false, // 取得前
+        busy: false,
+        saving: false,
+        originalPractice: original,
+        apiSave,
+        touchPractice: vi.fn(),
+        updatePractice: vi.fn(),
+        toast: vi.fn(),
+        onSpecificSaved: vi.fn(),
+        onDraftStaged: vi.fn(),
+      });
+      expect(outcomeNotFresh).toBe('guarded');
+      expect(apiSave).not.toHaveBeenCalled();
     });
   });
 
