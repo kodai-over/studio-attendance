@@ -2320,3 +2320,79 @@ details > summary {
   line-height: 1;
 }
 
+/* ---------- 詳細画面の回答ステータス表示 ---------- */
+.detail-rsvp-box {
+  margin: 12px 0 16px;
+  padding: 12px 14px;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+/* ---------- グループ切り替えピル（RSVP） ---------- */
+.group-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0 10px;
+  margin-bottom: 8px;
+  scrollbar-width: none;
+}
+.group-filter-bar::-webkit-scrollbar {
+  display: none;
+}
+.group-pill {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  color: var(--sub);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.group-pill:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.group-pill.active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+  font-weight: 600;
+}
+.group-pill .count {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+/* 送信先グループ選択 */
+.target-group-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.target-group-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  flex-shrink: 0;
+}
+.target-group-select {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 0.85rem;
+}
+
+

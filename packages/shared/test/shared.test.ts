@@ -33,6 +33,7 @@ import {
   practiceCancellationMessage,
   practiceListMessage,
   recruitMessages,
+  answerChangeReport,
   answerReport,
   warningCard,
   shouldNotifyPracticeCancellation,
@@ -394,6 +395,25 @@ describe('Flex Message', () => {
     ]);
     expect(sameDay).toBe('回答しました\n○ 11/1(日) 13:00 行きます\n✕ 11/1(日) 19:00 行きません');
     expect(answerReport([{ practice: at('2026-11-01', '13:00'), answer: null }])).toBeNull();
+  });
+
+  it('回答画面の回答済みタブで送る文（answerChangeReport）は変更前と変更後の回答を明示する', () => {
+    const at = (date: string, start: string) => ({ date, start });
+    expect(
+      answerChangeReport([
+        { practice: at('2026-11-02', '19:00'), from: '行く', to: '行かない' },
+        { practice: at('2026-11-01', '19:00'), from: '保留', to: '行く' },
+      ]),
+    ).toBe('回答を変更しました\n・11/1(日): 未定 → 行く\n・11/2(月): 行く → 行かない');
+
+    // 同じ日に2つあるときは開始時刻で見分ける
+    const sameDay = answerChangeReport([
+      { practice: at('2026-11-01', '13:00'), from: '行く', to: '保留' },
+      { practice: at('2026-11-01', '19:00'), from: null, to: '行く' },
+    ]);
+    expect(sameDay).toBe('回答を変更しました\n・11/1(日) 13:00: 行く → 未定\n・11/1(日) 19:00: 未回答 → 行く');
+
+    expect(answerChangeReport([])).toBeNull();
   });
 
   it('キャンセル期限前のお知らせは「募集」の練習の画面を開き、グループごとにもう一度募集できる', () => {

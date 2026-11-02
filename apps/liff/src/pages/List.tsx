@@ -84,7 +84,7 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
             ))}
           </div>
           <p class="note" style={{ textAlign: 'center', marginTop: 16 }}>
-            ※出欠の変更は予約情報をタップして開くか、下のメニューの「RSVP」からまとめて行えます
+            ※出欠の回答や変更は、下のメニューの「RSVP」からまとめて行えます
           </p>
         </>
       )}

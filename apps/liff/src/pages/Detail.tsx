@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { answerReport, computeCancelDeadline, endAfterStart, labelDate, roomInfo, yen, type Answer, type AttendeeView, type PracticePatch, type PracticeView } from '@studio-attendance/shared';
+import { computeCancelDeadline, endAfterStart, labelDate, roomInfo, yen, type Answer, type AttendeeView, type PracticePatch, type PracticeView } from '@studio-attendance/shared';
 import { api } from '../api';
 import { RoomSelect } from '../components/StudioRoom';
-import { canSendToChat, openCalendar, prefersIcs, sendToChat, shareLink } from '../liff';
-import { Avatar, DeleteConfirmDialog, FRESH_MS, Icon, Pass, RsvpButtons, Spinner, Syncing, TopBar, shareData, useApp, useRunner } from '../ui';
+import { openCalendar, prefersIcs, shareLink } from '../liff';
+import { Avatar, DeleteConfirmDialog, FRESH_MS, Icon, Pass, Spinner, Syncing, TopBar, go, shareData, useApp, useRunner } from '../ui';
 import { isAnswering } from '../answering';
-import { useAnswer } from './List';
+import { MyAnswerBadge } from './List';
 
 /**
  * 一覧にある内容ですぐ表示し、最新の内容は裏で取り直す（取り直している間もボタンは押せる）。
@@ -94,12 +94,9 @@ export function PracticePass({ v }: { v: PracticeView }) {
 /** 「予定」から開く練習の画面。見るのと出欠・カレンダーだけ（編集・削除・募集は「募集」から） */
 export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null }) {
   const { v, inList, loading, busy, update } = usePractice(id);
-  const { answer } = useAnswer();
   const { toast } = useApp();
   const calRef = useRef<HTMLDivElement>(null);
   const going = v ? v.myAnswer === '行く' && v.practice.status !== '中止' : false;
-  const [telling, setTelling] = useState(false);
-  const chatStatus = canSendToChat();
 
   useEffect(() => {
     if (v && focus === 'calendar') calRef.current?.scrollIntoView({ behavior: 'smooth', block: going ? 'nearest' : 'start' });
@@ -107,28 +104,8 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
 
   if (!v) return <><TopBar back />{loading ? <Spinner /> : <div class="empty">予約情報が見つかりません</div>}</>;
   const p = v.practice;
-  // 行くと答えたら、カレンダーに追加をボタンのすぐ下に出す（答えてそのまま追加できるように）
+  // 行くと答えたら、カレンダーに追加をすぐ下に出す
   const calendar = <CalendarButtons v={v} highlight={going} compact={going} />;
-
-  const handleTellGroup = async () => {
-    if (!v.myAnswer) return;
-    const msg = answerReport([{ practice: p, answer: v.myAnswer }]);
-    if (!msg) return;
-    setTelling(true);
-    try {
-      if (chatStatus === 'ok') {
-        await sendToChat(msg);
-        toast('グループに伝えました');
-      } else {
-        await navigator.clipboard.writeText(msg);
-        toast('回答メッセージをコピーしました');
-      }
-    } catch (e) {
-      toast(e instanceof Error ? e.message : '送信に失敗しました', true);
-    } finally {
-      setTelling(false);
-    }
-  };
 
   return (
     <>
@@ -152,31 +129,24 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
         <div class="detail-primary">
           <PracticePass v={v} />
 
-          <RsvpButtons
-            solo
-            value={v.myAnswer}
-            status={p.status}
-            busy={busy && !inList}
-            onAnswer={(a: Answer) => {
-              // 一覧にある練習は、待たずに切り替える（結果は一覧に入り、この画面もそれに合わせる）
-              if (inList) answer(id, a);
-              else update(() => api('rsvp', { id, answer: a }));
-            }}
-          />
-
-          {v.myAnswer && (
-            <div style={{ margin: '10px 0 6px', textAlign: 'center' }}>
-              <button
-                class="btn ghost small"
-                disabled={telling}
-                onClick={handleTellGroup}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.8rem' }}
-              >
-                <Icon name="chat" size={14} />
-                <span>{chatStatus === 'ok' ? '回答をグループに伝える' : '回答メッセージをコピー'}</span>
-              </button>
+          <div class="detail-rsvp-box">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span class="muted" style={{ fontSize: '0.85rem' }}>あなたの回答:</span>
+                <MyAnswerBadge answer={v.myAnswer} />
+              </div>
+              {p.status !== '中止' && (
+                <button
+                  class="btn small primary"
+                  onClick={() => go(`/answer?r=${encodeURIComponent(p.id)}`)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                >
+                  <Icon name="check" size={14} />
+                  <span>RSVPで回答・変更</span>
+                </button>
+              )}
             </div>
-          )}
+          </div>
 
           {going && (
             <div ref={calRef} class="cal-inline">

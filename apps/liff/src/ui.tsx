@@ -207,7 +207,7 @@ export function NavBar() {
   const currentTime = toJstTime(now);
   const todoCount = practices
     ? practices.filter(
-        (v) => isRsvpTarget(v, me.member.userId, me.member.groups, today, currentTime) && (v.myAnswer == null || v.myAnswer === '保留'),
+        (v) => isRsvpTarget(v, me.member.userId, me.member.groups, today, currentTime) && v.myAnswer == null,
       ).length
     : 0;
 
