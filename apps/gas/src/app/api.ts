@@ -2,6 +2,7 @@ import {
   FEEDBACK_STATUSES,
   canDeleteFeedback,
   canEditPractice,
+  canNotifyPracticeCancellation,
   canRegister,
   canRemoveAttendance,
   canSeePractice,
@@ -367,8 +368,7 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
     // 終了した予約情報や中止の予約情報は通知しない
     if (notifyGroups && practiceToDelete != null) {
       const p = practiceToDelete as Practice;
-      const canNotify = isActive(p) && p.date >= toJstDate(ctx.now());
-      if (canNotify && p.groups.length > 0) {
+      if (canNotifyPracticeCancellation(p, toJstDate(ctx.now())) && p.groups.length > 0) {
         sendPracticeCancellation(ctx, p, p.groups, bookerName);
       }
     }

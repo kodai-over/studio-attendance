@@ -144,6 +144,17 @@ export function isActive(p: Pick<Practice, 'status'>): boolean {
   return p.status === '募集中' || p.status === '満員';
 }
 
+/** 予約情報削除時に、募集済グループへ削除の連絡を送れる状態かどうか（未来の募集中予約情報のみ） */
+export function canNotifyPracticeCancellation(p: Pick<Practice, 'date' | 'status'>, today: string): boolean {
+  return isActive(p) && p.date >= today;
+}
+
+/** 予約情報削除の確認で、グループへの削除の連絡チェックの初期値を決める（終了済・中止・未募集は false） */
+export function shouldNotifyPracticeCancellation(p: Pick<Practice, 'date' | 'status' | 'groups'> | null, today: string): boolean {
+  if (!p) return false;
+  return canNotifyPracticeCancellation(p, today) && p.groups.length > 0;
+}
+
 /** LINEのトークで送られた文章が予約内容らしいか（日付と時刻の両方を含む） */
 export function looksLikeReservation(text: string): boolean {
   const t = text.replace(/[０-９：／]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));

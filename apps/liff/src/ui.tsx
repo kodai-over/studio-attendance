@@ -1,6 +1,6 @@
 import { createContext, type ComponentChildren } from 'preact';
 import { useCallback, useContext, useEffect, useState } from 'preact/hooks';
-import { canRegister, computeCancelDeadline, isActive, isHoliday, labelDate, toJstDate, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
+import { canRegister, computeCancelDeadline, isActive, isHoliday, labelDate, shouldNotifyPracticeCancellation, toJstDate, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
 import { applyTheme, getTheme, type ThemeMode } from './theme';
 
 // ---------------------------------------------------------------- ルーティング（ハッシュ）
@@ -384,10 +384,7 @@ export function CancelDeadlineBadge({ date, studio }: { date: string; studio: st
 
 /** 予約情報削除の確認で、グループ通知チェックの初期値を決める（終了済・中止・未募集は false） */
 export function shouldNotifyInitially(v: PracticeView | null, today = toJstDate(new Date())): boolean {
-  if (!v) return false;
-  const p = v.practice;
-  if (!isActive(p) || p.date < today) return false;
-  return p.groups.length > 0;
+  return shouldNotifyPracticeCancellation(v ? v.practice : null, today);
 }
 
 /** 予約情報削除の確認。募集済グループへの通知オプション付き */
@@ -452,10 +449,10 @@ export function DeleteConfirmDialog({
         ) : (
           <div class="muted" style={{ fontSize: '0.78rem', margin: '8px 0 16px', lineHeight: 1.3 }}>
             {isPast
-              ? '※終了した予約情報のため、グループへの通知は行われません。'
+              ? '※終了した予約情報のため、グループへの削除の連絡は送られません。'
               : isCanceled
-              ? '※中止済の予約情報のため、グループへの通知は行われません。'
-              : '※まだグループに募集されていないため、グループへの通知は行われません。'}
+              ? '※中止済の予約情報のため、グループへの削除の連絡は送られません。'
+              : '※まだグループに募集されていないため、グループへの削除の連絡は送られません。'}
           </div>
         )}
 

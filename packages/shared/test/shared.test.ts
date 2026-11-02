@@ -5,6 +5,7 @@ import {
   canonicalizeStudio,
   roomInfo,
   buildIcs,
+  canNotifyPracticeCancellation,
   cancelWarningAt,
   computeCancelDeadline,
   classifyReservations,
@@ -32,6 +33,7 @@ import {
   recruitMessages,
   answerReport,
   warningCard,
+  shouldNotifyPracticeCancellation,
   toJstDate,
   yen,
   type Practice,
@@ -489,6 +491,26 @@ describe('Flex Message', () => {
     expect(msg.text).toContain('スタジオノア 渋谷店 Ast');
     expect(msg.text).toContain('予約者: たろう');
     expect(msg.text).toContain('メモ: 自主練');
+  });
+
+  it('予約情報削除時のグループ通知可否と初期値判定', () => {
+    const today = '2026-11-02';
+    // 未来かつ募集中
+    expect(canNotifyPracticeCancellation({ date: '2026-11-10', status: '募集中' }, today)).toBe(true);
+    // 満員（アクティブ）も対象
+    expect(canNotifyPracticeCancellation({ date: '2026-11-10', status: '満員' }, today)).toBe(true);
+    // 当日も対象
+    expect(canNotifyPracticeCancellation({ date: '2026-11-02', status: '募集中' }, today)).toBe(true);
+    // 過去
+    expect(canNotifyPracticeCancellation({ date: '2026-11-01', status: '募集中' }, today)).toBe(false);
+    // 中止
+    expect(canNotifyPracticeCancellation({ date: '2026-11-10', status: '中止' }, today)).toBe(false);
+
+    // shouldNotifyPracticeCancellation: 募集済グループ有無との連動
+    expect(shouldNotifyPracticeCancellation({ date: '2026-11-10', status: '募集中', groups: ['C1'] }, today)).toBe(true);
+    expect(shouldNotifyPracticeCancellation({ date: '2026-11-10', status: '募集中', groups: [] }, today)).toBe(false);
+    expect(shouldNotifyPracticeCancellation({ date: '2026-11-01', status: '募集中', groups: ['C1'] }, today)).toBe(false);
+    expect(shouldNotifyPracticeCancellation(null, today)).toBe(false);
   });
 
   it('開始を変えたら、終了を開始の1時間後より前にしない', () => {

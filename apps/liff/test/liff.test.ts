@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { checkLiffRedirect, decideLiffInitAction } from '../src/liff';
 import { resolveInitialHash } from '../src/route';
 import { shouldNotifyInitially } from '../src/ui';
-import type { PracticeView } from '@studio-attendance/shared';
+import { shouldNotifyPracticeCancellation, type PracticeView } from '@studio-attendance/shared';
 
 describe('LIFF 初期化 & 画面遷移ロジック', () => {
   describe('checkLiffRedirect', () => {
@@ -206,6 +206,7 @@ describe('LIFF 初期化 & 画面遷移ロジック', () => {
 
     it('view が null の場合は false になる', () => {
       expect(shouldNotifyInitially(null, '2026-11-02')).toBe(false);
+      expect(shouldNotifyPracticeCancellation(null, '2026-11-02')).toBe(false);
     });
   });
 });
