@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { computeCancelDeadline, endAfterStart, labelDate, roomInfo, yen, type Answer, type AttendeeView, type PracticePatch, type PracticeView } from '@studio-attendance/shared';
+import { answerReport, computeCancelDeadline, endAfterStart, labelDate, roomInfo, yen, type Answer, type AttendeeView, type PracticePatch, type PracticeView } from '@studio-attendance/shared';
 import { api } from '../api';
 import { RoomSelect } from '../components/StudioRoom';
-import { openCalendar, prefersIcs, shareLink } from '../liff';
+import { canSendToChat, openCalendar, prefersIcs, sendToChat, shareLink } from '../liff';
 import { Avatar, DeleteConfirmDialog, FRESH_MS, Icon, Pass, RsvpButtons, Spinner, Syncing, TopBar, shareData, useApp, useRunner } from '../ui';
 import { isAnswering } from '../answering';
 import { useAnswer } from './List';
@@ -98,6 +98,8 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
   const { toast } = useApp();
   const calRef = useRef<HTMLDivElement>(null);
   const going = v ? v.myAnswer === '行く' && v.practice.status !== '中止' : false;
+  const [telling, setTelling] = useState(false);
+  const chatStatus = canSendToChat();
 
   useEffect(() => {
     if (v && focus === 'calendar') calRef.current?.scrollIntoView({ behavior: 'smooth', block: going ? 'nearest' : 'start' });
@@ -107,6 +109,26 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
   const p = v.practice;
   // 行くと答えたら、カレンダーに追加をボタンのすぐ下に出す（答えてそのまま追加できるように）
   const calendar = <CalendarButtons v={v} highlight={going} compact={going} />;
+
+  const handleTellGroup = async () => {
+    if (!v.myAnswer) return;
+    const msg = answerReport([{ practice: p, answer: v.myAnswer }]);
+    if (!msg) return;
+    setTelling(true);
+    try {
+      if (chatStatus === 'ok') {
+        await sendToChat(msg);
+        toast('グループに伝えました');
+      } else {
+        await navigator.clipboard.writeText(msg);
+        toast('回答メッセージをコピーしました');
+      }
+    } catch (e) {
+      toast(e instanceof Error ? e.message : '送信に失敗しました', true);
+    } finally {
+      setTelling(false);
+    }
+  };
 
   return (
     <>
@@ -141,6 +163,20 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
               else update(() => api('rsvp', { id, answer: a }));
             }}
           />
+
+          {v.myAnswer && (
+            <div style={{ margin: '10px 0 6px', textAlign: 'center' }}>
+              <button
+                class="btn ghost small"
+                disabled={telling}
+                onClick={handleTellGroup}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.8rem' }}
+              >
+                <Icon name="chat" size={14} />
+                <span>{chatStatus === 'ok' ? '回答をグループに伝える' : '回答メッセージをコピー'}</span>
+              </button>
+            </div>
+          )}
 
           {going && (
             <div ref={calRef} class="cal-inline">

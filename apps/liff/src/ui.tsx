@@ -1,6 +1,6 @@
 import { createContext, type ComponentChildren } from 'preact';
 import { useCallback, useContext, useEffect, useState } from 'preact/hooks';
-import { canRegister, computeCancelDeadline, isActive, isHoliday, isPastPractice, labelDate, shouldNotifyPracticeCancellation, toJstDate, toJstTime, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
+import { canRegister, computeCancelDeadline, isActive, isHoliday, isPastPractice, isRsvpTarget, labelDate, shouldNotifyPracticeCancellation, toJstDate, toJstTime, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
 import { applyTheme, getTheme, type ThemeMode } from './theme';
 
 // ---------------------------------------------------------------- ルーティング（ハッシュ）
@@ -195,16 +195,26 @@ export function Tabs<K extends string>({ items, value, onChange }: { items: { ke
   );
 }
 
-/** 画面下の浮いたナビ。どの画面からでも主な画面と要望に移れる */
+/** 画面下のナビゲーション。どの画面からでも主要画面に移れる */
 export function NavBar() {
-  const { me } = useApp();
+  const { me, practices } = useApp();
   const { path } = useRoute();
-  // 練習の画面は「予定」、募集の画面（/recruit/:id）と登録の画面は「募集」を光らせる
-  const here = path[0] === 'p' || path[0] === 'answer' ? '' : path[0] === 'register' ? 'recruit' : (path[0] ?? '');
-  const items: { to: string; key: string; icon: IconName; label: string }[] = [
+  // 予約詳細（/p/:id）は「予定」、登録画面（/register）は「募集」を光らせる
+  const here = path[0] === 'p' ? '' : path[0] === 'register' ? 'recruit' : (path[0] ?? '');
+
+  const now = new Date();
+  const today = toJstDate(now);
+  const currentTime = toJstTime(now);
+  const todoCount = practices
+    ? practices.filter(
+        (v) => isRsvpTarget(v, me.member.userId, me.member.groups, today, currentTime) && (v.myAnswer == null || v.myAnswer === '保留'),
+      ).length
+    : 0;
+
+  const items: { to: string; key: string; icon: IconName; label: string; badge?: number }[] = [
     { to: '/', key: '', icon: 'ticket', label: '予定' },
     ...(canRegister(me.member) ? ([{ to: '/recruit', key: 'recruit', icon: 'send', label: '募集' }] as const) : []),
-    { to: '/feedback', key: 'feedback', icon: 'chat', label: '要望' },
+    { to: '/answer', key: 'answer', icon: 'check', label: 'RSVP', badge: todoCount },
     { to: '/settings', key: 'settings', icon: 'user', label: 'アカウント' },
   ];
   const active = here === 'admin' ? 'settings' : here;
@@ -212,7 +222,14 @@ export function NavBar() {
     <nav class="navbar">
       {items.map((it) => (
         <button aria-current={active === it.key ? 'page' : undefined} onClick={() => go(it.to)}>
-          <Icon name={it.icon} />
+          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name={it.icon} />
+            {it.badge != null && it.badge > 0 && (
+              <span class="nav-badge" style={{ position: 'absolute', top: -5, right: -8 }}>
+                {it.badge}
+              </span>
+            )}
+          </div>
           <span>{it.label}</span>
         </button>
       ))}

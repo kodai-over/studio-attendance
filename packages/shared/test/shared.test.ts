@@ -15,6 +15,8 @@ import {
   formatFeeValue,
   isHoliday,
   isHolidayOrWeekend,
+  isMinePractice,
+  isRsvpTarget,
   jpHolidays,
   parseFeeValue,
   findCancelRule,
@@ -514,6 +516,73 @@ describe('Flex Message', () => {
     expect(shouldNotifyPracticeCancellation({ date: '2026-11-01', status: '募集中', groups: ['C1'] }, today)).toBe(false);
     expect(shouldNotifyPracticeCancellation({ date: '2026-11-02', end: '12:00', status: '募集中', groups: ['C1'] }, today, '15:00')).toBe(false);
     expect(shouldNotifyPracticeCancellation(null, today)).toBe(false);
+  });
+
+  it('自分に関係する練習判定（isMinePractice）とRSVP対象判定（isRsvpTarget）', () => {
+    const uid = 'U_ME';
+    const ugroups = ['G1', 'G2'];
+    const today = '2026-11-02';
+
+    // 1. isMinePractice
+    // 予約者本人
+    expect(isMinePractice({ practice: { booker: uid, groups: ['G_OTHER'] } }, uid, ugroups)).toBe(true);
+    // 所属グループに募集されている
+    expect(isMinePractice({ practice: { booker: 'U_OTHER', groups: ['G1'] } }, uid, ugroups)).toBe(true);
+    // 回答済み
+    expect(isMinePractice({ practice: { booker: 'U_OTHER', groups: ['G_OTHER'] }, myAnswer: '行く' }, uid, ugroups)).toBe(true);
+    // 参加履歴あり（involved）
+    expect(isMinePractice({ practice: { booker: 'U_OTHER', groups: ['G_OTHER'] }, involved: true }, uid, ugroups)).toBe(true);
+    // 全く関係ない
+    expect(isMinePractice({ practice: { booker: 'U_OTHER', groups: ['G_OTHER'] }, myAnswer: null, involved: false }, uid, ugroups)).toBe(false);
+
+    // 2. isRsvpTarget
+    // 未来・アクティブ・関係あり
+    expect(
+      isRsvpTarget(
+        { practice: { booker: 'U_OTHER', groups: ['G1'], status: '募集中', date: '2026-11-10', end: '20:00' } },
+        uid,
+        ugroups,
+        today,
+      ),
+    ).toBe(true);
+    // 中止は対象外
+    expect(
+      isRsvpTarget(
+        { practice: { booker: 'U_OTHER', groups: ['G1'], status: '中止', date: '2026-11-10', end: '20:00' } },
+        uid,
+        ugroups,
+        today,
+      ),
+    ).toBe(false);
+    // 過去日は対象外
+    expect(
+      isRsvpTarget(
+        { practice: { booker: 'U_OTHER', groups: ['G1'], status: '募集中', date: '2026-10-30', end: '20:00' } },
+        uid,
+        ugroups,
+        today,
+      ),
+    ).toBe(false);
+    // 当日終了済みは対象外
+    expect(
+      isRsvpTarget(
+        { practice: { booker: 'U_OTHER', groups: ['G1'], status: '募集中', date: today, end: '12:00' } },
+        uid,
+        ugroups,
+        today,
+        '15:00',
+      ),
+    ).toBe(false);
+    // 当日終了前なら対象
+    expect(
+      isRsvpTarget(
+        { practice: { booker: 'U_OTHER', groups: ['G1'], status: '募集中', date: today, end: '18:00' } },
+        uid,
+        ugroups,
+        today,
+        '15:00',
+      ),
+    ).toBe(true);
   });
 
   it('開始を変えたら、終了を開始の1時間後より前にしない', () => {

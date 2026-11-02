@@ -146,6 +146,18 @@ export function SettingsPage() {
         </>
       )}
 
+      <div class="section-title">サポート・ご意見</div>
+      <ul class="menu" style={{ marginTop: 8 }}>
+        <li>
+          <button class="menu-row" onClick={() => go('/feedback')}>
+            <Icon name="chat" size={20} />
+            <span class="grow">要望を送る</span>
+            <span class="val">改善の声を管理者に送信</span>
+            <Icon name="chevron" size={18} />
+          </button>
+        </li>
+      </ul>
+
       {/* ログアウトボタン（添付画像スタイル） */}
       <div class="account-logout-section">
         <button class="account-logout-btn" onClick={() => confirm('ログアウトしますか？') && logoutApp()}>

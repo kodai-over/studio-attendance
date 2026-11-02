@@ -131,6 +131,7 @@ describe('LIFF 初期化 & 画面遷移ロジック', () => {
     it('過去の ?view= パラメータも互換性を保って振り分けられる', () => {
       expect(resolveInitialHash(new URLSearchParams('view=recruit'))).toBe('/recruit');
       expect(resolveInitialHash(new URLSearchParams('view=mine'))).toBe('/?tab=mine');
+      expect(resolveInitialHash(new URLSearchParams('view=answer'))).toBe('/answer');
       expect(resolveInitialHash(new URLSearchParams('view=feedback'))).toBe('/feedback');
     });
 
