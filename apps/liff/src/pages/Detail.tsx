@@ -84,7 +84,7 @@ export function PracticePass({ v }: { v: PracticeView }) {
   );
 }
 
-/** 「予定」から開く練習の画面。見るのと出欠・カレンダーだけ（編集・削除・募集は「募集」から） */
+/** 「予定」から開く練習の画面。見るのと回答・カレンダーだけ（編集・削除・募集は「募集」から） */
 export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null }) {
   const { v, inList, loading, busy, update } = usePractice(id);
   const { toast } = useApp();

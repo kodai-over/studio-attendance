@@ -87,7 +87,7 @@ export interface ModifiedItem {
 }
 
 /**
- * 下書き（ドラフト）を更新する純粋関数。
+ * 下書きを更新する純粋関数。
  * 元の回答と同じ値が選ばれた場合は下書きから削除し、異なれば追加/更新する。
  */
 export function stageAnswer(
@@ -103,6 +103,19 @@ export function stageAnswer(
     next.set(id, answer);
   }
   return next;
+}
+
+/**
+ * 練習一覧に現在のタブ（または特定指定）の下書き回答を適用した表示用リストを生成する。
+ */
+export function computeDisplayedPractices(
+  baseList: PracticeView[],
+  currentStaged: StageMap,
+): PracticeView[] {
+  return baseList.map((v) => {
+    const answer = currentStaged.has(v.practice.id) ? currentStaged.get(v.practice.id)! : v.myAnswer;
+    return answer !== v.myAnswer ? { ...v, myAnswer: answer } : v;
+  });
 }
 
 /**

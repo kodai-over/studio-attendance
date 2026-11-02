@@ -777,7 +777,7 @@ a {
   margin-left: -6px;
 }
 
-/* ---------- 出欠 ○ △ ✕（記号だけ） ---------- */
+/* ---------- 回答 ○ △ ✕（記号だけ） ---------- */
 .rsvp {
   display: flex;
   border-top: 1px solid var(--line);
@@ -1069,7 +1069,7 @@ a {
   font-weight: 500;
 }
 
-/* 出欠の名前 */
+/* 回答者の名前 */
 .people {
   display: flex;
   flex-wrap: wrap;

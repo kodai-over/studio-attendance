@@ -63,7 +63,7 @@ function App() {
   const [startupFailed, setStartupFailed] = useState(false);
   const [loggedOut, setLoggedOut] = useState(false);
   const [toast, toastNode] = useToast();
-  // 起動中に出欠などで差し替えた練習。あとから届いた起動時の一覧（それより前の状態）で戻さない
+  // 起動中に回答などで差し替えた練習。あとから届いた起動時の一覧（それより前の状態）で戻さない
   const touched = useRef<Set<string> | null>(new Set());
   // 削除した（している）練習。あとから届いた一覧（削除より前に読んだもの）で戻さない
   const removed = useRef(new Set<string>());
@@ -178,7 +178,7 @@ function App() {
     }
   };
   const updatePractice = (v: PracticeView, { revert = false } = {}) => {
-    // 削除した練習は、あとから届いた結果（取り直し・出欠）で戻さない
+    // 削除した練習は、あとから届いた結果（取り直し・回答）で戻さない
     if (removed.current.has(v.practice.id)) return;
     // 失敗して元に戻したときは、起動時の一覧の最新の内容を入れてよい
     if (revert) touched.current?.delete(v.practice.id);

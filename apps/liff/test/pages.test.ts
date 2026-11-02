@@ -60,7 +60,7 @@ describe('readTab（予定一覧タブの互換性維持）', () => {
   });
 });
 
-describe('RsvpButtons（出欠選択ボタン）', () => {
+describe('RsvpButtons（回答選択ボタン）', () => {
   it('満員の予約情報で未回答の場合、「行く」ボタンは disabled ではなく押下時に onBlocked("full") が呼ばれる', () => {
     const handleAnswer = vi.fn();
     const handleBlocked = vi.fn();

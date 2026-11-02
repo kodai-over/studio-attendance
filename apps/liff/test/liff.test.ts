@@ -123,6 +123,11 @@ describe('LIFF 初期化 & 画面遷移ロジック', () => {
       expect(hash).toBe('/register');
     });
 
+    it('リッチメニューや外部導線の ?view=answer で /answer（RSVP画面）に振り分けられる', () => {
+      const hash = resolveInitialHash(new URLSearchParams('view=answer'));
+      expect(hash).toBe('/answer');
+    });
+
     it('パラメータがない通常起動時は undefined（トップ＝予定タブ）になる', () => {
       const hash = resolveInitialHash(new URLSearchParams(''));
       expect(hash).toBeUndefined();

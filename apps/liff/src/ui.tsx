@@ -61,7 +61,7 @@ interface AppState {
   startupFailed: boolean;
   /** 一覧を置き換える。fresh なら「今取った最新」として扱う（一覧に戻っても取り直さない） */
   setPractices(list: PracticeView[], fresh?: boolean): void;
-  /** 1件だけ差し替える（出欠や修正の結果をすぐ一覧に反映する） */
+  /** 1件だけ差し替える（回答や修正の結果をすぐ一覧に反映する） */
   updatePractice(v: PracticeView, opts?: { revert?: boolean }): void;
   /** 回答操作中の練習をマークし、一覧の再取得で上書き・巻き戻されないよう保護する */
   touchPractice(id: string): void;
@@ -304,7 +304,7 @@ const ANSWER_MARK: Record<Answer, string> = { 行く: '○', 保留: '△', 行�
 /** 画面に出す回答の名前（シートの値は「保留」のまま、画面では「未定」と出す） */
 export const ANSWER_LABEL: Record<Answer, string> = { 行く: '行く', 保留: '未定', 行かない: '行かない' };
 
-/** 出欠。文字は出さず、日本の出欠表どおり ○ △ ✕ の記号だけで選ぶ */
+/** 回答ボタン。文字は出さず、日本の回答表どおり ○ △ ✕ の記号だけで選ぶ */
 export function RsvpButtons({
   value,
   status,

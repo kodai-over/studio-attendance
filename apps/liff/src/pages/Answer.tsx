@@ -16,6 +16,7 @@ import { PracticeCard } from './List';
 import {
   cleanupAfterCommit,
   clearGlobalDrafts,
+  computeDisplayedPractices,
   executeStageAnswer,
   filterGroupPractices,
   filterTargetModifiedItems,
@@ -144,10 +145,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     : setAnsweredStaged;
 
   // 画面上の現在の回答（現在のタブの下書きを反映した表示用リスト）
-  const displayed = baseList.map((v) => {
-    const answer = currentStaged.has(v.practice.id) ? currentStaged.get(v.practice.id)! : v.myAnswer;
-    return answer !== v.myAnswer ? { ...v, myAnswer: answer } : v;
-  });
+  const displayed = computeDisplayedPractices(baseList, currentStaged);
 
   // 現在のタブで変更がある項目
   const modifiedItems = getModifiedItems(currentStaged, list);

@@ -3,6 +3,7 @@ import { answerReport, type PracticeView } from '@studio-attendance/shared';
 import {
   cleanupAfterCommit,
   clearGlobalDrafts,
+  computeDisplayedPractices,
   executeStageAnswer,
   filterGroupPractices,
   filterTargetModifiedItems,
@@ -938,29 +939,35 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
     });
   });
 
-  describe('並行取得・タブ復帰時の回答巻き戻り防止（displayed のステート優先順位）', () => {
+  describe('computeDisplayedPractices（表示用一覧の算出と下書きステート優先順位）', () => {
     it('特定予約モードで回答選択中・保存中に古いサーバー一覧が届いても、下書きステートが優先され回答が巻き戻らない', () => {
       // 1. 初期状態: サーバー上は p1 の myAnswer が null
-      const basePractice: PracticeView = { practice: mockPractice1, myAnswer: null, attendees: [] };
+      const baseList: PracticeView[] = [{ practice: mockPractice1, myAnswer: null, attendees: [] }];
 
-      // 2. ユーザーが '行く' を選択し、specificStaged にセット
+      // 2. ユーザーが '行く' を選択し、下書きにセット
       const specificStaged = new Map([['p1', '行く' as const]]);
 
-      // 3. 画面表示の算出（Answer.tsx の displayed ロジック）
-      const displayedAnswer = specificStaged.has(basePractice.practice.id)
-        ? specificStaged.get(basePractice.practice.id)!
-        : basePractice.myAnswer;
-
-      expect(displayedAnswer).toBe('行く');
+      // 3. 画面表示の算出（computeDisplayedPractices を直接呼び出し）
+      const displayed = computeDisplayedPractices(baseList, specificStaged);
+      expect(displayed[0].myAnswer).toBe('行く');
 
       // 4. 保存中に古いサーバー一覧（myAnswer が null のまま）が再度届いた場合をシミュレート
-      const staleServerPractice: PracticeView = { practice: mockPractice1, myAnswer: null, attendees: [] };
-      const displayedAfterStaleFetch = specificStaged.has(staleServerPractice.practice.id)
-        ? specificStaged.get(staleServerPractice.practice.id)!
-        : staleServerPractice.myAnswer;
+      const staleServerList: PracticeView[] = [{ practice: mockPractice1, myAnswer: null, attendees: [] }];
+      const displayedAfterStaleFetch = computeDisplayedPractices(staleServerList, specificStaged);
 
       // 古い一覧で上書きされず、ユーザーが選択した '行く' が保持される
-      expect(displayedAfterStaleFetch).toBe('行く');
+      expect(displayedAfterStaleFetch[0].myAnswer).toBe('行く');
+    });
+
+    it('下書きにない練習は元の回答がそのまま表示される', () => {
+      const baseList: PracticeView[] = [
+        { practice: mockPractice1, myAnswer: null, attendees: [] },
+        { practice: mockPractice2, myAnswer: '保留', attendees: [] },
+      ];
+      const staged = new Map([['p1', '行く' as const]]);
+      const displayed = computeDisplayedPractices(baseList, staged);
+      expect(displayed[0].myAnswer).toBe('行く');
+      expect(displayed[1].myAnswer).toBe('保留');
     });
   });
 
