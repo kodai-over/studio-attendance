@@ -2,11 +2,13 @@ import { render } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { HomeView, MeView, PracticeView } from '@studio-attendance/shared';
 import { api } from './api';
-import { initLiff, loginApp } from './liff';
+import { clientMode, initLiff, loginApp } from './liff';
 import { createPracticeSyncTracker, mergePracticesWithKeep } from './pages/answerLogic';
 import { AnswerPage } from './pages/Answer';
 import { DetailPage } from './pages/Detail';
 import { FeedbackPage } from './pages/Feedback';
+import { HomePage } from './pages/Home';
+import { syncPracticeNotices } from './pages/homeLogic';
 import { ListPage } from './pages/List';
 import { RecruitDetailPage } from './pages/RecruitDetail';
 import { RecruitListPage } from './pages/RecruitList';
@@ -21,6 +23,7 @@ initTheme();
 
 function Router() {
   const { path, query } = useRoute();
+  if (path[0] === 'home') return <HomePage />;
   if (path[0] === 'p' && path[1]) return <DetailPage id={path[1]} focus={query.get('cal') === '1' ? 'calendar' : null} />;
   if (path[0] === 'answer') return <AnswerPage ids={query.getAll('r')} />;
   if (path[0] === 'recruit' && path[1]) return <RecruitDetailPage id={path[1]} />;
@@ -77,6 +80,7 @@ function App() {
     const home = await api('home', entry.current);
     // ステート更新関数の外で保護対象IDの算出と完了済みエントリの掃除を行う
     const keepIds = syncTracker.current.prepareMerge(fetchStartedAt);
+    syncPracticeNotices(home.practices, home.me);
     setMe(home.me);
     setPracticesState((cur) => {
       const list = mergePracticesWithKeep(home.practices, cur?.list, keepIds);
@@ -97,7 +101,10 @@ function App() {
       const key = params.get('k');
       if (group && key) entry.current = { group, key };
 
-      const hash = resolveInitialHash(params);
+      const hash = resolveInitialHash(params, {
+        currentHash: location.hash,
+        isInClient: clientMode() === 'line',
+      });
       if (hash) {
         history.replaceState(null, '', `${location.pathname}#${hash}`);
         window.dispatchEvent(new HashChangeEvent('hashchange'));

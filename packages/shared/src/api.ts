@@ -24,6 +24,8 @@ export interface AttendeeView {
   answer: Answer;
   addedByName: string | null;
   canRemove: boolean;
+  /** 回答の更新日時（ISO文字列。出欠シートの更新日時） */
+  updatedAt?: string;
 }
 
 export interface PracticeView {

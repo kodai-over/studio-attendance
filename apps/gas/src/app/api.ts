@@ -122,6 +122,7 @@ export function practiceView(ctx: Ctx, p: Practice, me: Member | null, att?: Att
     answer: a.answer,
     addedByName: a.kind === 'ゲスト' && a.addedBy ? (byId.get(a.addedBy)?.name ?? null) : null,
     canRemove: canRemoveAttendance(me, p, a),
+    updatedAt: a.updatedAt,
   });
   const going = mine.filter((a) => a.answer === '行く').map(toView);
   const maybe = mine.filter((a) => a.answer === '保留').map(toView);

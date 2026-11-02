@@ -134,7 +134,17 @@ describe('LIFF 初期化 & 画面遷移ロジック', () => {
       expect(hash).toBeUndefined();
     });
 
+    it('LINE内（isInClient: true）でパラメータなし起動時は undefined（予定タブ）になり、外部ブラウザ・ホーム画面（isInClient: false）でハッシュ未指定なら /home になる', () => {
+      expect(resolveInitialHash(new URLSearchParams(''), { currentHash: '', isInClient: true })).toBeUndefined();
+      expect(resolveInitialHash(new URLSearchParams(''), { currentHash: '', isInClient: false })).toBe('/home');
+      expect(resolveInitialHash(new URLSearchParams(''), { currentHash: '#/', isInClient: false })).toBe('/home');
+      // 既存の有効なハッシュがある場合は上書きしない
+      expect(resolveInitialHash(new URLSearchParams(''), { currentHash: '#/answer', isInClient: false })).toBeUndefined();
+    });
+
     it('過去の ?view= パラメータも互換性を保って振り分けられる', () => {
+      expect(resolveInitialHash(new URLSearchParams('view=home'))).toBe('/home');
+      expect(resolveInitialHash(new URLSearchParams('view=schedule'))).toBe('/');
       expect(resolveInitialHash(new URLSearchParams('view=recruit'))).toBe('/recruit');
       expect(resolveInitialHash(new URLSearchParams('view=mine'))).toBe('/?tab=mine');
       expect(resolveInitialHash(new URLSearchParams('view=answer'))).toBe('/answer');

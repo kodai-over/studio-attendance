@@ -4,6 +4,7 @@ import { api, setActAs } from '../api';
 import { getProfile, logoutApp, type UserProfile } from '../liff';
 import { Avatar, Icon, Spinner, Tabs, TopBar, go, useApp, useRunner } from '../ui';
 import { clearGlobalDrafts } from './answerLogic';
+import { syncPracticeNotices } from './homeLogic';
 
 const ACT_AS_LABEL: Record<ActAs, string> = { self: '自分（管理者）', member: '自分（一般）', test: '確認用アカウント「admin」' };
 
@@ -16,6 +17,7 @@ function ActAsSwitch() {
     clearGlobalDrafts();
     const home = await run(() => api('home'));
     if (!home) return;
+    syncPracticeNotices(home.practices, home.me);
     setMe(home.me);
     setPractices(home.practices, true);
     toast(`${ACT_AS_LABEL[v]}として操作します`);

@@ -2,6 +2,7 @@ import { createContext, type ComponentChildren } from 'preact';
 import { useCallback, useContext, useEffect, useState } from 'preact/hooks';
 import { canRegister, computeCancelDeadline, isActive, isHoliday, isPastPractice, labelDate, shouldNotifyPracticeCancellation, toJstDate, toJstTime, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
 import { getUnansweredSummary } from './pages/answerLogic';
+import { getHomeUnreadStatus } from './pages/homeLogic';
 import { applyTheme, getTheme, type ThemeMode } from './theme';
 
 // ---------------------------------------------------------------- ルーティング（ハッシュ）
@@ -271,14 +272,16 @@ export function NavBar() {
   const today = toJstDate(now);
   const currentTime = toJstTime(now);
   const { totalCount: todoCount } = getUnansweredSummary(practices, me, today, currentTime);
+  const { totalBadgeCount: homeBadgeCount } = getHomeUnreadStatus(practices, me, today, currentTime);
 
   const items: { to: string; key: string; icon: IconName; label: string; badge?: number }[] = [
+    { to: '/home', key: 'home', icon: 'home', label: 'ホーム', badge: homeBadgeCount },
     { to: '/', key: '', icon: 'ticket', label: '予定' },
     ...(canRegister(me.member) ? ([{ to: '/recruit', key: 'recruit', icon: 'send', label: '募集' }] as const) : []),
     { to: '/answer', key: 'answer', icon: 'check', label: 'RSVP', badge: todoCount },
     { to: '/settings', key: 'settings', icon: 'user', label: 'アカウント' },
   ];
-  const active = here === 'admin' ? 'settings' : here;
+  const active = here === 'admin' || here === 'feedback' ? 'settings' : here;
   return (
     <nav class="navbar">
       {items.map((it) => (
