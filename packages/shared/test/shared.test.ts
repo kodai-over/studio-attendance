@@ -485,7 +485,7 @@ describe('Flex Message', () => {
       'たろう',
     );
     expect(msg.type).toBe('text');
-    expect(msg.text).toContain('【予約削除のお知らせ】');
+    expect(msg.text).toContain('【予約の削除連絡】');
     expect(msg.text).toContain('11/10');
     expect(msg.text).toContain('18:00〜21:00');
     expect(msg.text).toContain('スタジオノア 渋谷店 Ast');
@@ -499,8 +499,10 @@ describe('Flex Message', () => {
     expect(canNotifyPracticeCancellation({ date: '2026-11-10', status: '募集中' }, today)).toBe(true);
     // 満員（アクティブ）も対象
     expect(canNotifyPracticeCancellation({ date: '2026-11-10', status: '満員' }, today)).toBe(true);
-    // 当日も対象
-    expect(canNotifyPracticeCancellation({ date: '2026-11-02', status: '募集中' }, today)).toBe(true);
+    // 当日終了前（現在 10:00、終了 12:00）
+    expect(canNotifyPracticeCancellation({ date: '2026-11-02', end: '12:00', status: '募集中' }, today, '10:00')).toBe(true);
+    // 当日終了後（現在 15:00、終了 12:00）
+    expect(canNotifyPracticeCancellation({ date: '2026-11-02', end: '12:00', status: '募集中' }, today, '15:00')).toBe(false);
     // 過去
     expect(canNotifyPracticeCancellation({ date: '2026-11-01', status: '募集中' }, today)).toBe(false);
     // 中止
@@ -510,6 +512,7 @@ describe('Flex Message', () => {
     expect(shouldNotifyPracticeCancellation({ date: '2026-11-10', status: '募集中', groups: ['C1'] }, today)).toBe(true);
     expect(shouldNotifyPracticeCancellation({ date: '2026-11-10', status: '募集中', groups: [] }, today)).toBe(false);
     expect(shouldNotifyPracticeCancellation({ date: '2026-11-01', status: '募集中', groups: ['C1'] }, today)).toBe(false);
+    expect(shouldNotifyPracticeCancellation({ date: '2026-11-02', end: '12:00', status: '募集中', groups: ['C1'] }, today, '15:00')).toBe(false);
     expect(shouldNotifyPracticeCancellation(null, today)).toBe(false);
   });
 

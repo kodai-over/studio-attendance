@@ -1,6 +1,6 @@
 import { createContext, type ComponentChildren } from 'preact';
 import { useCallback, useContext, useEffect, useState } from 'preact/hooks';
-import { canRegister, computeCancelDeadline, isActive, isHoliday, labelDate, shouldNotifyPracticeCancellation, toJstDate, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
+import { canRegister, computeCancelDeadline, isActive, isHoliday, isPastPractice, labelDate, shouldNotifyPracticeCancellation, toJstDate, toJstTime, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
 import { applyTheme, getTheme, type ThemeMode } from './theme';
 
 // ---------------------------------------------------------------- ルーティング（ハッシュ）
@@ -382,12 +382,16 @@ export function CancelDeadlineBadge({ date, studio }: { date: string; studio: st
   );
 }
 
-/** 予約情報削除の確認で、グループ通知チェックの初期値を決める（終了済・中止・未募集は false） */
-export function shouldNotifyInitially(v: PracticeView | null, today = toJstDate(new Date())): boolean {
-  return shouldNotifyPracticeCancellation(v ? v.practice : null, today);
+/** 予約情報削除の確認で、グループへの削除の連絡チェックの初期値を決める（終了済・中止・未募集は false） */
+export function shouldNotifyInitially(
+  v: PracticeView | null,
+  today = toJstDate(new Date()),
+  currentTime = toJstTime(new Date()),
+): boolean {
+  return shouldNotifyPracticeCancellation(v ? v.practice : null, today, currentTime);
 }
 
-/** 予約情報削除の確認。募集済グループへの通知オプション付き */
+/** 予約情報削除の確認。募集済グループへの削除の連絡オプション付き */
 export function DeleteConfirmDialog({
   view: v,
   onClose,
@@ -399,7 +403,10 @@ export function DeleteConfirmDialog({
   onConfirm: (notifyGroups: boolean) => Promise<unknown> | void;
   busy?: boolean;
 }) {
-  const canNotify = shouldNotifyInitially(v);
+  const now = new Date();
+  const today = toJstDate(now);
+  const currentTime = toJstTime(now);
+  const canNotify = shouldNotifyInitially(v, today, currentTime);
   const [notify, setNotify] = useState(canNotify);
 
   useEffect(() => {
@@ -409,7 +416,7 @@ export function DeleteConfirmDialog({
   if (!v) return null;
   const p = v.practice;
   const answered = v.goingCount + v.maybe.length;
-  const isPast = p.date < toJstDate(new Date());
+  const isPast = isPastPractice(p, today, currentTime);
   const isCanceled = !isActive(p);
 
   return (
@@ -440,10 +447,10 @@ export function DeleteConfirmDialog({
                 onChange={(e) => setNotify((e.target as HTMLInputElement).checked)}
                 disabled={busy}
               />
-              <span>募集済のグループに削除を通知</span>
+              <span>募集済のグループに削除の連絡を送る</span>
             </label>
             <div class="muted" style={{ fontSize: '0.75rem', marginTop: 4, paddingLeft: 24, lineHeight: 1.3 }}>
-              {notify ? 'グループに削除の連絡が送信されます。' : 'チェックを外すとグループへは送信されません。'}
+              {notify ? 'グループに削除の連絡が送られます。' : 'チェックを外すとグループへは送られません。'}
             </div>
           </div>
         ) : (
@@ -476,13 +483,13 @@ export function ParsingProgressOverlay({ kind }: { kind: 'image' | 'text' }) {
   const steps =
     kind === 'image'
       ? [
-          { label: 'スクショから文字を読み取り中...', note: 'スクショからテキストを抽出しています' },
-          { label: '日時・スタジオ情報を特定中...', note: '予約内容を抽出・照合しています' },
+          { label: 'スクショから文字を読み取り中...', note: 'スクショから文字を読み取っています' },
+          { label: '日時・スタジオ情報を確認中...', note: '日時やスタジオ・部屋を調べています' },
           { label: 'スタジオ代・キャンセル期限を計算中...', note: '入力内容を準備しています' },
         ]
       : [
-          { label: '文章から予約内容を読み取り中...', note: 'テキストから項目を解析しています' },
-          { label: '日時・スタジオ情報を特定中...', note: '予約内容を抽出・照合しています' },
+          { label: '文章から予約内容を読み取り中...', note: '文章から予約内容を読み取っています' },
+          { label: '日時・スタジオ情報を確認中...', note: '日時やスタジオ・部屋を調べています' },
           { label: 'スタジオ代・キャンセル期限を計算中...', note: '入力内容を準備しています' },
         ];
 
@@ -503,7 +510,7 @@ export function ParsingProgressOverlay({ kind }: { kind: 'image' | 'text' }) {
           <strong style={{ fontSize: '0.98rem' }}>予約内容を読み取り中</strong>
         </div>
         <p class="muted" style={{ fontSize: '0.75rem', margin: '0 0 14px' }}>
-          数秒ほどかかる場合があります
+          ※処理状況の目安です。数秒ほどかかる場合があります
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {steps.map((st, i) => {

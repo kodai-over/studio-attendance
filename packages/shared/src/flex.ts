@@ -412,7 +412,7 @@ export function practiceCancellationMessage(
   bookerName?: string,
 ): LineMessage {
   const lines = [
-    '【予約削除のお知らせ】',
+    '【予約の削除連絡】',
     '以下の予約情報が削除されました。',
     '',
     `日時: ${labelDate(p.date)} ${timeRange(p)}`,

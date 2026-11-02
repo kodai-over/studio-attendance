@@ -438,9 +438,9 @@ describe('出欠', () => {
     expect(t.line.pushes).toHaveLength(initialPushes);
   });
 
-  it('終了済み・中止の練習は notifyGroups: true を指定してもグループ通知は送られない', () => {
+  it('終了済み・中止の練習は notifyGroups: true を指定しても削除の連絡は送られない', () => {
     t.store.s.groups.push({ id: 'C_PAST', name: 'チーム過去' });
-    // 過去の予約（2026-10-01）
+    // 過去日の予約（2026-10-01）
     const pastItem = { ...reservation, date: '2026-10-01', max: null, min: null, memo: '' };
     const { created: pastCreated } = handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [pastItem], groups: ['C_PAST'] }) as any;
     const pastPid = pastCreated[0];
@@ -449,6 +449,16 @@ describe('出欠', () => {
     const list1 = handleApi(t.ctx, { userId: BOOKER }, 'deletePractice', { id: pastPid, notifyGroups: true }) as any[];
     expect(list1.map((v) => v.practice.id)).not.toContain(pastPid);
     expect(t.line.pushes).toHaveLength(pushesAfterCreatePast);
+
+    // 当日ですでに終了時刻を過ぎた予約（現在 12:00 JST、終了 11:30）
+    const todayEndedItem = { ...reservation, date: '2026-10-10', start: '10:00', end: '11:30', max: null, min: null, memo: '' };
+    const { created: todayEndedCreated } = handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [todayEndedItem], groups: ['C_PAST'] }) as any;
+    const todayEndedPid = todayEndedCreated[0];
+    const pushesAfterCreateEnded = t.line.pushes.length;
+
+    const listEnded = handleApi(t.ctx, { userId: BOOKER }, 'deletePractice', { id: todayEndedPid, notifyGroups: true }) as any[];
+    expect(listEnded.map((v) => v.practice.id)).not.toContain(todayEndedPid);
+    expect(t.line.pushes).toHaveLength(pushesAfterCreateEnded);
 
     // 中止の予約
     const canceledItem = { ...reservation, date: '2026-11-20', max: null, min: null, memo: '' };
@@ -476,7 +486,7 @@ describe('出欠', () => {
     expect(t.line.pushes).toHaveLength(initialPushes + 1);
     const sent = t.line.pushes[t.line.pushes.length - 1];
     expect(sent.to).toBe('C3');
-    expect(JSON.stringify(sent.messages)).toContain('【予約削除のお知らせ】');
+    expect(JSON.stringify(sent.messages)).toContain('【予約の削除連絡】');
     expect(JSON.stringify(sent.messages)).toContain('11/5');
     expect(JSON.stringify(sent.messages)).toContain('予約者: 後輩');
 

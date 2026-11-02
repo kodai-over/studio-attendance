@@ -15,6 +15,7 @@ import {
   perPersonFee,
   sortPractices,
   toJstDate,
+  toJstTime,
   appLink,
   ACT_AS,
   MAX_SCREENSHOTS,
@@ -353,7 +354,7 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
     return view(ctx, id, me);
   },
 
-  /** 予約情報を削除する。notifyGroups が true のときは募集済グループに削除のお知らせを送る */
+  /** 予約情報を削除する。notifyGroups が true のときは募集済グループに削除の連絡を送る */
   deletePractice(ctx, me, { id, notifyGroups }) {
     let practiceToDelete: Practice | null = null;
     let bookerName = '';
@@ -365,10 +366,10 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
       ctx.store.deletePractice(id);
     });
     // 削除が成功したあと、ロックの外でグループへ知らせる（通信待ちでロックを長引かせない）
-    // 終了した予約情報や中止の予約情報は通知しない
+    // 終了した予約情報（当日の終了時間帯を含む）や中止の予約情報は連絡しない
     if (notifyGroups && practiceToDelete != null) {
       const p = practiceToDelete as Practice;
-      if (canNotifyPracticeCancellation(p, toJstDate(ctx.now())) && p.groups.length > 0) {
+      if (canNotifyPracticeCancellation(p, toJstDate(ctx.now()), toJstTime(ctx.now())) && p.groups.length > 0) {
         sendPracticeCancellation(ctx, p, p.groups, bookerName);
       }
     }

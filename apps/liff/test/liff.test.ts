@@ -159,13 +159,13 @@ describe('LIFF 初期化 & 画面遷移ロジック', () => {
   });
 
   describe('予約削除ダイアログの初期状態判定（shouldNotifyInitially）', () => {
-    const mockView = (partial: { date?: string; status?: any; groups?: string[] }): PracticeView =>
+    const mockView = (partial: { date?: string; start?: string; end?: string; status?: any; groups?: string[] }): PracticeView =>
       ({
         practice: {
           id: 'p1',
           date: partial.date ?? '2026-11-20',
-          start: '18:00',
-          end: '21:00',
+          start: partial.start ?? '18:00',
+          end: partial.end ?? '21:00',
           studio: 'worcle',
           room: '101',
           fee: 3000,
@@ -198,6 +198,16 @@ describe('LIFF 初期化 & 画面遷移ロジック', () => {
 
     it('終了した（過去の）予約情報では募集済グループがあっても false になる', () => {
       expect(shouldNotifyInitially(mockView({ date: '2026-10-31', groups: ['C1'] }), '2026-11-02')).toBe(false);
+    });
+
+    it('当日の予約情報でも、終了時刻を過ぎていれば false になる', () => {
+      // 2026-11-02 の 10:00〜12:00 の予約情報。現在時刻 15:00 では終了済み
+      const endedView = mockView({ date: '2026-11-02', start: '10:00', end: '12:00', groups: ['C1'] });
+      expect(shouldNotifyInitially(endedView, '2026-11-02', '15:00')).toBe(false);
+
+      // 2026-11-02 の 13:00〜15:00 の予約情報。現在時刻 10:00 ではまだ終了前なので true
+      const futureTodayView = mockView({ date: '2026-11-02', start: '13:00', end: '15:00', groups: ['C1'] });
+      expect(shouldNotifyInitially(futureTodayView, '2026-11-02', '10:00')).toBe(true);
     });
 
     it('中止済の予約情報では募集済グループがあっても false になる', () => {
