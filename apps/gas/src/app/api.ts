@@ -2,6 +2,7 @@ import {
   FEEDBACK_STATUSES,
   canDeleteFeedback,
   canEditPractice,
+  canNotifyPracticeCancellation,
   canRegister,
   canRemoveAttendance,
   canSeePractice,
@@ -14,6 +15,7 @@ import {
   perPersonFee,
   sortPractices,
   toJstDate,
+  toJstTime,
   appLink,
   ACT_AS,
   MAX_SCREENSHOTS,
@@ -33,7 +35,7 @@ import {
   type StudioDef,
 } from '@studio-attendance/shared';
 import { UserError, type Ctx, type RawReservation } from './ports';
-import { buildDraft, classifyFor, createPractices, ensureMember, inGroupKey, loadDraft, noteGroupMember, readReservations, recordAnswer, refreshStatus, removeDraft, sendRecruit, withDefaultFee } from './practices';
+import { buildDraft, classifyFor, createPractices, ensureMember, inGroupKey, loadDraft, noteGroupMember, readReservations, recordAnswer, refreshStatus, removeDraft, sendPracticeCancellation, sendRecruit, withDefaultFee } from './practices';
 
 /** 誰として操作しているか（管理者の見え方の切り替え） */
 interface Acting {
@@ -352,13 +354,25 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
     return view(ctx, id, me);
   },
 
-  /** 練習をやめるときは削除する（中止として残さない）。グループへの通知は送らない */
-  deletePractice(ctx, me, { id }) {
+  /** 予約情報を削除する。notifyGroups が true のときは募集済グループに削除の連絡を送る */
+  deletePractice(ctx, me, { id, notifyGroups }) {
+    let practiceToDelete: Practice | null = null;
+    let bookerName = '';
     ctx.withLock(() => {
       const p = getPracticeOrThrow(ctx, id);
       requireEditable(me, p);
+      practiceToDelete = p;
+      bookerName = memberNameOf(ctx, p.booker);
       ctx.store.deletePractice(id);
     });
+    // 削除が成功したあと、ロックの外でグループへ知らせる（通信待ちでロックを長引かせない）
+    // 終了した予約情報（当日の終了時間帯を含む）や中止の予約情報は連絡しない
+    if (notifyGroups && practiceToDelete != null) {
+      const p = practiceToDelete as Practice;
+      if (canNotifyPracticeCancellation(p, toJstDate(ctx.now()), toJstTime(ctx.now())) && p.groups.length > 0) {
+        sendPracticeCancellation(ctx, p, p.groups, bookerName);
+      }
+    }
     return handlers.listPractices(ctx, me, {});
   },
 

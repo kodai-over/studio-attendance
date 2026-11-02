@@ -149,12 +149,12 @@ function App() {
     }));
 
   /** 確認したらすぐ一覧から消し、サーバーの返事は裏で待つ。失敗したらその練習だけ元に戻す */
-  const deletePractice = async (v: PracticeView): Promise<boolean> => {
+  const deletePractice = async (v: PracticeView, opts?: { notifyGroups?: boolean }): Promise<boolean> => {
     const id = v.practice.id;
     removed.current.add(id);
     setPracticesState((cur) => cur && { ...cur, list: cur.list.filter((x) => x.practice.id !== id) });
     try {
-      setPractices(await api('deletePractice', { id }), true);
+      setPractices(await api('deletePractice', { id, notifyGroups: opts?.notifyGroups }), true);
       toast('削除しました');
       return true;
     } catch (e) {

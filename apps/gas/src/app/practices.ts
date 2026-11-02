@@ -9,6 +9,7 @@ import {
   isActive,
   nextStatus,
   normalizeReservation,
+  practiceCancellationMessage,
   recruitMessages,
   sortPractices,
   toJstDate,
@@ -364,6 +365,22 @@ export function sendRecruit(ctx: Ctx, practices: Practice[], groups: string[], b
       sent.push(g);
     } catch (e) {
       ctx.log('recruit push failed', g, e);
+    }
+  }
+  return sent;
+}
+
+/** 予約情報が削除されたことを募集済グループに知らせる */
+export function sendPracticeCancellation(ctx: Ctx, practice: Practice, groups: string[], bookerName?: string): string[] {
+  if (groups.length === 0) return [];
+  const msg = practiceCancellationMessage(practice, bookerName);
+  const sent: string[] = [];
+  for (const g of groups) {
+    try {
+      ctx.line.push(g, [msg]);
+      sent.push(g);
+    } catch (e) {
+      ctx.log('practice cancellation push failed', g, e);
     }
   }
   return sent;

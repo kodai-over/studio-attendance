@@ -144,6 +144,39 @@ export function isActive(p: Pick<Practice, 'status'>): boolean {
   return p.status === '募集中' || p.status === '満員';
 }
 
+/** 予約情報が終了しているか（過去日、または当日で終了時刻を過ぎているか） */
+export function isPastPractice(
+  p: Pick<Practice, 'date'> & Partial<Pick<Practice, 'end'>>,
+  today: string,
+  currentTime?: string,
+): boolean {
+  if (p.date < today) return true;
+  if (p.date === today && p.end && currentTime) {
+    return minutes(p.end) <= minutes(currentTime);
+  }
+  return false;
+}
+
+/** 予約情報削除時に、募集済グループへ削除の連絡を送れる状態かどうか（未来の募集中予約情報のみ。今日すでに終了した時間帯は除外） */
+export function canNotifyPracticeCancellation(
+  p: Pick<Practice, 'date' | 'status'> & Partial<Pick<Practice, 'end'>>,
+  today: string,
+  currentTime?: string,
+): boolean {
+  if (!isActive(p)) return false;
+  return !isPastPractice(p, today, currentTime);
+}
+
+/** 予約情報削除の確認で、グループへの削除の連絡チェックの初期値を決める（終了済・中止・未募集は false） */
+export function shouldNotifyPracticeCancellation(
+  p: (Pick<Practice, 'date' | 'status' | 'groups'> & Partial<Pick<Practice, 'end'>>) | null,
+  today: string,
+  currentTime?: string,
+): boolean {
+  if (!p) return false;
+  return canNotifyPracticeCancellation(p, today, currentTime) && p.groups.length > 0;
+}
+
 /** LINEのトークで送られた文章が予約内容らしいか（日付と時刻の両方を含む） */
 export function looksLikeReservation(text: string): boolean {
   const t = text.replace(/[０-９：／]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));

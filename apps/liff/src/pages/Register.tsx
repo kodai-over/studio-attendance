@@ -2,7 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { addDays, defaultFee, endAfterStart, labelDate, MAX_SCREENSHOTS, skippedNote, toJstDate, type DraftItemKind, type NewPracticeInput, type Reservation } from '@studio-attendance/shared';
 import { api } from '../api';
 import { RoomInfo, RoomSelect, StudioSelect } from '../components/StudioRoom';
-import { BusyOverlay, Icon, Spinner, TopBar, go, useApp, useRunner } from '../ui';
+import { BusyOverlay, Icon, ParsingProgressOverlay, Spinner, TopBar, go, useApp, useRunner } from '../ui';
 
 interface FormRow {
   key: number;
@@ -90,7 +90,7 @@ async function shrink(file: File): Promise<{ mimeType: string; data: string }> {
 /** recruit: 確認カードの「登録して募集」から開いた（ふだんの送り先を各予約に入れておく） */
 export function RegisterPage({ draftId, recruit = false }: { draftId: string | null; recruit?: boolean }) {
   const { me, toast, setPractices } = useApp();
-  const [phase, setPhase] = useState<null | 'reading' | 'saving'>(null);
+  const [phase, setPhase] = useState<null | 'readingImage' | 'readingText' | 'saving'>(null);
   const [rows, setRows] = useState<FormRow[]>(() => [emptyRow({ date: addDays(toJstDate(new Date()), 7) })]);
   // 募集先は予約ごとに、その予約の欄で選ぶ（空なら登録だけ）。2件以上なら下でまとめて付け外しもできる
   // 延長（既存の練習を伸ばす）と登録済みの予約には募集を送らないので、選べるのは新しく登録する予約だけ
@@ -161,7 +161,7 @@ export function RegisterPage({ draftId, recruit = false }: { draftId: string | n
 
   /** スクショか文章から読み取って、入力欄を置き換える */
   const parse = async (params: { images?: { mimeType: string; data: string }[]; text?: string }) => {
-    setPhase('reading');
+    setPhase(params.images ? 'readingImage' : 'readingText');
     const res = await run(() => api('parseReservations', params));
     setPhase(null);
     if (!res) return false;
@@ -181,7 +181,7 @@ export function RegisterPage({ draftId, recruit = false }: { draftId: string | n
     if (files.length === 0) return;
     // 多すぎるときは読み取らない（Bot と同じ。どれを読んだか分からなくなり、読み直すと先の結果も消えるため）
     if (files.length > MAX_SCREENSHOTS) return toast(`スクショは${MAX_SCREENSHOTS}枚までにしてください。`, true);
-    setPhase('reading');
+    setPhase('readingImage');
     const images = await run(() => Promise.all(files.map(shrink)));
     if (images) await parse({ images });
     else setPhase(null);
@@ -231,7 +231,8 @@ export function RegisterPage({ draftId, recruit = false }: { draftId: string | n
   return (
     <>
       <TopBar title="スタジオ予約登録" back />
-      {phase === 'reading' && <BusyOverlay message="読み取り中" />}
+      {phase === 'readingImage' && <ParsingProgressOverlay kind="image" />}
+      {phase === 'readingText' && <ParsingProgressOverlay kind="text" />}
       {phase === 'saving' && <BusyOverlay message={recruiting ? '登録して募集中' : '登録中'} />}
 
       <div class="sources">

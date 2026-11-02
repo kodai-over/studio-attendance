@@ -1,6 +1,6 @@
 import { createContext, type ComponentChildren } from 'preact';
 import { useCallback, useContext, useEffect, useState } from 'preact/hooks';
-import { canRegister, computeCancelDeadline, isHoliday, labelDate, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
+import { canRegister, computeCancelDeadline, isActive, isHoliday, isPastPractice, labelDate, shouldNotifyPracticeCancellation, toJstDate, toJstTime, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
 import { applyTheme, getTheme, type ThemeMode } from './theme';
 
 // ---------------------------------------------------------------- ルーティング（ハッシュ）
@@ -44,7 +44,7 @@ interface AppState {
   /** 1件だけ差し替える（出欠や修正の結果をすぐ一覧に反映する） */
   updatePractice(v: PracticeView, opts?: { revert?: boolean }): void;
   /** 練習を削除する（すぐ一覧から消し、失敗したら戻す）。消せたら true */
-  deletePractice(v: PracticeView): Promise<boolean>;
+  deletePractice(v: PracticeView, opts?: { notifyGroups?: boolean }): Promise<boolean>;
   /** 起動時と同じまとめ取得をやり直す（グループのカードから開いたときは、そのグループのメンバーとしても覚えてもらう） */
   loadHome(): Promise<void>;
 }
@@ -378,6 +378,183 @@ export function CancelDeadlineBadge({ date, studio }: { date: string; studio: st
     <div class={`ticket-deadline${deadline.isSoon ? ' is-soon' : ''}${deadline.isPast ? ' is-past' : ''}`}>
       <Icon name="clock" size={10} />
       <span>{deadline.isPast ? 'キャンセル期限超過' : `キャンセル期限: ${deadline.formatted}`}</span>
+    </div>
+  );
+}
+
+/** 予約情報削除の確認で、グループへの削除の連絡チェックの初期値を決める（終了済・中止・未募集は false） */
+export function shouldNotifyInitially(
+  v: PracticeView | null,
+  today = toJstDate(new Date()),
+  currentTime = toJstTime(new Date()),
+): boolean {
+  return shouldNotifyPracticeCancellation(v ? v.practice : null, today, currentTime);
+}
+
+/** 予約情報削除の確認。募集済グループへの削除の連絡オプション付き */
+export function DeleteConfirmDialog({
+  view: v,
+  onClose,
+  onConfirm,
+  busy,
+}: {
+  view: PracticeView | null;
+  onClose: () => void;
+  onConfirm: (notifyGroups: boolean) => Promise<unknown> | void;
+  busy?: boolean;
+}) {
+  const now = new Date();
+  const today = toJstDate(now);
+  const currentTime = toJstTime(now);
+  const canNotify = shouldNotifyInitially(v, today, currentTime);
+  const [notify, setNotify] = useState(canNotify);
+
+  useEffect(() => {
+    setNotify(canNotify);
+  }, [v?.practice.id, canNotify]);
+
+  if (!v) return null;
+  const p = v.practice;
+  const answered = v.goingCount + v.maybe.length;
+  const isPast = isPastPractice(p, today, currentTime);
+  const isCanceled = !isActive(p);
+
+  return (
+    <div class="overlay" role="dialog" aria-modal="true" aria-label="予約情報の削除">
+      <div class="overlay-box" style={{ maxWidth: 320, textAlign: 'left' }}>
+        <h3 style={{ margin: '0 0 10px', fontSize: '1.05rem', fontWeight: 600 }}>予約情報を削除</h3>
+        <p style={{ margin: '0 0 8px', fontSize: '0.9rem', lineHeight: 1.5 }}>
+          <b>{labelDate(p.date)} {p.start}〜{p.end}</b><br />
+          {place(p)}
+        </p>
+        {answered > 0 ? (
+          <p class="muted" style={{ margin: '0 0 12px', fontSize: '0.8rem', lineHeight: 1.4 }}>
+            回答している人がいます（行く{v.goingCount}人・未定{v.maybe.length}人）。<br />
+            回答も一緒に削除されます。
+          </p>
+        ) : (
+          <p class="muted" style={{ margin: '0 0 12px', fontSize: '0.8rem' }}>
+            この予約情報を削除します。
+          </p>
+        )}
+
+        {canNotify ? (
+          <div style={{ padding: '10px 12px', background: 'var(--paper-subtle, rgb(0 0 0 / 4%))', borderRadius: 8, margin: '8px 0 16px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.88rem', fontWeight: 500 }}>
+              <input
+                type="checkbox"
+                checked={notify}
+                onChange={(e) => setNotify((e.target as HTMLInputElement).checked)}
+                disabled={busy}
+              />
+              <span>募集済のグループに削除の連絡を送る</span>
+            </label>
+            <div class="muted" style={{ fontSize: '0.75rem', marginTop: 4, paddingLeft: 24, lineHeight: 1.3 }}>
+              {notify ? 'グループに削除の連絡が送られます。' : 'チェックを外すとグループへは送られません。'}
+            </div>
+          </div>
+        ) : (
+          <div class="muted" style={{ fontSize: '0.78rem', margin: '8px 0 16px', lineHeight: 1.3 }}>
+            {isPast
+              ? '※終了した予約情報のため、グループへの削除の連絡は送られません。'
+              : isCanceled
+              ? '※中止済の予約情報のため、グループへの削除の連絡は送られません。'
+              : '※まだグループに募集されていないため、グループへの削除の連絡は送られません。'}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+          <button class="btn ghost" style={{ flex: 1 }} onClick={onClose} disabled={busy}>
+            キャンセル
+          </button>
+          <button class="btn danger" style={{ flex: 1 }} onClick={() => onConfirm(canNotify && notify)} disabled={busy}>
+            {busy ? '削除中...' : '削除する'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** 読み取り中の進捗オーバーレイ（スクショ・文章両対応、目安のステップ表示） */
+export function ParsingProgressOverlay({ kind }: { kind: 'image' | 'text' }) {
+  const [stepIndex, setStepIndex] = useState(0);
+
+  const steps =
+    kind === 'image'
+      ? [
+          { label: 'スクショから文字を読み取り中...', note: 'スクショから文字を読み取っています' },
+          { label: '日時・スタジオ情報を確認中...', note: '日時やスタジオ・部屋を調べています' },
+          { label: 'スタジオ代・キャンセル期限を計算中...', note: '入力内容を準備しています' },
+        ]
+      : [
+          { label: '文章から予約内容を読み取り中...', note: '文章から予約内容を読み取っています' },
+          { label: '日時・スタジオ情報を確認中...', note: '日時やスタジオ・部屋を調べています' },
+          { label: 'スタジオ代・キャンセル期限を計算中...', note: '入力内容を準備しています' },
+        ];
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setStepIndex(1), 1800);
+    const t2 = setTimeout(() => setStepIndex(2), 3600);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, []);
+
+  return (
+    <div class="overlay" role="alertdialog" aria-busy="true" aria-label="読み取り中">
+      <div class="overlay-box" style={{ maxWidth: 300, textAlign: 'left', padding: '20px 18px 18px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+          <div class="spinner" style={{ width: 20, height: 20, margin: 0 }} />
+          <strong style={{ fontSize: '0.98rem' }}>予約内容を読み取り中</strong>
+        </div>
+        <p class="muted" style={{ fontSize: '0.75rem', margin: '0 0 14px' }}>
+          ※処理状況の目安です。数秒ほどかかる場合があります
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {steps.map((st, i) => {
+            const isCurrent = i === stepIndex;
+            const isPassed = i < stepIndex;
+            return (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 8,
+                  opacity: isCurrent ? 1 : isPassed ? 0.7 : 0.35,
+                  transition: 'opacity 0.2s',
+                }}
+              >
+                <div
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginTop: 2,
+                    flexShrink: 0,
+                    background: isCurrent ? 'var(--ink)' : isPassed ? 'var(--forest, #065F46)' : 'var(--line)',
+                    color: isCurrent || isPassed ? '#fff' : 'var(--muted)',
+                  }}
+                >
+                  <span style={{ fontSize: '0.65rem', fontWeight: 'bold' }}>{i + 1}</span>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.84rem', fontWeight: isCurrent ? 600 : 400, color: 'var(--ink)' }}>{st.label}</div>
+                  {isCurrent && (
+                    <div class="muted" style={{ fontSize: '0.72rem', marginTop: 1 }}>
+                      {st.note}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

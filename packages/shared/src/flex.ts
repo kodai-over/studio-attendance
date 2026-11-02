@@ -405,3 +405,23 @@ export function answerReport(items: { practice: Pick<Practice, 'date' | 'start'>
 export function reservationLabel(r: Reservation): string {
   return practiceSummary(r);
 }
+
+/** 予約情報が削除されたときに、募集済グループへ送るメッセージ */
+export function practiceCancellationMessage(
+  p: Pick<Practice, 'date' | 'start' | 'end' | 'studio' | 'room' | 'memo'>,
+  bookerName?: string,
+): LineMessage {
+  const lines = [
+    '【予約の削除連絡】',
+    '以下の予約情報が削除されました。',
+    '',
+    `日時: ${labelDate(p.date)} ${timeRange(p)}`,
+    `場所: ${place(p)}`,
+  ];
+  if (bookerName) lines.push(`予約者: ${bookerName}`);
+  if (p.memo) lines.push(`メモ: ${p.memo}`);
+  return {
+    type: 'text',
+    text: lines.join('\n'),
+  };
+}

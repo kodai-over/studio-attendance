@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { checkLiffRedirect, decideLiffInitAction } from '../src/liff';
 import { resolveInitialHash } from '../src/route';
+import { shouldNotifyInitially } from '../src/ui';
+import { shouldNotifyPracticeCancellation, type PracticeView } from '@studio-attendance/shared';
 
 describe('LIFF 初期化 & 画面遷移ロジック', () => {
   describe('checkLiffRedirect', () => {
@@ -153,6 +155,68 @@ describe('LIFF 初期化 & 画面遷移ロジック', () => {
       expect(resolveInitialHash(new URLSearchParams('r=r1&manage=m1'))).toBe('/answer?r=r1');
       // draft と view が同時 -> draft が優先
       expect(resolveInitialHash(new URLSearchParams('draft=d1&view=register'))).toBe('/register?draft=d1');
+    });
+  });
+
+  describe('予約削除ダイアログの初期状態判定（shouldNotifyInitially）', () => {
+    const mockView = (partial: { date?: string; start?: string; end?: string; status?: any; groups?: string[] }): PracticeView =>
+      ({
+        practice: {
+          id: 'p1',
+          date: partial.date ?? '2026-11-20',
+          start: partial.start ?? '18:00',
+          end: partial.end ?? '21:00',
+          studio: 'worcle',
+          room: '101',
+          fee: 3000,
+          status: partial.status ?? '募集中',
+          booker: 'U1',
+          groups: partial.groups ?? ['C1'],
+        },
+        groupNames: [],
+        canEdit: true,
+        involved: true,
+        myAnswer: null,
+        going: [],
+        maybe: [],
+        notGoing: [],
+        goingCount: 0,
+        perPersonFee: null,
+        shareUrl: '',
+        joinUrl: '',
+        googleCalendarUrl: '',
+        icsUrl: '',
+      }) as unknown as PracticeView;
+
+    it('未来の募集中で募集済グループがある予約情報では true になる', () => {
+      expect(shouldNotifyInitially(mockView({ date: '2026-11-20', groups: ['C1'] }), '2026-11-02')).toBe(true);
+    });
+
+    it('未募集の予約情報では false になる', () => {
+      expect(shouldNotifyInitially(mockView({ date: '2026-11-20', groups: [] }), '2026-11-02')).toBe(false);
+    });
+
+    it('終了した（過去の）予約情報では募集済グループがあっても false になる', () => {
+      expect(shouldNotifyInitially(mockView({ date: '2026-10-31', groups: ['C1'] }), '2026-11-02')).toBe(false);
+    });
+
+    it('当日の予約情報でも、終了時刻を過ぎていれば false になる', () => {
+      // 2026-11-02 の 10:00〜12:00 の予約情報。現在時刻 15:00 では終了済み
+      const endedView = mockView({ date: '2026-11-02', start: '10:00', end: '12:00', groups: ['C1'] });
+      expect(shouldNotifyInitially(endedView, '2026-11-02', '15:00')).toBe(false);
+
+      // 2026-11-02 の 13:00〜15:00 の予約情報。現在時刻 10:00 ではまだ終了前なので true
+      const futureTodayView = mockView({ date: '2026-11-02', start: '13:00', end: '15:00', groups: ['C1'] });
+      expect(shouldNotifyInitially(futureTodayView, '2026-11-02', '10:00')).toBe(true);
+    });
+
+    it('中止済の予約情報では募集済グループがあっても false になる', () => {
+      expect(shouldNotifyInitially(mockView({ date: '2026-11-20', status: '中止', groups: ['C1'] }), '2026-11-02')).toBe(false);
+    });
+
+    it('view が null の場合は false になる', () => {
+      expect(shouldNotifyInitially(null, '2026-11-02')).toBe(false);
+      expect(shouldNotifyPracticeCancellation(null, '2026-11-02')).toBe(false);
     });
   });
 });

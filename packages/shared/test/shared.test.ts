@@ -5,6 +5,7 @@ import {
   canonicalizeStudio,
   roomInfo,
   buildIcs,
+  canNotifyPracticeCancellation,
   cancelWarningAt,
   computeCancelDeadline,
   classifyReservations,
@@ -27,10 +28,12 @@ import {
   parsePostback,
   perPersonFee,
   endAfterStart,
+  practiceCancellationMessage,
   practiceListMessage,
   recruitMessages,
   answerReport,
   warningCard,
+  shouldNotifyPracticeCancellation,
   toJstDate,
   yen,
   type Practice,
@@ -474,6 +477,43 @@ describe('Flex Message', () => {
     // 上限があれば「参加/上限」で出す
     expect(JSON.stringify(practiceListMessage([{ practice: practice({ max: 12 }), going: 1 }], appUrl))).toContain('"1/12人"');
     expect(JSON.stringify(practiceListMessage([{ practice: practice({ max: 5, status: '満員' }), going: 5 }], appUrl))).toContain('5/5人 満員');
+  });
+
+  it('予約情報削除の通知メッセージ', () => {
+    const msg = practiceCancellationMessage(
+      { date: '2026-11-10', start: '18:00', end: '21:00', studio: 'スタジオノア 渋谷店', room: 'Ast', memo: '自主練' },
+      'たろう',
+    );
+    expect(msg.type).toBe('text');
+    expect(msg.text).toContain('【予約の削除連絡】');
+    expect(msg.text).toContain('11/10');
+    expect(msg.text).toContain('18:00〜21:00');
+    expect(msg.text).toContain('スタジオノア 渋谷店 Ast');
+    expect(msg.text).toContain('予約者: たろう');
+    expect(msg.text).toContain('メモ: 自主練');
+  });
+
+  it('予約情報削除時のグループ通知可否と初期値判定', () => {
+    const today = '2026-11-02';
+    // 未来かつ募集中
+    expect(canNotifyPracticeCancellation({ date: '2026-11-10', status: '募集中' }, today)).toBe(true);
+    // 満員（アクティブ）も対象
+    expect(canNotifyPracticeCancellation({ date: '2026-11-10', status: '満員' }, today)).toBe(true);
+    // 当日終了前（現在 10:00、終了 12:00）
+    expect(canNotifyPracticeCancellation({ date: '2026-11-02', end: '12:00', status: '募集中' }, today, '10:00')).toBe(true);
+    // 当日終了後（現在 15:00、終了 12:00）
+    expect(canNotifyPracticeCancellation({ date: '2026-11-02', end: '12:00', status: '募集中' }, today, '15:00')).toBe(false);
+    // 過去
+    expect(canNotifyPracticeCancellation({ date: '2026-11-01', status: '募集中' }, today)).toBe(false);
+    // 中止
+    expect(canNotifyPracticeCancellation({ date: '2026-11-10', status: '中止' }, today)).toBe(false);
+
+    // shouldNotifyPracticeCancellation: 募集済グループ有無との連動
+    expect(shouldNotifyPracticeCancellation({ date: '2026-11-10', status: '募集中', groups: ['C1'] }, today)).toBe(true);
+    expect(shouldNotifyPracticeCancellation({ date: '2026-11-10', status: '募集中', groups: [] }, today)).toBe(false);
+    expect(shouldNotifyPracticeCancellation({ date: '2026-11-01', status: '募集中', groups: ['C1'] }, today)).toBe(false);
+    expect(shouldNotifyPracticeCancellation({ date: '2026-11-02', end: '12:00', status: '募集中', groups: ['C1'] }, today, '15:00')).toBe(false);
+    expect(shouldNotifyPracticeCancellation(null, today)).toBe(false);
   });
 
   it('開始を変えたら、終了を開始の1時間後より前にしない', () => {
