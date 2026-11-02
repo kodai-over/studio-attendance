@@ -28,6 +28,8 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # コメントを1つにまとめ、更新のたびに同じコメントを書き換える（通知メールを増やさない）
+          use_sticky_comment: true
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
@@ -51,9 +53,10 @@ jobs:
             5. CHANGELOG・タグ・コミットなど公開する文に、使っているグループの名前や内輪の言い方が入っていないか
 
             出し方:
-            - 行ごとの指摘は、インラインコメントで出す
-            - 最後に、全体の所見を PR コメントに1つだけまとめる。冒頭に「本番が止まる重大な変更: あり（内容）/ 見当たらない」を1行で書き、続けて直してほしい点を優先度の高い順に並べる（良い点は1〜2行）
+            - コメントは PR コメント1つだけにする。行ごとのインラインコメントは出さない（通知メールが増えるため）
+            - 指摘する場所は、コメントの中に「ファイル名:行番号」で書く
+            - 全体の所見をそのコメントにまとめる。冒頭に「本番が止まる重大な変更: あり（内容）/ 見当たらない」を1行で書き、続けて直してほしい点を優先度の高い順に並べる（良い点は1〜2行）
             - 直してほしい点は「何を・なぜ・どう直すか」を具体的に書く
             - 好みの問題や細かすぎる指摘は出さない
           claude_args: |
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+            --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
