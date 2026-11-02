@@ -196,14 +196,18 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
 
   // 回答を反映してグループに伝える（現在のタブの変更を一括保存してから送信）
   const handleTell = async () => {
+    // commitAnswers() による再レンダリングで latest.current がリセットされる前に、送信メッセージを先にキャプチャ
+    const body = latest.current.trim();
+    if (!body) {
+      toast('送る文がありません', true);
+      return;
+    }
     setSaving(true);
     try {
       if (hasChanges) {
         await commitAnswers();
         await answersSettled();
       }
-      const body = latest.current.trim();
-      if (!body) throw new Error('送る文がありません');
       if (chat === 'ok') {
         await sendToChat(body);
         toast('回答を反映し、グループに伝えました');
@@ -357,7 +361,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
               <button
                 class="btn ghost block"
                 style={{ marginTop: 8 }}
-                disabled={!text.trim() || saving || !fresh}
+                disabled={!text.trim() || saving || !fresh || (activeTab === 'answered' && !hasChanges)}
                 onClick={handleTell}
               >
                 <Icon name="copy" size={16} />
@@ -391,7 +395,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
               )}
               <button
                 class="btn primary block"
-                disabled={!text.trim() || saving || !fresh}
+                disabled={!text.trim() || saving || !fresh || (activeTab === 'answered' && !hasChanges)}
                 onClick={handleTell}
               >
                 <Icon name="send" size={18} />

@@ -167,10 +167,21 @@ export function PracticeCard({
   onAnswer?: (a: Answer) => void;
   busy?: boolean;
 }) {
+  const { toast } = useApp();
+  const [shaking, setShaking] = useState(false);
   const p = v.practice;
   const open = () => go(`/p/${encodeURIComponent(p.id)}`);
+
+  const handleBlocked = (reason: 'full' | 'closed') => {
+    if (reason === 'full') {
+      setShaking(true);
+      toast('満員のため「○ 行く」は選べません（未定または行かないを選択できます）', true);
+      setTimeout(() => setShaking(false), 450);
+    }
+  };
+
   return (
-    <article class="ticket" data-answer={v.myAnswer ?? 'none'} data-status={p.status}>
+    <article class={`ticket${shaking ? ' is-shaking' : ''}`} data-answer={v.myAnswer ?? 'none'} data-status={p.status}>
       <Stub date={p.date} onClick={open} />
       <button class="ticket-main" onClick={open}>
         <span class="sr">{labelDate(p.date)}</span>
@@ -198,7 +209,15 @@ export function PracticeCard({
           <MyAnswerBadge answer={v.myAnswer} />
         </div>
       </button>
-      {onAnswer && <RsvpButtons value={v.myAnswer} status={p.status} busy={busy} onAnswer={onAnswer} />}
+      {onAnswer && (
+        <RsvpButtons
+          value={v.myAnswer}
+          status={p.status}
+          busy={busy}
+          onAnswer={onAnswer}
+          onBlocked={handleBlocked}
+        />
+      )}
     </article>
   );
 }

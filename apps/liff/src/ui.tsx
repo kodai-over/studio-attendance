@@ -267,12 +267,15 @@ export function RsvpButtons({
   value,
   status,
   onAnswer,
+  onBlocked,
   busy,
   solo,
 }: {
   value: Answer | null;
   status: string;
   onAnswer: (a: Answer) => void;
+  /** 満員や締切などで選択がブロックされたときの通知コールバック */
+  onBlocked?: (reason: 'full' | 'closed') => void;
   busy?: boolean;
   /** チケットの外に単独で置く（大きなボタンにする） */
   solo?: boolean;
@@ -281,21 +284,31 @@ export function RsvpButtons({
   const full = status === '満員' && value !== '行く';
   return (
     <div class={`rsvp${solo ? ' solo' : ''}`} role="radiogroup" aria-label="回答">
-      {(['行く', '保留', '行かない'] as const).map((a) => (
-        <button
-          role="radio"
-          class={a === '行く' ? 'yes' : a === '保留' ? 'maybe' : 'no'}
-          aria-checked={value === a}
-          aria-label={a === '行く' && full ? '満員' : ANSWER_LABEL[a]}
-          title={ANSWER_LABEL[a]}
-          disabled={busy || closed || (a === '行く' && full)}
-          onClick={() => value !== a && onAnswer(a)}
-        >
-          <span class="mark" aria-hidden="true">
-            {ANSWER_MARK[a]}
-          </span>
-        </button>
-      ))}
+      {(['行く', '保留', '行かない'] as const).map((a) => {
+        const isGoingBlocked = a === '行く' && full;
+        return (
+          <button
+            type="button"
+            role="radio"
+            class={`${a === '行く' ? 'yes' : a === '保留' ? 'maybe' : 'no'}${isGoingBlocked ? ' is-blocked-full' : ''}`}
+            aria-checked={value === a}
+            aria-label={isGoingBlocked ? '満員（選択不可）' : ANSWER_LABEL[a]}
+            title={isGoingBlocked ? '満員のため「行く」は選べません' : ANSWER_LABEL[a]}
+            disabled={busy || closed}
+            onClick={() => {
+              if (isGoingBlocked) {
+                onBlocked?.('full');
+                return;
+              }
+              if (value !== a) onAnswer(a);
+            }}
+          >
+            <span class="mark" aria-hidden="true">
+              {ANSWER_MARK[a]}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

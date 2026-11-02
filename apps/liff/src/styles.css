@@ -2397,4 +2397,31 @@ details > summary {
   font-size: 0.85rem;
 }
 
+/* ---------- 満員時のフィードバック（チケット揺れ） ---------- */
+@keyframes ticket-shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  15%, 55% {
+    transform: translateX(-6px);
+  }
+  35%, 75% {
+    transform: translateX(6px);
+  }
+}
+.ticket.is-shaking {
+  animation: ticket-shake 0.4s ease-in-out;
+  border-color: #ef4444 !important;
+}
+
+.rsvp button.yes.is-blocked-full {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: grayscale(0.8);
+}
+.rsvp button.yes.is-blocked-full:hover {
+  opacity: 0.6;
+}
+
+
 
