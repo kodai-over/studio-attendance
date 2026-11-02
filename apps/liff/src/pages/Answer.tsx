@@ -44,10 +44,15 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   const myGroupIds = new Set(me.member.groups);
   const userGroups = allGroups.filter((g) => myGroupIds.has(g.id));
 
-  // 所属グループごとのチケット絞り込み（'all' またはグループID）
-  const [selectedGroup, setSelectedGroup] = useState<string>('all');
-  // メッセージを送るグループ（'all' またはグループID）
-  const [targetGroup, setTargetGroup] = useState<string>('all');
+  // 所属グループ選択（'all' は廃止し、グループごとに作業）
+  const [selectedGroup, setSelectedGroup] = useState<string>(() => {
+    if (isSpecific && list) {
+      const target = list.find((v) => ids.includes(v.practice.id));
+      const matched = target?.practice.groups.find((gid) => myGroupIds.has(gid));
+      if (matched) return matched;
+    }
+    return userGroups[0]?.id || '';
+  });
 
   // 最新の一覧を取り終えたか。前回の表示の回答のまま送らないよう、取れるまでは答えも送信も止める。
   const [load, setLoad] = useState<'wait' | 'loading' | 'ok' | 'error'>(() =>
@@ -86,11 +91,13 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     allTargets = list.filter((v) => isRsvpTarget(v, me.member.userId, me.member.groups, today, currentTime));
   }
 
-  // 所属グループ選択によるチケット絞り込み（特定指定時はグループ絞り込みで消えないようにする）
+  // 所属グループ選択によるチケット絞り込み（特定指定時以外は、選択中グループのチケットのみ表示）
   const groupFiltered =
-    isSpecific || selectedGroup === 'all'
+    isSpecific
       ? allTargets
-      : allTargets.filter((v) => v.practice.groups.includes(selectedGroup));
+      : selectedGroup
+      ? allTargets.filter((v) => v.practice.groups.includes(selectedGroup))
+      : allTargets;
 
   // 未回答・回答済の分類（タブ分類の基準は元の回答 myAnswer に固定し、回答変更してもチケットが消えないようにする）
   const todos = groupFiltered.filter((v) => v.myAnswer == null);
@@ -150,18 +157,14 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   // グループ切り替え
   const handleGroupFilterChange = (gId: string) => {
     setSelectedGroup(gId);
-    if (gId !== 'all') {
-      setTargetGroup(gId);
-    }
     setDraft(null);
   };
 
-  // 送信先グループによる絞り込み
-  const effectiveTargetGroup = selectedGroup !== 'all' ? selectedGroup : targetGroup;
+  // メッセージ対象の練習（選択中グループの練習）
   const messagePracticeFilter = (p: Pick<Practice, 'groups'>) =>
-    effectiveTargetGroup === 'all' || p.groups.includes(effectiveTargetGroup);
+    !selectedGroup || p.groups.includes(selectedGroup);
 
-  // 表示中かつ送信先グループに該当する変更項目（メッセージと件数を完全連動させる）
+  // 表示中かつ選択グループに該当する変更項目（メッセージと件数を完全連動させる）
   const displayedIds = new Set(displayed.map((v) => v.practice.id));
   const targetModifiedItems = modifiedItems.filter(
     (item) => displayedIds.has(item.id) && messagePracticeFilter(item.practice),
@@ -290,12 +293,6 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
           {/* 複数グループに所属している場合のグループ切り替え（大分類を上に配置） */}
           {userGroups.length > 1 && (
             <div class="group-filter-bar">
-              <button
-                class={`group-pill ${selectedGroup === 'all' ? 'active' : ''}`}
-                onClick={() => handleGroupFilterChange('all')}
-              >
-                <span>すべて</span>
-              </button>
               {userGroups.map((g) => (
                 <button
                   key={g.id}
@@ -362,29 +359,6 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
             グループに伝える
           </div>
 
-          {/* メッセージ送信先グループの選択（全表示かつ所属グループが複数の場合） */}
-          {userGroups.length > 1 && selectedGroup === 'all' && (
-            <div class="target-group-field" style={{ marginBottom: 14 }}>
-              <span class="target-group-label">送り先グループ:</span>
-              <select
-                class="target-group-select"
-                value={targetGroup}
-                onChange={(e) => {
-                  setTargetGroup(e.currentTarget.value);
-                  setDraft(null);
-                }}
-                disabled={saving}
-              >
-                <option value="all">すべてのグループ（全体）</option>
-                {userGroups.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
           {chat === 'outside' ? (
             <>
               <p class="note" style={{ lineHeight: 1.5 }}>
@@ -437,7 +411,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
               </button>
               <p class="note rsvp-tell-note">
                 押すと、回答が反映され、あなたの発言として開いているトークに送ります。
-                {userGroups.length > 1 && '（他のグループにも伝えたいときは、文をコピーしてそのトークに貼り付けてください）'}
+                {userGroups.length > 1 && '（他のグループは上のグループを切り替えて伝えられます）'}
               </p>
             </>
           )}
@@ -453,7 +427,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
           {saving
             ? '保存中...'
             : hasChanges
-            ? selectedGroup !== 'all' && modifiedItems.length > targetModifiedItems.length
+            ? modifiedItems.length > targetModifiedItems.length
               ? `回答を反映して完了（全${modifiedItems.length}件）`
               : `回答を反映して完了（${modifiedItems.length}件）`
             : '完了'}

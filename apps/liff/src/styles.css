@@ -2416,28 +2416,6 @@ button + .muted {
   opacity: 0.8;
 }
 
-/* 送信先グループ選択 */
-.target-group-field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-.target-group-label {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--ink);
-  flex-shrink: 0;
-}
-.target-group-select {
-  flex: 1;
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--paper);
-  color: var(--ink);
-  font-size: 0.85rem;
-}
 
 /* ---------- 満員時のフィードバック（チケット揺れ） ---------- */
 @keyframes ticket-shake {
