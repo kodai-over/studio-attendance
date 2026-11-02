@@ -11,7 +11,7 @@ import {
 } from '@studio-attendance/shared';
 import { api } from '../api';
 import { canSendToChat, closeApp, sendToChat } from '../liff';
-import { FRESH_MS, Icon, Spinner, Syncing, Tabs, TopBar, go, useApp, useRunner } from '../ui';
+import { FRESH_MS, Icon, Spinner, Syncing, Tabs, TopBar, useApp, useRunner } from '../ui';
 import { answersSettled } from '../answering';
 import { PracticeCard } from './List';
 
@@ -244,7 +244,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     }
   };
 
-  // 回答を反映して完了（現在のタブの変更があれば保存して完了）
+  // 回答を反映して完了（現在のタブの変更があれば保存。予定画面へは切り替えずそのまま留まる）
   const handleDone = async () => {
     if (hasChanges) {
       setSaving(true);
@@ -252,14 +252,11 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
         const count = modifiedItems.length;
         await commitAllAnswers();
         toast(`${count}件の回答を反映しました`);
-        go('/');
       } catch (e) {
         toast(e instanceof Error ? e.message : '保存に失敗しました', true);
       } finally {
         setSaving(false);
       }
-    } else {
-      go('/');
     }
   };
 
