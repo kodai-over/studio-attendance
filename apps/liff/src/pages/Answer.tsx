@@ -11,7 +11,7 @@ import {
 } from '@studio-attendance/shared';
 import { api } from '../api';
 import { canSendToChat, closeApp, sendToChat } from '../liff';
-import { FRESH_MS, Icon, Spinner, Syncing, Tabs, TopBar, useApp, useRunner } from '../ui';
+import { FRESH_MS, Icon, Spinner, Syncing, Tabs, TopBar, go, useApp, useRunner } from '../ui';
 import { answersSettled } from '../answering';
 import { PracticeCard } from './List';
 
@@ -260,10 +260,20 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     }
   };
 
+  const handleBack = () => {
+    if (history.length > 1) {
+      history.back();
+    } else if (ids.length === 1) {
+      go(`/p/${encodeURIComponent(ids[0])}`);
+    } else {
+      go('/');
+    }
+  };
+
   if (list == null || (isSpecific && displayed.length < ids.length && (load === 'loading' || load === 'wait'))) {
     return (
       <>
-        <TopBar title="RSVP" />
+        <TopBar title="RSVP" back={isSpecific} onBack={handleBack} />
         <Spinner />
       </>
     );
@@ -271,7 +281,9 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
 
   return (
     <>
-      <TopBar title="RSVP">{(busy || saving || load === 'loading' || load === 'wait') && <Syncing />}</TopBar>
+      <TopBar title="RSVP" back={isSpecific} onBack={handleBack}>
+        {(busy || saving || load === 'loading' || load === 'wait') && <Syncing />}
+      </TopBar>
 
       {!isSpecific && (
         <>

@@ -163,12 +163,32 @@ export function ThemeToggle() {
   );
 }
 
-export function TopBar({ title, back, children, showTheme }: { title?: string; back?: boolean; children?: ComponentChildren; showTheme?: boolean }) {
+export function TopBar({
+  title,
+  back,
+  onBack,
+  children,
+  showTheme,
+}: {
+  title?: string;
+  back?: boolean;
+  onBack?: () => void;
+  children?: ComponentChildren;
+  showTheme?: boolean;
+}) {
   if (!title && !back && children === undefined && !showTheme) return null;
   return (
     <header class="topbar">
       {back && (
-        <button class="back-btn" aria-label="戻る" onClick={() => (history.length > 1 ? history.back() : go('/'))}>
+        <button
+          class="back-btn"
+          aria-label="戻る"
+          onClick={() => {
+            if (onBack) onBack();
+            else if (history.length > 1) history.back();
+            else go('/');
+          }}
+        >
           <Icon name="back" size={20} />
         </button>
       )}
