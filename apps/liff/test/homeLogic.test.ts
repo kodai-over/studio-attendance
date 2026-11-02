@@ -10,9 +10,11 @@ import {
   isRelatedForNotice,
   markNoticesRead,
   markReleaseNotesRead,
+  parseChangelog,
   syncPracticeNotices,
   updatePracticeSnapshot,
 } from '../src/pages/homeLogic';
+import { resolveActiveNavKey } from '../src/ui';
 
 function createMockMe(partial?: Partial<MeView['member']>, actAs: MeView['actAs'] = 'self'): MeView {
   return {
@@ -335,7 +337,7 @@ describe('ホーム画面ロジック（homeLogic）', () => {
   });
 
   describe('未読・既読管理（getHomeUnreadStatus / markNoticesRead / markReleaseNotesRead）', () => {
-    it('初期状態ではお知らせ件数＋未読リリースノート(1)がバッジ数になり、既読化すると 0 になる', () => {
+    it('初回起動時（既読時刻なし）は過去の既存回答が大量に未読にならないよう unreadNoticesCount が 0 になり、それ以降の新着のみ未読として数える', () => {
       const me = createMockMe();
       const p1 = createMockPracticeView({
         id: 'p1',
@@ -343,33 +345,71 @@ describe('ホーム画面ロジック（homeLogic）', () => {
         going: [createAttendee('U3', 'けんた', '行く', '2026-11-02T10:00:00.000Z')],
       });
 
-      const status1 = getHomeUnreadStatus([p1], me, '2026-11-02');
-      expect(status1.unreadNoticesCount).toBe(1);
-      expect(status1.hasUnreadReleaseNote).toBe(true);
-      expect(status1.totalBadgeCount).toBe(2);
+      // 1. 初回 sync 前の段階でも readAt === null なので過去の既存回答は未読扱いにならない（未読リリースノートの 1 のみ）
+      const statusBeforeSync = getHomeUnreadStatus([p1], me, '2026-11-02');
+      expect(statusBeforeSync.unreadNoticesCount).toBe(0);
+      expect(statusBeforeSync.hasUnreadReleaseNote).toBe(true);
+      expect(statusBeforeSync.totalBadgeCount).toBe(1);
 
-      // お知らせを既読化
-      markNoticesRead(me, '2026-11-02T10:00:00.000Z');
-      const status2 = getHomeUnreadStatus([p1], me, '2026-11-02');
-      expect(status2.unreadNoticesCount).toBe(0);
-      expect(status2.hasUnreadReleaseNote).toBe(true);
-      expect(status2.totalBadgeCount).toBe(1);
+      // 2. 初回 syncPracticeNotices でベースライン既読時刻が設定される
+      syncPracticeNotices([p1], me, '2026-11-02T10:05:00.000Z');
+      const statusAfterFirstSync = getHomeUnreadStatus([p1], me, '2026-11-02');
+      expect(statusAfterFirstSync.unreadNoticesCount).toBe(0);
 
-      // リリースノートを既読化
+      // 3. その後に新しい回答や回答変更が来た場合は未読としてカウントされる
+      const p1Updated = createMockPracticeView({
+        id: 'p1',
+        booker: 'Ume',
+        going: [
+          createAttendee('U3', 'けんた', '行く', '2026-11-02T10:00:00.000Z'),
+          createAttendee('U4', 'みお', '行く', '2026-11-02T11:00:00.000Z'),
+        ],
+      });
+      syncPracticeNotices([p1Updated], me, '2026-11-02T11:01:00.000Z');
+      const statusWithNewNotice = getHomeUnreadStatus([p1Updated], me, '2026-11-02');
+      expect(statusWithNewNotice.unreadNoticesCount).toBe(1);
+      expect(statusWithNewNotice.totalBadgeCount).toBe(2);
+
+      // 4. お知らせを既読化
+      markNoticesRead(me, '2026-11-02T11:05:00.000Z');
+      const statusReadNotices = getHomeUnreadStatus([p1Updated], me, '2026-11-02');
+      expect(statusReadNotices.unreadNoticesCount).toBe(0);
+      expect(statusReadNotices.hasUnreadReleaseNote).toBe(true);
+      expect(statusReadNotices.totalBadgeCount).toBe(1);
+
+      // 5. リリースノートを既読化
       markReleaseNotesRead(me, LATEST_RELEASE_VERSION);
-      const status3 = getHomeUnreadStatus([p1], me, '2026-11-02');
-      expect(status3.hasUnreadReleaseNote).toBe(false);
-      expect(status3.totalBadgeCount).toBe(0);
+      const statusAllRead = getHomeUnreadStatus([p1Updated], me, '2026-11-02');
+      expect(statusAllRead.hasUnreadReleaseNote).toBe(false);
+      expect(statusAllRead.totalBadgeCount).toBe(0);
     });
 
-    it('リリースノート定義に最新バージョン v1.4.0〜v1.0.0 が含まれている', () => {
+    it('CHANGELOG.md から自動生成されたリリースノートに最新バージョン v1.4.0〜v1.0.0 が含まれている', () => {
       expect(RELEASE_NOTES[0].version).toBe('v1.4.0');
       expect(RELEASE_NOTES[RELEASE_NOTES.length - 1].version).toBe('v1.0.0');
+      expect(RELEASE_NOTES[0].sections.length).toBeGreaterThan(0);
+
+      const customParsed = parseChangelog('## v1.5.0（2026-11-03）\n\n### 新しくできること\n- **ホーム画面**:\n  - お知らせを見られます。');
+      expect(customParsed).toHaveLength(1);
+      expect(customParsed[0].version).toBe('v1.5.0');
+      expect(customParsed[0].sections[0].items[0]).toBe('ホーム画面: お知らせを見られます。');
     });
 
     it('formatNoticeTime が ISO 文字列を JST の MM/DD HH:mm 形式に整形する', () => {
       expect(formatNoticeTime('2026-11-02T10:30:00.000Z')).toBe('11/02 19:30');
       expect(formatNoticeTime('invalid')).toBe('');
+    });
+
+    it('resolveActiveNavKey が各画面パスに対して正しい下部ナビのタブキーを返す（/feedback や /admin はアカウント扱い）', () => {
+      expect(resolveActiveNavKey(['home'])).toBe('home');
+      expect(resolveActiveNavKey([])).toBe('');
+      expect(resolveActiveNavKey(['p', 'p1'])).toBe('');
+      expect(resolveActiveNavKey(['recruit'])).toBe('recruit');
+      expect(resolveActiveNavKey(['register'])).toBe('recruit');
+      expect(resolveActiveNavKey(['answer'])).toBe('answer');
+      expect(resolveActiveNavKey(['settings'])).toBe('settings');
+      expect(resolveActiveNavKey(['admin'])).toBe('settings');
+      expect(resolveActiveNavKey(['feedback'])).toBe('settings');
     });
   });
 });

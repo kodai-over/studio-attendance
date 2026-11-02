@@ -261,6 +261,15 @@ export function Tabs<K extends string>({ items, value, onChange }: { items: { ke
   );
 }
 
+/** 画面下のナビゲーションから現在地のタブキーを解決する */
+export function resolveActiveNavKey(path: string[]): string {
+  const first = path[0] ?? '';
+  if (first === 'p') return '';
+  if (first === 'register') return 'recruit';
+  if (first === 'admin' || first === 'feedback') return 'settings';
+  return first;
+}
+
 /** 画面下のナビゲーション。どの画面からでも主要画面に移れる */
 export function NavBar() {
   const { me, practices } = useApp();
@@ -272,9 +281,6 @@ export function NavBar() {
     window.addEventListener(HOME_READ_EVENT, onRead);
     return () => window.removeEventListener(HOME_READ_EVENT, onRead);
   }, []);
-
-  // 予約詳細（/p/:id）は「予定」、登録画面（/register）は「募集」を光らせる
-  const here = path[0] === 'p' ? '' : path[0] === 'register' ? 'recruit' : (path[0] ?? '');
 
   const now = new Date();
   const today = toJstDate(now);
@@ -289,7 +295,7 @@ export function NavBar() {
     { to: '/answer', key: 'answer', icon: 'check', label: 'RSVP', badge: todoCount },
     { to: '/settings', key: 'settings', icon: 'user', label: 'アカウント' },
   ];
-  const active = here === 'admin' || here === 'feedback' ? 'settings' : here;
+  const active = resolveActiveNavKey(path);
   return (
     <nav class="navbar">
       {items.map((it) => (

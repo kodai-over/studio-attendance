@@ -98,7 +98,7 @@ export function HomePage() {
         <div class="home-section-head">
           <h2 class="section-title" style={{ margin: 0 }}>次の参加予定</h2>
           <button class="home-section-link" onClick={() => go('/?tab=mine')}>
-            <span>予定一覧へ</span>
+            <span>予定へ</span>
             <Icon name="chevron" size={14} />
           </button>
         </div>
@@ -108,7 +108,7 @@ export function HomePage() {
           </div>
         ) : (
           <div class="home-empty-card">
-            <span>行く予約情報はありません。</span>
+            <span>次の参加予定はありません。</span>
           </div>
         )}
       </section>
@@ -139,7 +139,7 @@ export function HomePage() {
           ) : (
             <ul class="home-notice-list">
               {notices.map((n) => {
-                const isUnread = !readAtBefore || n.updatedAt > readAtBefore;
+                const isUnread = readAtBefore != null && n.updatedAt > readAtBefore;
                 return (
                   <li key={n.id}>
                     <button

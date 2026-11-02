@@ -27,6 +27,7 @@ description: スタジオ練出欠管理 の新しいバージョンを出す。
 ## 3. リリースノートを書く
 
 - [CHANGELOG.md](../../../CHANGELOG.md) の `---` のすぐ下に、`## vX.Y.Z（YYYY-MM-DD）` を足す。
+- ※アプリの「ホーム ＞ リリースノート」（`apps/liff/src/pages/homeLogic.ts`）は `CHANGELOG.md` を自動解析して `RELEASE_NOTES` と `LATEST_RELEASE_VERSION` を生成するため、`CHANGELOG.md` を更新すればアプリ内にも自動反映される。
 - 見出しは、あるものだけ使う：「新しくできること」「変わったこと」「直したこと」。
 - 使う人に向けて、「何ができるようになったか」「何が変わったか」を書く。コードやファイルの名前、コミットの題名は書かない。
 - 言葉は [docs/glossary.md](../../../docs/glossary.md) に従う。

@@ -8,6 +8,7 @@ import {
   type PracticeStatus,
   type PracticeView,
 } from '@studio-attendance/shared';
+import changelogRaw from '../../../../CHANGELOG.md?raw';
 import { getDraftOwnerKey } from './answerLogic';
 
 export interface ReleaseNoteSection {
@@ -22,104 +23,80 @@ export interface ReleaseNote {
   sections: ReleaseNoteSection[];
 }
 
-export const LATEST_RELEASE_VERSION = 'v1.4.0';
+/**
+ * CHANGELOG.md の Markdown テキストからリリースノート一覧を自動生成する。
+ * これにより CHANGELOG.md とアプリ内リリースノートの二重管理を防ぐ。
+ */
+export function parseChangelog(md: string): ReleaseNote[] {
+  const notes: ReleaseNote[] = [];
+  let current: ReleaseNote | null = null;
+  let currentSec: ReleaseNoteSection | null = null;
 
-export const RELEASE_NOTES: ReleaseNote[] = [
-  {
-    version: 'v1.4.0',
-    date: '2026-11-02',
-    sections: [
-      {
-        heading: '新しくできること',
-        items: [
-          '下のメニューに「RSVP」を追加し、今後の予約情報を「未回答」「回答済」に分けて確認・回答できるようになりました（未回答の件数がバッジで表示されます）。',
-          '複数のグループに所属している場合は、グループごとに切り替えて回答や「グループに伝える」を行えます。',
-          '「回答済」タブで回答を変更すると、「回答を変更しました（例: 行く → 未定）」の文が自動で作られ、「グループに伝える」やコピーでそのまま共有できます。',
-          '満員の予約情報で「○ 行く」を押したときは、満員のため選べない旨の案内が表示されます（「△ 未定」「✕ 行かない」は選択できます）。',
-        ],
-      },
-      {
-        heading: '変わったこと',
-        items: [
-          '予定を確認しているときの誤タップで回答が変わってしまうのを防ぐため、「予定」の一覧と予約情報の詳細は確認専用になりました。',
-          '下のメニューの「RSVP」から回答するときは、選んだ内容が下書きとして保持され、「回答を反映してグループに伝える」または「回答を反映して完了」を押した時点でまとめて反映されます。',
-          '「予定」の上のタブを「すべて」「行く」の2つに整理し、自分の現在の回答を記号（○・△・✕・—）でひと目で確認できるようにしました。',
-        ],
-      },
-    ],
-  },
-  {
-    version: 'v1.3.0',
-    date: '2026-11-02',
-    sections: [
-      {
-        heading: '新しくできること',
-        items: [
-          '募集済のグループがある予約情報を削除する際、「募集済のグループに削除の連絡を送る」を選べるようになりました（初期値はON）。',
-          'スクショや文章から予約内容を読み取っている間、処理の目安ステップ（文字の読み取り → 日時・スタジオ情報の確認 → スタジオ代・キャンセル期限の計算）が表示されるようになりました。',
-        ],
-      },
-      {
-        heading: '変わったこと',
-        items: [
-          '予約情報を削除する際、参加者の回答がある場合の警告や削除の連絡オプションが確認画面として統一して表示されるようになり、意図しない誤削除を防ぎやすくしました。',
-        ],
-      },
-    ],
-  },
-  {
-    version: 'v1.2.0',
-    date: '2026-11-02',
-    sections: [
-      {
-        heading: '新しくできること',
-        items: [
-          'LINE Bot との個別トーク下にあるメニューを、「予定確認」「予約登録」「ブラウザで開く」の3つのカード型ボタンに刷新しました。',
-          'トーク画面を広く使えるコンパクトなサイズに変更し、見やすいデザインに一新しました。',
-        ],
-      },
-    ],
-  },
-  {
-    version: 'v1.1.0',
-    date: '2026-11-02',
-    sections: [
-      {
-        heading: '新しくできること',
-        items: [
-          '予約情報の一覧や詳細画面に、各スタジオの無料キャンセル期限が表示されるようになりました。',
-          '最低人数に届いていないときに届くキャンセル期限前のお知らせから、ボタンひとつで同じグループにもう一度募集を送れるようになりました。',
-          'Safari や Chrome などの外部ブラウザで直接アプリを開いたり、ホーム画面に追加して全画面で利用できるようになりました。',
-          '画面右上のボタンから、ダークモードとライトモードを手動でいつでも切り替えられるようになりました。',
-          'アカウント画面からログアウトし、別の LINE アカウントでログインし直せるようになりました。',
-        ],
-      },
-      {
-        heading: '変わったこと',
-        items: [
-          '予約情報の一覧や画面全体のデザインを見直し、曜日ごとの色分けや満員時の「FULL」表示など、より見やすく整理しました。',
-          '下のメニューの表記を「アカウント」「管理画面」にそろえました。',
-        ],
-      },
-    ],
-  },
-  {
-    version: 'v1.0.0',
-    date: '2026-10-28',
-    summary: '最初のバージョンです。',
-    sections: [
-      {
-        heading: '新しくできること',
-        items: [
-          '予約画面のスクショや予約完了メールの文章を Bot に送るか、アプリの「募集」の右上の＋から予約情報を登録できるようになりました。',
-          '登録と同時に、または登録したあとに、選んだグループへ「参加者募集」のカードを送れます。',
-          '募集カードの「回答」から ○ 行く・△ 未定・✕ 行かない を選び、「グループに伝える」で自分の回答をトークに送れます。',
-          '予約情報ごとに、参加者・参加人数・スタジオ代・1人あたりを確認でき、「カレンダーに追加」もできます。',
-        ],
-      },
-    ],
-  },
-];
+  for (const rawLine of md.split(/\r?\n/)) {
+    const line = rawLine.trimEnd();
+    const verMatch = line.match(/^##\s+(v[0-9]+\.[0-9]+\.[0-9]+)(?:[（(]([^）)]+)[）)])?/);
+    if (verMatch) {
+      current = {
+        version: verMatch[1],
+        date: verMatch[2] ?? '',
+        sections: [],
+      };
+      notes.push(current);
+      currentSec = null;
+      continue;
+    }
+    if (!current) continue;
+
+    const secMatch = line.match(/^###\s+(.+)/);
+    if (secMatch) {
+      currentSec = {
+        heading: secMatch[1].trim(),
+        items: [],
+      };
+      current.sections.push(currentSec);
+      continue;
+    }
+
+    const bulletMatch = line.match(/^(\s*)-\s+(.+)/);
+    if (bulletMatch) {
+      if (!currentSec) {
+        currentSec = { heading: '更新内容', items: [] };
+        current.sections.push(currentSec);
+      }
+      const indent = bulletMatch[1].length;
+      const cleanText = bulletMatch[2]
+        .replace(/\*\*(.+?)\*\*:\s*$/, '$1')
+        .replace(/\*\*(.+?)\*\*/g, '$1')
+        .replace(/`([^`]+)`/g, '$1')
+        .trim();
+
+      if (!cleanText) continue;
+      if (indent >= 2 && currentSec.items.length > 0) {
+        const lastIdx = currentSec.items.length - 1;
+        const prev = currentSec.items[lastIdx];
+        // 親箇条書きが見出しのみだった場合は「見出し: 本文」として連結し、それ以外は新しい項目として追加
+        if (!prev.includes('。') && prev.length <= 28) {
+          currentSec.items[lastIdx] = `${prev}: ${cleanText}`;
+        } else {
+          currentSec.items.push(cleanText);
+        }
+      } else {
+        currentSec.items.push(cleanText);
+      }
+      continue;
+    }
+
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith('#') && !trimmed.startsWith('---') && current.sections.length === 0) {
+      current.summary = current.summary ? `${current.summary} ${trimmed}` : trimmed;
+    }
+  }
+
+  return notes;
+}
+
+export const RELEASE_NOTES: ReleaseNote[] = parseChangelog(changelogRaw);
+export const LATEST_RELEASE_VERSION: string = RELEASE_NOTES[0]?.version ?? 'v1.0.0';
 
 export type NoticeKind = 'answer' | 'practice_changed' | 'practice_canceled';
 
@@ -310,10 +287,13 @@ function saveStoredNotices(ownerKey: string, notices: HomeNoticeItem[]): void {
 }
 
 /**
- * 前回取得した予約情報スナップショットと今回の予約情報一覧を比較し、
+ * 前回取得した予約情報スナップショット（端末の localStorage）と今回の予約情報一覧を比較し、
  * ① 自分が関係する予約情報の変更・中止通知
  * ② 自分が予約者の予約情報に対するメンバーの回答変更通知（前回答 → 新回答）
  * を検知して保存する。
+ *
+ * ※設計仕様: スプレッドシートの列や構成を変えずに差分通知を実現するため、前回スナップショットと既読時刻は端末ごとの localStorage に保持する。
+ * そのため、初回起動時（prevMap === null）は既存データが大量に未読通知されないよう現時点を既読基準時刻として記録する。
  */
 export function syncPracticeNotices(
   practices: PracticeView[],
@@ -325,6 +305,24 @@ export function syncPracticeNotices(
   const stored = loadStoredNotices(ownerKey);
   const nextMap: Record<string, PracticeSnapshot> = {};
   const newlyDetected: HomeNoticeItem[] = [];
+
+  // 初回起動時（既読時刻が未保存 かつ 前回スナップショットなし）は、過去の全回答が未読にならないようベースライン既読時刻を設定する
+  if (!prevMap && !getNoticeReadAt(me)) {
+    let latestExisting = nowIso;
+    for (const v of practices) {
+      if (v.practice.createdAt > latestExisting) latestExisting = v.practice.createdAt;
+      for (const a of collectAttendees(v)) {
+        if (a.updatedAt && a.updatedAt > latestExisting) latestExisting = a.updatedAt;
+      }
+    }
+    try {
+      if (typeof localStorage !== 'undefined' && typeof localStorage.setItem === 'function') {
+        localStorage.setItem(NOTICE_READ_AT_KEY_PREFIX + ownerKey, latestExisting);
+      }
+    } catch {
+      /* 保存できなくても動作する */
+    }
+  }
 
   for (const v of practices) {
     const p = v.practice;
@@ -567,9 +565,10 @@ export function getHomeUnreadStatus(
 ): HomeUnreadStatus {
   const notices = buildHomeNotices(practices, me, today, currentTime);
   const readAt = getNoticeReadAt(me);
+  // 初回（readAt === null）は既存の過去回答が大量に未読バッジにならないよう 0 件として扱い、初回 sync 以降の差分のみを未読とする
   const unreadNoticesCount = readAt
     ? notices.filter((n) => n.updatedAt > readAt).length
-    : notices.length;
+    : 0;
   const seenVersion = getSeenReleaseVersion(me);
   const hasUnreadReleaseNote = seenVersion !== LATEST_RELEASE_VERSION;
   const totalBadgeCount = unreadNoticesCount + (hasUnreadReleaseNote ? 1 : 0);
