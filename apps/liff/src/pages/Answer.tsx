@@ -156,8 +156,36 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     setDraft(null);
   };
 
-  // 変更内容を一括でサーバーに送信して保存（現在のタブの変更のみコミット）
-  const commitAnswers = async () => {
+  // 送信先グループによる絞り込み
+  const effectiveTargetGroup = selectedGroup !== 'all' ? selectedGroup : targetGroup;
+  const messagePracticeFilter = (p: Pick<Practice, 'groups'>) =>
+    effectiveTargetGroup === 'all' || p.groups.includes(effectiveTargetGroup);
+
+  // 表示中かつ送信先グループに該当する変更項目（メッセージと件数を完全連動させる）
+  const displayedIds = new Set(displayed.map((v) => v.practice.id));
+  const targetModifiedItems = modifiedItems.filter(
+    (item) => displayedIds.has(item.id) && messagePracticeFilter(item.practice),
+  );
+  const hasTargetChanges = targetModifiedItems.length > 0;
+
+  // 送信対象の変更内容のみをサーバーに送信して保存（他のグループの下書きは保持する）
+  const commitTargetAnswers = async () => {
+    if (targetModifiedItems.length === 0) return;
+    for (const item of targetModifiedItems) {
+      const updated = await api('rsvp', { id: item.id, answer: item.answer });
+      updatePractice(updated);
+    }
+    setCurrentStaged((prev) => {
+      const next = new Map(prev);
+      for (const item of targetModifiedItems) {
+        next.delete(item.id);
+      }
+      return next;
+    });
+  };
+
+  // 完了時は現在のタブのすべての変更（他グループ分含む）を保存
+  const commitAllAnswers = async () => {
     if (modifiedItems.length === 0) return;
     for (const item of modifiedItems) {
       const updated = await api('rsvp', { id: item.id, answer: item.answer });
@@ -165,11 +193,6 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     }
     setCurrentStaged(new Map());
   };
-
-  // 送信先グループによる絞り込み
-  const effectiveTargetGroup = selectedGroup !== 'all' ? selectedGroup : targetGroup;
-  const messagePracticeFilter = (p: Pick<Practice, 'groups'>) =>
-    effectiveTargetGroup === 'all' || p.groups.includes(effectiveTargetGroup);
 
   // 送信文の生成
   let report = '';
@@ -181,9 +204,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     report = answerReport(activeUnanswered.map((v) => ({ practice: v.practice, answer: v.myAnswer }))) ?? '';
   } else {
     // 回答済タブ: 「回答を変更しました」形式（どういう変更をしたかを明示）
-    const activeModified = modifiedItems.filter(
-      (item) => item.practice.status !== '中止' && messagePracticeFilter(item.practice),
-    );
+    const activeModified = targetModifiedItems.filter((item) => item.practice.status !== '中止');
     report =
       answerChangeReport(
         activeModified.map((item) => ({ practice: item.practice, from: item.originalAnswer, to: item.answer })),
@@ -194,9 +215,9 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   latest.current = text;
   const chat = canSendToChat();
 
-  // 回答を反映してグループに伝える（現在のタブの変更を一括保存してから送信）
+  // 回答を反映してグループに伝える（送信先グループの変更のみ保存して送信）
   const handleTell = async () => {
-    // commitAnswers() による再レンダリングで latest.current がリセットされる前に、送信メッセージを先にキャプチャ
+    // commitTargetAnswers() による再レンダリングで latest.current がリセットされる前に、送信メッセージを先にキャプチャ
     const body = latest.current.trim();
     if (!body) {
       toast('送る文がありません', true);
@@ -204,8 +225,8 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     }
     setSaving(true);
     try {
-      if (hasChanges) {
-        await commitAnswers();
+      if (hasTargetChanges) {
+        await commitTargetAnswers();
         await answersSettled();
       }
       if (chat === 'ok') {
@@ -229,7 +250,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
       setSaving(true);
       try {
         const count = modifiedItems.length;
-        await commitAnswers();
+        await commitAllAnswers();
         toast(`${count}件の回答を反映しました`);
         go('/');
       } catch (e) {
@@ -361,11 +382,11 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
               <button
                 class="btn ghost block"
                 style={{ marginTop: 8 }}
-                disabled={!text.trim() || saving || !fresh || (activeTab === 'answered' && !hasChanges)}
+                disabled={!text.trim() || saving || !fresh || (activeTab === 'answered' && !hasTargetChanges)}
                 onClick={handleTell}
               >
                 <Icon name="copy" size={16} />
-                {hasChanges ? `回答を反映してコピー（${modifiedItems.length}件）` : '回答メッセージをコピー'}
+                {hasTargetChanges ? `回答を反映してコピー（${targetModifiedItems.length}件）` : '回答メッセージをコピー'}
               </button>
             </>
           ) : chat === 'noScope' ? (
@@ -395,11 +416,11 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
               )}
               <button
                 class="btn primary block"
-                disabled={!text.trim() || saving || !fresh || (activeTab === 'answered' && !hasChanges)}
+                disabled={!text.trim() || saving || !fresh || (activeTab === 'answered' && !hasTargetChanges)}
                 onClick={handleTell}
               >
                 <Icon name="send" size={18} />
-                {hasChanges ? `回答を反映してグループに伝える（${modifiedItems.length}件）` : 'グループに伝える'}
+                {hasTargetChanges ? `回答を反映してグループに伝える（${targetModifiedItems.length}件）` : 'グループに伝える'}
               </button>
               <p class="note">
                 押すと、回答が反映され、あなたの発言として開いているトークに送ります。
@@ -417,7 +438,13 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
           disabled={saving}
           onClick={handleDone}
         >
-          {saving ? '保存中...' : hasChanges ? `回答を反映して完了（${modifiedItems.length}件）` : '完了'}
+          {saving
+            ? '保存中...'
+            : hasChanges
+            ? selectedGroup !== 'all' && modifiedItems.length > targetModifiedItems.length
+              ? `回答を反映して完了（全${modifiedItems.length}件）`
+              : `回答を反映して完了（${modifiedItems.length}件）`
+            : '完了'}
         </button>
       )}
     </>
