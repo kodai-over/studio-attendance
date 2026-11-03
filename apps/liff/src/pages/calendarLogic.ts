@@ -140,25 +140,32 @@ export function groupPracticesByDate(practices: PracticeView[]): Map<string, Pra
 }
 
 export interface DayDotSummary {
-  goingCount: number; // 自分が「行く」予約の件数（アクセント色ドット）
-  otherCount: number; // それ以外の予約の件数（グレー色ドット）
+  goingCount: number; // 中止以外の自分が「行く」予約情報の件数（アクセント色ドット）
+  otherCount: number; // 中止以外のそれ以外の予約情報の件数（グレー色ドット）
+  canceledCount: number; // 中止の予約情報の件数
   totalCount: number;
+  allCanceled: boolean; // 予定がすべて中止かどうか
 }
 
 export function getDayDotSummary(practicesOnDay?: PracticeView[]): DayDotSummary {
   if (!practicesOnDay || practicesOnDay.length === 0) {
-    return { goingCount: 0, otherCount: 0, totalCount: 0 };
+    return { goingCount: 0, otherCount: 0, canceledCount: 0, totalCount: 0, allCanceled: false };
   }
   let goingCount = 0;
   let otherCount = 0;
+  let canceledCount = 0;
   for (const v of practicesOnDay) {
-    if (v.myAnswer === '行く') {
+    if (v.practice.status === '中止') {
+      canceledCount++;
+    } else if (v.myAnswer === '行く') {
       goingCount++;
     } else {
       otherCount++;
     }
   }
-  return { goingCount, otherCount, totalCount: practicesOnDay.length };
+  const totalCount = practicesOnDay.length;
+  const allCanceled = canceledCount > 0 && goingCount === 0 && otherCount === 0;
+  return { goingCount, otherCount, canceledCount, totalCount, allCanceled };
 }
 
 /**

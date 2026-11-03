@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import { labelDate, toJstDate, yen, type PracticeView } from '@studio-attendance/shared';
-import { Icon, go, place } from '../ui';
+import { CancelDeadlineBadge, Icon, StatusBadge, go, place } from '../ui';
 import {
   buildMonthDays,
   formatYearMonth,
@@ -14,6 +14,55 @@ import {
 import { MyAnswerBadge } from './List';
 
 const WEEKDAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
+
+export function CalendarPracticeItem({
+  v,
+  onClick,
+}: {
+  v: PracticeView;
+  onClick: () => void;
+}) {
+  const p = v.practice;
+  const isGoing = v.myAnswer === '行く';
+  const isCanceled = p.status === '中止';
+
+  return (
+    <button
+      type="button"
+      class={`cal-practice-item ${isGoing ? 'is-going' : ''} ${isCanceled ? 'is-canceled' : ''}`}
+      onClick={onClick}
+    >
+      <div class="cal-item-time-col">
+        <span class="cal-item-start">{p.start}</span>
+        <span class="cal-item-end">{p.end}</span>
+      </div>
+      <div class="cal-item-main">
+        <div class="cal-item-title-row">
+          <span class="cal-item-title">{place(p)}</span>
+          <div class="cal-item-badges">
+            {p.status !== '募集中' && <StatusBadge v={v} />}
+            {p.status === '募集中' && <CancelDeadlineBadge date={p.date} studio={p.studio} />}
+            <MyAnswerBadge answer={v.myAnswer} />
+          </div>
+        </div>
+        <div class="cal-item-meta-row">
+          <span>{v.goingCount}人参加</span>
+          <span class="cal-meta-dot">·</span>
+          <span>1人あたり {v.perPerson != null ? yen(v.perPerson) : '—'}</span>
+          {v.bookerName && (
+            <>
+              <span class="cal-meta-dot">·</span>
+              <span class="cal-meta-booker">{v.bookerName}</span>
+            </>
+          )}
+        </div>
+      </div>
+      <div class="cal-item-arrow">
+        <Icon name="chevron" size={14} />
+      </div>
+    </button>
+  );
+}
 
 export function CalendarView({
   practices,
@@ -136,14 +185,21 @@ export function CalendarView({
                 day.dayOfWeek === 0 || day.isHoliday ? 'holiday' : day.dayOfWeek === 6 ? 'sat' : ''
               }`}
               onClick={() => handleSelectDay(day)}
-              aria-label={`${day.date} ${dots.totalCount > 0 ? `${dots.totalCount}件の予定` : ''}`}
+              aria-label={`${day.date} ${dots.totalCount > 0 ? `${dots.totalCount}件の予約情報` : ''}`}
               aria-selected={isSelected}
             >
               <span class="cal-day-num">{day.day}</span>
               <div class="cal-dots-wrap">
-                {dots.goingCount > 0 && <span class="cal-dot going" />}
-                {dots.otherCount > 0 && <span class="cal-dot other" />}
-                {dots.totalCount > 2 && <span class="cal-dot more" />}
+                {dots.allCanceled ? (
+                  <span class="cal-dot canceled" title="中止" />
+                ) : (
+                  <>
+                    {dots.goingCount > 0 && <span class="cal-dot going" />}
+                    {dots.otherCount > 0 && <span class="cal-dot other" />}
+                    {dots.canceledCount > 0 && <span class="cal-dot canceled" title="中止" />}
+                    {dots.totalCount > 2 && <span class="cal-dot more" />}
+                  </>
+                )}
               </div>
             </button>
           );
@@ -172,42 +228,13 @@ export function CalendarView({
           </div>
         ) : (
           <div class="cal-practice-list">
-            {selectedPractices.map((v) => {
-              const p = v.practice;
-              const isGoing = v.myAnswer === '行く';
-              return (
-                <article
-                  key={p.id}
-                  class={`cal-practice-item ${isGoing ? 'is-going' : ''}`}
-                  onClick={() => go(`/p/${encodeURIComponent(p.id)}`)}
-                >
-                  <div class="cal-item-time-col">
-                    <span class="cal-item-start">{p.start}</span>
-                    <span class="cal-item-end">{p.end}</span>
-                  </div>
-                  <div class="cal-item-main">
-                    <div class="cal-item-title-row">
-                      <span class="cal-item-title">{place(p)}</span>
-                      <MyAnswerBadge answer={v.myAnswer} />
-                    </div>
-                    <div class="cal-item-meta-row">
-                      <span>{v.goingCount}人参加</span>
-                      <span class="cal-meta-dot">·</span>
-                      <span>1人あたり {v.perPerson != null ? yen(v.perPerson) : '—'}</span>
-                      {v.bookerName && (
-                        <>
-                          <span class="cal-meta-dot">·</span>
-                          <span class="cal-meta-booker">{v.bookerName}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <div class="cal-item-arrow">
-                    <Icon name="chevron" size={14} />
-                  </div>
-                </article>
-              );
-            })}
+            {selectedPractices.map((v) => (
+              <CalendarPracticeItem
+                key={v.practice.id}
+                v={v}
+                onClick={() => go(`/p/${encodeURIComponent(v.practice.id)}`)}
+              />
+            ))}
           </div>
         )}
       </section>

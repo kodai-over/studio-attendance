@@ -2985,6 +2985,10 @@ button + .muted {
   background: var(--faint);
   opacity: 0.7;
 }
+.cal-dot.canceled {
+  background: #e5534b;
+  opacity: 0.5;
+}
 .cal-dot.more {
   background: var(--faint);
   opacity: 0.4;
@@ -3044,6 +3048,11 @@ button + .muted {
   gap: 8px;
 }
 .cal-practice-item {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  text-align: left;
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -3060,6 +3069,14 @@ button + .muted {
 }
 .cal-practice-item.is-going {
   border-left: 3px solid var(--ink);
+}
+.cal-practice-item.is-canceled {
+  opacity: 0.7;
+  background: var(--bg);
+}
+.cal-practice-item.is-canceled .cal-item-title {
+  text-decoration: line-through;
+  color: var(--faint);
 }
 .cal-item-time-col {
   display: flex;
@@ -3087,6 +3104,12 @@ button + .muted {
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 2px;
+}
+.cal-item-badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
 }
 .cal-item-title {
   font-size: 13px;

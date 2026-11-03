@@ -11,6 +11,7 @@ import {
   resolveInitialSelectedDate,
   saveScheduleViewMode,
 } from '../src/pages/calendarLogic';
+import { CalendarPracticeItem } from '../src/pages/CalendarView';
 
 function createMockPracticeView(partial: {
   id: string;
@@ -135,6 +136,20 @@ describe('カレンダーロジック（calendarLogic）', () => {
         expect(nextJan.year).toBe(2027);
       }
     });
+
+    it('うるう年の2月（29日）と平年の2月（28日）が正確に生成される', () => {
+      // 2024年はうるう年（2月は29日まで）
+      const leapDays = buildMonthDays(2024, 2);
+      const leapInMonth = leapDays.filter((d) => d.isCurrentMonth);
+      expect(leapInMonth).toHaveLength(29);
+      expect(leapInMonth[28].date).toBe('2024-02-29');
+
+      // 2026年は平年（2月は28日まで）
+      const commonDays = buildMonthDays(2026, 2);
+      const commonInMonth = commonDays.filter((d) => d.isCurrentMonth);
+      expect(commonInMonth).toHaveLength(28);
+      expect(commonInMonth[27].date).toBe('2026-02-28');
+    });
   });
 
   describe('年月ナビゲーション（getPrevMonth / getNextMonth / formatYearMonth）', () => {
@@ -171,18 +186,40 @@ describe('カレンダーロジック（calendarLogic）', () => {
       expect(nov15).toHaveLength(1);
     });
 
-    it('getDayDotSummary が「行く」と「その他」の件数を正確に返す', () => {
+    it('getDayDotSummary が「行く」「その他」「中止」の件数と中止判定を正確に返す', () => {
       const p1 = createMockPracticeView({ id: 'p1', date: '2026-11-10', myAnswer: '行く' });
       const p2 = createMockPracticeView({ id: 'p2', date: '2026-11-10', myAnswer: '保留' });
       const p3 = createMockPracticeView({ id: 'p3', date: '2026-11-10', myAnswer: null });
+      const p4 = createMockPracticeView({ id: 'p4', date: '2026-11-10', myAnswer: '行く', status: '中止' });
 
-      const summary = getDayDotSummary([p1, p2, p3]);
-      expect(summary.goingCount).toBe(1);
-      expect(summary.otherCount).toBe(2);
-      expect(summary.totalCount).toBe(3);
+      const summary = getDayDotSummary([p1, p2, p3, p4]);
+      expect(summary.goingCount).toBe(1); // p1
+      expect(summary.otherCount).toBe(2); // p2, p3
+      expect(summary.canceledCount).toBe(1); // p4
+      expect(summary.totalCount).toBe(4);
+      expect(summary.allCanceled).toBe(false);
 
-      expect(getDayDotSummary(undefined)).toEqual({ goingCount: 0, otherCount: 0, totalCount: 0 });
-      expect(getDayDotSummary([])).toEqual({ goingCount: 0, otherCount: 0, totalCount: 0 });
+      // 中止の予定のみの場合
+      const canceledSummary = getDayDotSummary([p4]);
+      expect(canceledSummary.goingCount).toBe(0);
+      expect(canceledSummary.otherCount).toBe(0);
+      expect(canceledSummary.canceledCount).toBe(1);
+      expect(canceledSummary.allCanceled).toBe(true);
+
+      expect(getDayDotSummary(undefined)).toEqual({
+        goingCount: 0,
+        otherCount: 0,
+        canceledCount: 0,
+        totalCount: 0,
+        allCanceled: false,
+      });
+      expect(getDayDotSummary([])).toEqual({
+        goingCount: 0,
+        otherCount: 0,
+        canceledCount: 0,
+        totalCount: 0,
+        allCanceled: false,
+      });
     });
   });
 
@@ -197,12 +234,19 @@ describe('カレンダーロジック（calendarLogic）', () => {
       expect(selected).toBe('2026-11-10');
     });
 
-    it('今日以降の予約情報がない場合は今日を選ぶ', () => {
+    it('当月で今日より前の過去の予約情報しかない場合、今日の日付を選択する（今日の状態を明瞭にするため）', () => {
       const map = new Map<string, PracticeView[]>();
       map.set('2026-11-01', [createMockPracticeView({ id: 'p0', date: '2026-11-01' })]);
 
+      // 今日が 2026-11-15 の場合、過去の予定があっても今日が選択される
       const selected = resolveInitialSelectedDate(2026, 11, map, '2026-11-15');
       expect(selected).toBe('2026-11-15');
+    });
+
+    it('当月に予約情報が1件もない場合も今日の日付を選択する', () => {
+      const map = new Map<string, PracticeView[]>();
+      const selected = resolveInitialSelectedDate(2026, 11, map, '2026-11-03');
+      expect(selected).toBe('2026-11-03');
     });
 
     it('別月を表示している場合は、その月の最初の予約日（なければ1日）を選ぶ', () => {
@@ -227,6 +271,53 @@ describe('カレンダーロジック（calendarLogic）', () => {
 
       saveScheduleViewMode('list');
       expect(readScheduleViewMode()).toBe('list');
+    });
+  });
+
+  describe('CalendarPracticeItem（選択日カード部品テスト）', () => {
+    it('予約情報がある場合、正しくカード（button）を描画しアクセシビリティを確保する', () => {
+      const p1 = createMockPracticeView({
+        id: 'p1',
+        date: '2026-11-10',
+        status: '募集中',
+        myAnswer: '行く',
+      });
+
+      const vnode = CalendarPracticeItem({ v: p1, onClick: () => {} });
+      expect(vnode).toBeDefined();
+      expect(vnode.type).toBe('button');
+      expect(vnode.props.type).toBe('button');
+      expect(vnode.props.class).toContain('cal-practice-item');
+      expect(vnode.props.class).toContain('is-going');
+    });
+
+    it('中止の予約情報がある場合、カードに is-canceled クラスと StatusBadge が適用される', () => {
+      const canceledPractice = createMockPracticeView({
+        id: 'p-canceled',
+        date: '2026-11-10',
+        status: '中止',
+        myAnswer: '行く',
+      });
+
+      const vnode = CalendarPracticeItem({ v: canceledPractice, onClick: () => {} });
+      expect(vnode).toBeDefined();
+      expect(vnode.props.class).toContain('is-canceled');
+
+      const jsonStr = JSON.stringify(vnode);
+      expect(jsonStr).toContain('中止');
+    });
+
+    it('満員の予約情報の場合、StatusBadge に FULL が渡される', () => {
+      const fullPractice = createMockPracticeView({
+        id: 'p-full',
+        date: '2026-11-10',
+        status: '満員',
+        myAnswer: null,
+      });
+
+      const vnode = CalendarPracticeItem({ v: fullPractice, onClick: () => {} });
+      const jsonStr = JSON.stringify(vnode);
+      expect(jsonStr).toContain('満員');
     });
   });
 });
