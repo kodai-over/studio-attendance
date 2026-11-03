@@ -2,6 +2,8 @@ import { useEffect, useState } from 'preact/hooks';
 import { isMinePractice, labelDate, type Answer, type PracticeView } from '@studio-attendance/shared';
 import { api } from '../api';
 import { AvatarStack, CancelDeadlineBadge, FRESH_MS, Fee, Icon, RsvpButtons, Spinner, StatusBadge, Stub, Syncing, Tabs, go, place, useApp, useRunner } from '../ui';
+import { CalendarView } from './CalendarView';
+import { readScheduleViewMode, saveScheduleViewMode, type ScheduleViewMode } from './calendarLogic';
 
 type Tab = 'all' | 'mine';
 const TAB_KEY = 'pb:tab';
@@ -26,6 +28,7 @@ export function MyAnswerBadge({ answer }: { answer: Answer | null }) {
 export function ListPage({ initialTab }: { initialTab?: string | null }) {
   const { me, practices: list, practicesAt, setPractices } = useApp();
   const [tab, setTab] = useState<Tab>(() => (initialTab === 'mine' || initialTab === 'all' ? initialTab : readTab()));
+  const [viewMode, setViewMode] = useState<ScheduleViewMode>(() => readScheduleViewMode());
   const [run, busy] = useRunner();
 
   useEffect(() => {
@@ -40,6 +43,11 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
     } catch {
       /* 保存できなくても動く */
     }
+  };
+
+  const handleSelectViewMode = (mode: ScheduleViewMode) => {
+    setViewMode(mode);
+    saveScheduleViewMode(mode);
   };
 
   // 「予定」に出すのは、自分に招待が来た（入っているグループに募集された）練習と、自分が招待を送った（登録した）練習。
@@ -63,11 +71,35 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
             { key: 'mine', label: '行く', count: list ? groups.mine.length : undefined },
           ]}
         />
-        {(practicesAt === 0 || busy) && <Syncing />}
+        <div class="tabs-head-right">
+          <div class="view-mode-toggle" role="group" aria-label="表示形式">
+            <button
+              type="button"
+              class={`view-mode-btn ${viewMode === 'list' ? 'active' : ''}`}
+              onClick={() => handleSelectViewMode('list')}
+              aria-label="リスト表示"
+              title="リスト表示"
+            >
+              <Icon name="ticket" size={14} />
+            </button>
+            <button
+              type="button"
+              class={`view-mode-btn ${viewMode === 'calendar' ? 'active' : ''}`}
+              onClick={() => handleSelectViewMode('calendar')}
+              aria-label="カレンダー表示"
+              title="カレンダー表示"
+            >
+              <Icon name="calendar" size={14} />
+            </button>
+          </div>
+          {(practicesAt === 0 || busy) && <Syncing />}
+        </div>
       </header>
 
       {list == null ? (
         <Spinner />
+      ) : viewMode === 'calendar' ? (
+        <CalendarView practices={shown} tab={tab} />
       ) : shown.length === 0 ? (
         <div class="empty">
           <div>{tab === 'mine' ? '行く予約情報はありません。' : '登録されている予約情報はありません。'}</div>
