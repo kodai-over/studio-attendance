@@ -2,6 +2,8 @@ import { useEffect, useState } from 'preact/hooks';
 import { isMinePractice, labelDate, type Answer, type PracticeView } from '@studio-attendance/shared';
 import { api } from '../api';
 import { AvatarStack, CancelDeadlineBadge, FRESH_MS, Fee, Icon, RsvpButtons, Spinner, StatusBadge, Stub, Syncing, Tabs, go, place, useApp, useRunner } from '../ui';
+import { CalendarView } from './CalendarView';
+import { computeScrollOffset, hasPracticeOnDate, readScheduleViewMode, saveScheduleViewMode, type ScheduleViewMode } from './calendarLogic';
 
 type Tab = 'all' | 'mine';
 const TAB_KEY = 'pb:tab';
@@ -26,6 +28,8 @@ export function MyAnswerBadge({ answer }: { answer: Answer | null }) {
 export function ListPage({ initialTab }: { initialTab?: string | null }) {
   const { me, practices: list, practicesAt, setPractices } = useApp();
   const [tab, setTab] = useState<Tab>(() => (initialTab === 'mine' || initialTab === 'all' ? initialTab : readTab()));
+  const [viewMode, setViewMode] = useState<ScheduleViewMode>(() => readScheduleViewMode());
+  const [highlightedDate, setHighlightedDate] = useState<string | null>(null);
   const [run, busy] = useRunner();
 
   useEffect(() => {
@@ -35,10 +39,42 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
 
   const selectTab = (t: Tab) => {
     setTab(t);
+    setHighlightedDate(null);
     try {
       localStorage.setItem(TAB_KEY, t);
     } catch {
       /* 保存できなくても動く */
+    }
+  };
+
+  const showCalendar = viewMode === 'calendar';
+
+  const handleToggleCalendar = () => {
+    const next: ScheduleViewMode = showCalendar ? 'list' : 'calendar';
+    setViewMode(next);
+    saveScheduleViewMode(next);
+    if (next === 'list') {
+      setHighlightedDate(null);
+    }
+  };
+
+  // カレンダーの日付タップ時: 該当日に予約情報があれば、その日の先頭の予約情報チケットへスムーズにスクロール
+  const handleSelectCalendarDate = (date: string) => {
+    if (!date || !hasPracticeOnDate(shown, date)) {
+      setHighlightedDate(null);
+      return;
+    }
+    setHighlightedDate(date);
+    if (typeof document !== 'undefined') {
+      // 同一日に複数の予約情報がある場合も、その日の先頭チケットの位置に合わせてスクロールする
+      const el = document.querySelector(`[data-ticket-date="${date}"]`);
+      if (el) {
+        const headSticky = document.querySelector('.schedule-head-sticky');
+        const headBottom = headSticky ? headSticky.getBoundingClientRect().bottom : 140;
+        const elRect = el.getBoundingClientRect();
+        const offsetTop = computeScrollOffset(elRect.top, headBottom);
+        window.scrollBy({ top: offsetTop, behavior: 'smooth' });
+      }
     }
   };
 
@@ -54,17 +90,38 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
 
   return (
     <>
-      <header class="tabs-head">
-        <Tabs
-          value={tab}
-          onChange={selectTab}
-          items={[
-            { key: 'all', label: 'すべて', count: list ? groups.all.length : undefined },
-            { key: 'mine', label: '行く', count: list ? groups.mine.length : undefined },
-          ]}
-        />
-        {(practicesAt === 0 || busy) && <Syncing />}
-      </header>
+      <div class={`schedule-head-sticky${showCalendar ? ' has-calendar' : ''}`}>
+        <header class="tabs-head">
+          <Tabs
+            value={tab}
+            onChange={selectTab}
+            items={[
+              { key: 'all', label: 'すべて', count: list ? groups.all.length : undefined },
+              { key: 'mine', label: '行く', count: list ? groups.mine.length : undefined },
+            ]}
+          />
+          <div class="tabs-head-right">
+            <button
+              type="button"
+              class={`cal-toggle-btn ${showCalendar ? 'active' : ''}`}
+              onClick={handleToggleCalendar}
+              aria-pressed={showCalendar}
+              aria-label="カレンダー"
+              title="カレンダー"
+            >
+              <Icon name="calendar" size={14} />
+              <span>カレンダー</span>
+            </button>
+            {(practicesAt === 0 || busy) && <Syncing />}
+          </div>
+        </header>
+
+        {showCalendar && (
+          <div class="cal-sticky-panel">
+            <CalendarView practices={shown} onSelectDate={handleSelectCalendarDate} />
+          </div>
+        )}
+      </div>
 
       {list == null ? (
         <Spinner />
@@ -78,7 +135,11 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
         <>
           <div class="ticket-grid">
             {shown.map((v) => (
-              <PracticeCard key={v.practice.id} v={v} />
+              <PracticeCard
+                key={v.practice.id}
+                v={v}
+                highlighted={highlightedDate === v.practice.date}
+              />
             ))}
           </div>
           <p class="note list-rsvp-note">
@@ -98,10 +159,12 @@ export function PracticeCard({
   v,
   onAnswer,
   busy,
+  highlighted,
 }: {
   v: PracticeView;
   onAnswer?: (a: Answer) => void;
   busy?: boolean;
+  highlighted?: boolean;
 }) {
   const { toast } = useApp();
   const [shaking, setShaking] = useState(false);
@@ -117,7 +180,12 @@ export function PracticeCard({
   };
 
   return (
-    <article class={`ticket${shaking ? ' is-shaking' : ''}`} data-answer={v.myAnswer ?? 'none'} data-status={p.status}>
+    <article
+      class={`ticket${shaking ? ' is-shaking' : ''}${highlighted ? ' is-cal-highlighted' : ''}`}
+      data-answer={v.myAnswer ?? 'none'}
+      data-status={p.status}
+      data-ticket-date={p.date}
+    >
       <Stub date={p.date} onClick={open} />
       <button class="ticket-main" onClick={open}>
         <span class="sr">{labelDate(p.date)}</span>
