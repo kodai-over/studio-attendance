@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import { toJstDate, type PracticeView } from '@studio-attendance/shared';
+import { labelDate, toJstDate, type PracticeView } from '@studio-attendance/shared';
 import { Icon, useApp } from '../ui';
 import {
   buildMonthDays,
@@ -13,7 +13,6 @@ import {
   resolveInitialSelectedDate,
   type CalendarDay,
   type CalendarEventTone,
-  type CalendarToneSettings,
 } from './calendarLogic';
 
 const WEEKDAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
@@ -34,6 +33,7 @@ export function CalendarEventChip({
   return (
     <div
       class={`cal-event-chip tone-${tone}${isCanceled ? ' is-canceled' : ''}`}
+      role="img"
       aria-label={chipAriaLabel}
     >
       <span class="cal-chip-dot" aria-hidden="true" />
@@ -61,7 +61,7 @@ export function CalendarView({
   const practicesByDate = groupPracticesByDate(practices);
 
   // 初期選択日（今日、または直近の予定日）
-  const [selectedDate, setSelectedDate] = useState<string>(() =>
+  const [selectedDate, setSelectedDate] = useState<string | null>(() =>
     resolveInitialSelectedDate(currentYear, currentMonth, practicesByDate, todayIso),
   );
 
@@ -71,14 +71,16 @@ export function CalendarView({
     const prev = getPrevMonth(currentYear, currentMonth);
     setCurrentYear(prev.year);
     setCurrentMonth(prev.month);
-    setSelectedDate(resolveInitialSelectedDate(prev.year, prev.month, practicesByDate, todayIso));
+    setSelectedDate(null);
+    onSelectDate?.('');
   };
 
   const handleNextMonth = () => {
     const next = getNextMonth(currentYear, currentMonth);
     setCurrentYear(next.year);
     setCurrentMonth(next.month);
-    setSelectedDate(resolveInitialSelectedDate(next.year, next.month, practicesByDate, todayIso));
+    setSelectedDate(null);
+    onSelectDate?.('');
   };
 
   const handleToday = () => {
@@ -160,7 +162,7 @@ export function CalendarView({
                 day.dayOfWeek === 0 || day.isHoliday ? 'holiday' : day.dayOfWeek === 6 ? 'sat' : ''
               }`}
               onClick={() => handleSelectDay(day)}
-              aria-label={`${day.date}${
+              aria-label={`${labelDate(day.date)}${
                 practicesOnDay.length > 0 ? ` ${practicesOnDay.length}件の予約情報` : ''
               }`}
               aria-pressed={isSelected}

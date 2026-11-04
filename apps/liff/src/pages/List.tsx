@@ -3,7 +3,7 @@ import { isMinePractice, labelDate, type Answer, type PracticeView } from '@stud
 import { api } from '../api';
 import { AvatarStack, CancelDeadlineBadge, FRESH_MS, Fee, Icon, RsvpButtons, Spinner, StatusBadge, Stub, Syncing, Tabs, go, place, useApp, useRunner } from '../ui';
 import { CalendarView } from './CalendarView';
-import { readScheduleViewMode, saveScheduleViewMode, type ScheduleViewMode } from './calendarLogic';
+import { computeScrollOffset, hasPracticeOnDate, readScheduleViewMode, saveScheduleViewMode, type ScheduleViewMode } from './calendarLogic';
 
 type Tab = 'all' | 'mine';
 const TAB_KEY = 'pb:tab';
@@ -60,8 +60,7 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
 
   // カレンダーの日付タップ時: 該当日に予約情報があれば、その日の先頭の予約情報チケットへスムーズにスクロール
   const handleSelectCalendarDate = (date: string) => {
-    const hasPractice = shown.some((v) => v.practice.date === date);
-    if (!hasPractice) {
+    if (!date || !hasPracticeOnDate(shown, date)) {
       setHighlightedDate(null);
       return;
     }
@@ -73,7 +72,7 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
         const headSticky = document.querySelector('.schedule-head-sticky');
         const headBottom = headSticky ? headSticky.getBoundingClientRect().bottom : 140;
         const elRect = el.getBoundingClientRect();
-        const offsetTop = elRect.top - headBottom - 12;
+        const offsetTop = computeScrollOffset(elRect.top, headBottom);
         window.scrollBy({ top: offsetTop, behavior: 'smooth' });
       }
     }

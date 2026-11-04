@@ -3084,6 +3084,12 @@ button + .muted {
   text-decoration: line-through;
 }
 
+/* 設定未取得など中立 */
+.cal-event-chip.tone-neutral .cal-chip-dot {
+  background: var(--sub);
+  opacity: 0.45;
+}
+
 .cal-chip-count {
   font-family: var(--mono);
   font-size: 9.5px;

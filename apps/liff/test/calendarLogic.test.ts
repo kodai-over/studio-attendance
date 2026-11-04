@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Answer, AttendeeView, PracticeStatus, PracticeView } from '@studio-attendance/shared';
 import {
   buildMonthDays,
+  computeScrollOffset,
   formatCalendarCount,
   formatYearMonth,
   getCalendarToneLabel,
@@ -9,6 +10,7 @@ import {
   getPracticeCalendarTone,
   getPrevMonth,
   groupPracticesByDate,
+  hasPracticeOnDate,
   readScheduleViewMode,
   resolveInitialSelectedDate,
   saveScheduleViewMode,
@@ -291,11 +293,20 @@ describe('カレンダーロジック（calendarLogic）', () => {
         min: 4,
         goingCount: 2,
       });
-      // 11/5 12:00 JST（期限 11/6 10:00 JST まで22時間 = isSoon）
+      // 11/10 の worcle は 4日前 = 11/6 10:00 JST が期限
+      // 11/5 09:59 JST（期限まで24時間1分 = 余裕あり、under-min）
+      const nowNotSoon = new Date('2026-11-05T00:59:00Z');
+      expect(getPracticeCalendarTone(v, toneSettings, nowNotSoon)).toBe('under-min');
+
+      // 11/5 10:00 JST（期限までちょうど24時間 = isSoon、under-min-urgent）
+      const nowBorder = new Date('2026-11-05T01:00:00Z');
+      expect(getPracticeCalendarTone(v, toneSettings, nowBorder)).toBe('under-min-urgent');
+
+      // 11/5 12:00 JST（期限まで22時間 = isSoon、under-min-urgent）
       const nowSoon = new Date('2026-11-05T03:00:00Z');
       expect(getPracticeCalendarTone(v, toneSettings, nowSoon)).toBe('under-min-urgent');
 
-      // 11/7 12:00 JST（期限超過 = isPast）
+      // 11/7 12:00 JST（期限超過 = isPast、under-min-urgent）
       const nowPast = new Date('2026-11-07T03:00:00Z');
       expect(getPracticeCalendarTone(v, toneSettings, nowPast)).toBe('under-min-urgent');
     });
@@ -310,14 +321,14 @@ describe('カレンダーロジック（calendarLogic）', () => {
       expect(getPracticeCalendarTone(canceled, toneSettings)).toBe('inactive');
     });
 
-    it('設定が渡されていない場合は inactive になる', () => {
+    it('設定が渡されていない場合は neutral になる', () => {
       const v = createMockPracticeView({
         id: 'p-no-settings',
         date: '2026-11-10',
         goingCount: 1,
       });
-      expect(getPracticeCalendarTone(v, undefined)).toBe('inactive');
-      expect(getPracticeCalendarTone(v, null)).toBe('inactive');
+      expect(getPracticeCalendarTone(v, undefined)).toBe('neutral');
+      expect(getPracticeCalendarTone(v, null)).toBe('neutral');
     });
 
     it('トーン種別ごとのアクセシビリティ用ラベルが正しく返る', () => {
@@ -325,6 +336,7 @@ describe('カレンダーロジック（calendarLogic）', () => {
       expect(getCalendarToneLabel('under-min')).toBe('最低人数未達');
       expect(getCalendarToneLabel('under-min-urgent')).toBe('最低人数未達かつキャンセル期限間近');
       expect(getCalendarToneLabel('inactive')).toBe('中止または終了');
+      expect(getCalendarToneLabel('neutral')).toBe('最低人数未確認');
     });
 
     it('参加人数（上限あり・なし）のフォーマットが正しく返る', () => {
@@ -395,15 +407,21 @@ describe('カレンダーロジック（calendarLogic）', () => {
       expect(mineMap.has('2026-11-15')).toBe(false);
     });
 
-    it('日付選択時に該当日の予約情報が存在するかどうかを正しく判定できる', () => {
+    it('hasPracticeOnDate が予約情報の有無を正確に判定する', () => {
       const p1 = createMockPracticeView({ id: 'p1', date: '2026-11-10' });
       const shown = [p1];
 
-      // 予約情報がある日付: true
-      expect(shown.some((v) => v.practice.date === '2026-11-10')).toBe(true);
+      expect(hasPracticeOnDate(shown, '2026-11-10')).toBe(true);
+      expect(hasPracticeOnDate(shown, '2026-11-11')).toBe(false);
+      expect(hasPracticeOnDate([], '2026-11-10')).toBe(false);
+    });
 
-      // 予約情報がない日付: false
-      expect(shown.some((v) => v.practice.date === '2026-11-11')).toBe(false);
+    it('computeScrollOffset が固定ヘッダー下端からの相対オフセットを正しく計算する', () => {
+      // チケットtopが 300px、固定ヘッダーbottomが 140px、gapが 12px の場合: 300 - 140 - 12 = 148px
+      expect(computeScrollOffset(300, 140)).toBe(148);
+
+      // カスタムgap指定
+      expect(computeScrollOffset(200, 100, 8)).toBe(92);
     });
   });
 });

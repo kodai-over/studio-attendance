@@ -152,8 +152,9 @@ export function groupPracticesByDate(practices: PracticeView[]): Map<string, Pra
  * - 'under-min': 最低人数未達（注意・黄/アンバー系）
  * - 'under-min-urgent': 最低人数未達 かつ キャンセル期限間近(24h以内)または超過（警告・赤系）
  * - 'inactive': 中止または終了（グレー系）
+ * - 'neutral': 設定未ロード等による中立（グレー系）
  */
-export type CalendarEventTone = 'met-min' | 'under-min' | 'under-min-urgent' | 'inactive';
+export type CalendarEventTone = 'met-min' | 'under-min' | 'under-min-urgent' | 'inactive' | 'neutral';
 
 export function getCalendarToneLabel(tone: CalendarEventTone): string {
   switch (tone) {
@@ -165,6 +166,8 @@ export function getCalendarToneLabel(tone: CalendarEventTone): string {
       return '最低人数未達かつキャンセル期限間近';
     case 'inactive':
       return '中止または終了';
+    case 'neutral':
+      return '最低人数未確認';
   }
 }
 
@@ -183,7 +186,7 @@ export function getPracticeCalendarTone(
     return 'inactive';
   }
   if (!settings) {
-    return 'inactive';
+    return 'neutral';
   }
   const min = p.min ?? settings.minDefault;
   if (v.goingCount >= min) {
@@ -194,6 +197,20 @@ export function getPracticeCalendarTone(
     return 'under-min-urgent';
   }
   return 'under-min';
+}
+
+/**
+ * 該当日に予約情報が存在するか判定する
+ */
+export function hasPracticeOnDate(practices: PracticeView[], date: string): boolean {
+  return practices.some((v) => v.practice.date === date);
+}
+
+/**
+ * 固定カレンダー下端に合わせたスクロール量を計算する
+ */
+export function computeScrollOffset(ticketTop: number, stickyBottom: number, gap = 12): number {
+  return ticketTop - stickyBottom - gap;
 }
 
 /**
