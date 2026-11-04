@@ -98,6 +98,13 @@ store.p = [
     groups: ['G1', 'G2', 'G3'],
     memo: '祝日スペシャル練習会。最低5人集まれば開催！',
   }),
+  // 8. 最低人数未達 かつ キャンセル期限超過（worcleは4日前期限、3日後開催で現在2/8人・最低4人）
+  mk(3, '19:00', '21:00', 'studio worcle 横浜', '301', 4400, 'Ume', {
+    min: 4,
+    max: 8,
+    groups: ['G1'],
+    memo: '最低人数4人に未達のままキャンセル期限を過ぎている枠',
+  }),
 ];
 
 let attOffsetMins = 180;
@@ -162,6 +169,11 @@ att(store.p[6].id, 'U2', 'さくら', '行く');
 att(store.p[6].id, 'Ume', 'おおゆち', '行く');
 att(store.p[6].id, 'U3', 'けんた', '保留');
 att(store.p[6].id, 'U4', 'みお', '保留');
+
+// 8. worcle 横浜 301 (store.p[7] - 最低4人設定・上限8人で2人行く・キャンセル期限超過)
+att(store.p[7].id, 'Ume', 'おおゆち', '行く');
+att(store.p[7].id, 'U3', 'けんた', '行く');
+att(store.p[7].id, 'U5', 'れん', '保留');
 
 store.f = [
   { id: 'f1', userId: 'U3', name: 'けんた', text: '練習の前日にリマインドがほしい', status: '改善済み', reply: '前日にアプリの「自分が行く」で確認できるようにしました', createdAt: new Date(Date.now() - 86400000).toISOString() },

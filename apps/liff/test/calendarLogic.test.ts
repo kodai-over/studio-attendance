@@ -2,16 +2,20 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Answer, AttendeeView, PracticeStatus, PracticeView } from '@studio-attendance/shared';
 import {
   buildMonthDays,
+  formatCalendarCount,
+  formatCalendarPlace,
   formatYearMonth,
   getDayDotSummary,
   getNextMonth,
+  getPracticeCalendarTone,
   getPrevMonth,
   groupPracticesByDate,
   readScheduleViewMode,
   resolveInitialSelectedDate,
   saveScheduleViewMode,
+  type CalendarToneSettings,
 } from '../src/pages/calendarLogic';
-import { CalendarPracticeItem } from '../src/pages/CalendarView';
+import { CalendarEventChip } from '../src/pages/CalendarView';
 
 function createMockPracticeView(partial: {
   id: string;
@@ -21,6 +25,9 @@ function createMockPracticeView(partial: {
   studio?: string;
   room?: string;
   fee?: number;
+  max?: number | null;
+  min?: number | null;
+  goingCount?: number;
   myAnswer?: Answer | null;
   status?: PracticeStatus;
 }): PracticeView {
@@ -34,8 +41,8 @@ function createMockPracticeView(partial: {
       room: partial.room ?? '202',
       fee: partial.fee ?? 4400,
       booker: 'U1',
-      max: null,
-      min: null,
+      max: partial.max ?? null,
+      min: partial.min ?? null,
       memo: '',
       status: partial.status ?? '募集中',
       groups: ['G1'],
@@ -48,7 +55,7 @@ function createMockPracticeView(partial: {
     maybe: [],
     notGoing: [],
     unknown: [],
-    goingCount: 0,
+    goingCount: partial.goingCount ?? 0,
     maybeCount: 0,
     notGoingCount: 0,
     unknownCount: 0,
@@ -274,50 +281,109 @@ describe('カレンダーロジック（calendarLogic）', () => {
     });
   });
 
-  describe('CalendarPracticeItem（選択日カード部品テスト）', () => {
-    it('予約情報がある場合、正しくカード（button）を描画しアクセシビリティを確保する', () => {
+  describe('getPracticeCalendarTone / formatCalendarPlace / formatCalendarCount（カレンダーセル表示・色分け判定）', () => {
+    const toneSettings: CalendarToneSettings = {
+      minDefault: 3,
+      cancelRules: [{ studio: 'worcle', daysBefore: 4, time: '10:00' }],
+    };
+
+    it('参加人数が最低人数以上の場合は met-min になる', () => {
+      const v = createMockPracticeView({
+        id: 'p1',
+        date: '2026-11-10',
+        goingCount: 3,
+      });
+      const now = new Date('2026-11-01T01:00:00Z');
+      expect(getPracticeCalendarTone(v, toneSettings, now)).toBe('met-min');
+    });
+
+    it('最低人数未達でキャンセル期限まで余裕がある場合は under-min になる', () => {
+      // 2026-11-10 の worcle は 4日前 = 2026-11-06 10:00 JST が期限
+      const v = createMockPracticeView({
+        id: 'p2',
+        date: '2026-11-10',
+        studio: 'studio worcle 横浜',
+        min: 4,
+        goingCount: 2,
+      });
+      const now = new Date('2026-11-03T01:00:00Z'); // 11/3 10:00 JST（期限まで3日）
+      expect(getPracticeCalendarTone(v, toneSettings, now)).toBe('under-min');
+    });
+
+    it('最低人数未達でキャンセル期限が近い（24時間以内）または過ぎている場合は under-min-urgent になる', () => {
+      const v = createMockPracticeView({
+        id: 'p3',
+        date: '2026-11-10',
+        studio: 'studio worcle 横浜',
+        min: 4,
+        goingCount: 2,
+      });
+      // 11/5 12:00 JST（期限 11/6 10:00 JST まで22時間 = isSoon）
+      const nowSoon = new Date('2026-11-05T03:00:00Z');
+      expect(getPracticeCalendarTone(v, toneSettings, nowSoon)).toBe('under-min-urgent');
+
+      // 11/7 12:00 JST（期限超過 = isPast）
+      const nowPast = new Date('2026-11-07T03:00:00Z');
+      expect(getPracticeCalendarTone(v, toneSettings, nowPast)).toBe('under-min-urgent');
+    });
+
+    it('中止または終了の予約情報は inactive になる', () => {
+      const canceled = createMockPracticeView({
+        id: 'p-canceled',
+        date: '2026-11-10',
+        status: '中止',
+        goingCount: 0,
+      });
+      expect(getPracticeCalendarTone(canceled, toneSettings)).toBe('inactive');
+    });
+
+    it('場所と人数（上限あり・なし）のフォーマットが正しく返る', () => {
+      expect(formatCalendarPlace({ studio: 'studio worcle 横浜', room: '202' })).toBe('worcle 横浜 202');
+      expect(formatCalendarPlace({ studio: 'BUZZ横浜東口', room: 'Bst' })).toBe('BUZZ横浜東口 Bst');
+
+      const vNoMax = createMockPracticeView({ id: 'p1', date: '2026-11-10', goingCount: 4, max: null });
+      expect(formatCalendarCount(vNoMax)).toBe('4人');
+
+      const vWithMax = createMockPracticeView({ id: 'p2', date: '2026-11-10', goingCount: 3, max: 6 });
+      expect(formatCalendarCount(vWithMax)).toBe('3/6人');
+    });
+  });
+
+  describe('CalendarEventChip（カレンダーセル内チップ部品テスト）', () => {
+    it('参加人数（上限込み）のみをシンプルに描画し、色分けクラスを適用する', () => {
       const p1 = createMockPracticeView({
         id: 'p1',
         date: '2026-11-10',
+        start: '19:00',
+        end: '21:00',
+        studio: 'studio worcle 横浜',
+        room: '202',
+        goingCount: 2,
+        max: 8,
         status: '募集中',
-        myAnswer: '行く',
       });
 
-      const vnode = CalendarPracticeItem({ v: p1, onClick: () => {} });
+      const vnode = CalendarEventChip({ v: p1, tone: 'under-min-urgent' });
       expect(vnode).toBeDefined();
-      expect(vnode.type).toBe('button');
-      expect(vnode.props.type).toBe('button');
-      expect(vnode.props.class).toContain('cal-practice-item');
-      expect(vnode.props.class).toContain('is-going');
+      expect(vnode.props.class).toContain('cal-event-chip');
+      expect(vnode.props.class).toContain('tone-under-min-urgent');
+
+      const jsonStr = JSON.stringify(vnode);
+      expect(jsonStr).toContain('2/8人');
+      expect(jsonStr).not.toContain('worcle 横浜 202');
+      expect(jsonStr).not.toContain('19:00');
     });
 
-    it('中止の予約情報がある場合、カードに is-canceled クラスと StatusBadge が適用される', () => {
+    it('中止の予約情報の場合、is-canceled クラスと tone-inactive が適用される', () => {
       const canceledPractice = createMockPracticeView({
         id: 'p-canceled',
         date: '2026-11-10',
         status: '中止',
-        myAnswer: '行く',
       });
 
-      const vnode = CalendarPracticeItem({ v: canceledPractice, onClick: () => {} });
-      expect(vnode).toBeDefined();
+      const vnode = CalendarEventChip({ v: canceledPractice, tone: 'inactive' });
+      expect(vnode.props.class).toContain('tone-inactive');
       expect(vnode.props.class).toContain('is-canceled');
-
-      const jsonStr = JSON.stringify(vnode);
-      expect(jsonStr).toContain('中止');
-    });
-
-    it('満員の予約情報の場合、StatusBadge に FULL が渡される', () => {
-      const fullPractice = createMockPracticeView({
-        id: 'p-full',
-        date: '2026-11-10',
-        status: '満員',
-        myAnswer: null,
-      });
-
-      const vnode = CalendarPracticeItem({ v: fullPractice, onClick: () => {} });
-      const jsonStr = JSON.stringify(vnode);
-      expect(jsonStr).toContain('満員');
     });
   });
 });

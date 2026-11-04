@@ -1,76 +1,55 @@
 import { useState } from 'preact/hooks';
-import { labelDate, toJstDate, yen, type PracticeView } from '@studio-attendance/shared';
-import { CancelDeadlineBadge, Icon, StatusBadge, go, place } from '../ui';
+import { toJstDate, type PracticeView } from '@studio-attendance/shared';
+import { Icon, useApp } from '../ui';
 import {
   buildMonthDays,
+  formatCalendarCount,
   formatYearMonth,
-  getDayDotSummary,
   getNextMonth,
+  getPracticeCalendarTone,
   getPrevMonth,
   groupPracticesByDate,
   resolveInitialSelectedDate,
   type CalendarDay,
+  type CalendarEventTone,
+  type CalendarToneSettings,
 } from './calendarLogic';
-import { MyAnswerBadge } from './List';
 
 const WEEKDAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
 
-export function CalendarPracticeItem({
+const DEFAULT_TONE_SETTINGS: CalendarToneSettings = {
+  minDefault: 3,
+  cancelRules: [],
+};
+
+export function CalendarEventChip({
   v,
-  onClick,
+  tone,
 }: {
   v: PracticeView;
-  onClick: () => void;
+  tone: CalendarEventTone;
 }) {
   const p = v.practice;
-  const isGoing = v.myAnswer === '行く';
   const isCanceled = p.status === '中止';
 
   return (
-    <button
-      type="button"
-      class={`cal-practice-item ${isGoing ? 'is-going' : ''} ${isCanceled ? 'is-canceled' : ''}`}
-      onClick={onClick}
-    >
-      <div class="cal-item-time-col">
-        <span class="cal-item-start">{p.start}</span>
-        <span class="cal-item-end">{p.end}</span>
-      </div>
-      <div class="cal-item-main">
-        <div class="cal-item-title-row">
-          <span class="cal-item-title">{place(p)}</span>
-          <div class="cal-item-badges">
-            {p.status !== '募集中' && <StatusBadge v={v} />}
-            {p.status === '募集中' && <CancelDeadlineBadge date={p.date} studio={p.studio} />}
-            <MyAnswerBadge answer={v.myAnswer} />
-          </div>
-        </div>
-        <div class="cal-item-meta-row">
-          <span>{v.goingCount}人参加</span>
-          <span class="cal-meta-dot">·</span>
-          <span>1人あたり {v.perPerson != null ? yen(v.perPerson) : '—'}</span>
-          {v.bookerName && (
-            <>
-              <span class="cal-meta-dot">·</span>
-              <span class="cal-meta-booker">{v.bookerName}</span>
-            </>
-          )}
-        </div>
-      </div>
-      <div class="cal-item-arrow">
-        <Icon name="chevron" size={14} />
-      </div>
-    </button>
+    <div class={`cal-event-chip tone-${tone}${isCanceled ? ' is-canceled' : ''}`}>
+      <span class="cal-chip-dot" aria-hidden="true" />
+      <span class="cal-chip-count">{formatCalendarCount(v)}</span>
+    </div>
   );
 }
 
 export function CalendarView({
   practices,
-  tab,
+  onSelectDate,
 }: {
   practices: PracticeView[];
-  tab: 'all' | 'mine';
+  onSelectDate?: (date: string) => void;
 }) {
+  const app = useApp();
+  const toneSettings: CalendarToneSettings = app?.me?.settings ?? DEFAULT_TONE_SETTINGS;
+
   const todayIso = toJstDate(new Date());
   const [tY, tM] = todayIso.split('-').map(Number);
 
@@ -90,7 +69,6 @@ export function CalendarView({
     const prev = getPrevMonth(currentYear, currentMonth);
     setCurrentYear(prev.year);
     setCurrentMonth(prev.month);
-    // 月を切り替えたら、その月の最初の予約日（なければ1日）を選択
     setSelectedDate(resolveInitialSelectedDate(prev.year, prev.month, practicesByDate, todayIso));
   };
 
@@ -105,6 +83,7 @@ export function CalendarView({
     setCurrentYear(tY);
     setCurrentMonth(tM);
     setSelectedDate(todayIso);
+    onSelectDate?.(todayIso);
   };
 
   const handleSelectDay = (day: CalendarDay) => {
@@ -113,44 +92,39 @@ export function CalendarView({
       setCurrentYear(day.year);
       setCurrentMonth(day.month);
     }
+    onSelectDate?.(day.date);
   };
-
-  // 選択日の予約情報
-  const selectedPractices = practicesByDate.get(selectedDate) ?? [];
-  const isSelectedToday = selectedDate === todayIso;
 
   return (
     <div class="ios-calendar">
       {/* 1. 年月ヘッダー & ナビゲーション */}
       <div class="cal-nav-header">
-        <div class="cal-nav-title">
-          <span class="cal-year-month">{formatYearMonth(currentYear, currentMonth)}</span>
-        </div>
-        <div class="cal-nav-actions">
+        <span class="cal-year-month">{formatYearMonth(currentYear, currentMonth)}</span>
+        <div class="cal-nav-controls">
           <button
             type="button"
-            class="cal-today-btn"
+            class="cal-nav-today-btn"
             onClick={handleToday}
             disabled={currentYear === tY && currentMonth === tM && selectedDate === todayIso}
           >
             今日
           </button>
-          <div class="cal-arrow-group">
+          <div class="cal-nav-pager">
             <button
               type="button"
-              class="cal-arrow-btn"
+              class="cal-pager-btn"
               onClick={handlePrevMonth}
               aria-label="前月"
             >
-              <Icon name="back" size={14} />
+              <Icon name="back" size={13} />
             </button>
             <button
               type="button"
-              class="cal-arrow-btn"
+              class="cal-pager-btn"
               onClick={handleNextMonth}
               aria-label="翌月"
             >
-              <Icon name="chevron" size={14} />
+              <Icon name="chevron" size={13} />
             </button>
           </div>
         </div>
@@ -172,8 +146,7 @@ export function CalendarView({
       <div class="cal-grid" role="grid">
         {days.map((day) => {
           const isSelected = day.date === selectedDate;
-          const practicesOnDay = practicesByDate.get(day.date);
-          const dots = getDayDotSummary(practicesOnDay);
+          const practicesOnDay = practicesByDate.get(day.date) ?? [];
 
           return (
             <button
@@ -185,59 +158,27 @@ export function CalendarView({
                 day.dayOfWeek === 0 || day.isHoliday ? 'holiday' : day.dayOfWeek === 6 ? 'sat' : ''
               }`}
               onClick={() => handleSelectDay(day)}
-              aria-label={`${day.date} ${dots.totalCount > 0 ? `${dots.totalCount}件の予約情報` : ''}`}
+              aria-label={`${day.date}${
+                practicesOnDay.length > 0 ? ` ${practicesOnDay.length}件の予約情報` : ''
+              }`}
               aria-selected={isSelected}
             >
               <span class="cal-day-num">{day.day}</span>
-              <div class="cal-dots-wrap">
-                {dots.allCanceled ? (
-                  <span class="cal-dot canceled" title="中止" />
-                ) : (
-                  <>
-                    {dots.goingCount > 0 && <span class="cal-dot going" />}
-                    {dots.otherCount > 0 && <span class="cal-dot other" />}
-                    {dots.canceledCount > 0 && <span class="cal-dot canceled" title="中止" />}
-                    {dots.totalCount > 2 && <span class="cal-dot more" />}
-                  </>
-                )}
-              </div>
+              {practicesOnDay.length > 0 && (
+                <div class="cal-day-events">
+                  {practicesOnDay.map((v) => (
+                    <CalendarEventChip
+                      key={v.practice.id}
+                      v={v}
+                      tone={getPracticeCalendarTone(v, toneSettings)}
+                    />
+                  ))}
+                </div>
+              )}
             </button>
           );
         })}
       </div>
-
-      {/* 4. 選択日の予約情報リスト（iOS スプリットビュー風） */}
-      <section class="cal-selected-day-section">
-        <div class="cal-selected-day-head">
-          <div class="cal-selected-title-wrap">
-            <h3 class="cal-selected-title">{labelDate(selectedDate)}</h3>
-            {isSelectedToday && <span class="cal-today-badge">今日</span>}
-          </div>
-          <span class="cal-selected-count">
-            {selectedPractices.length > 0 ? `${selectedPractices.length}件` : ''}
-          </span>
-        </div>
-
-        {selectedPractices.length === 0 ? (
-          <div class="cal-empty-day">
-            <span>
-              {tab === 'mine'
-                ? 'この日に行く予約情報はありません。'
-                : 'この日の予約情報はありません。'}
-            </span>
-          </div>
-        ) : (
-          <div class="cal-practice-list">
-            {selectedPractices.map((v) => (
-              <CalendarPracticeItem
-                key={v.practice.id}
-                v={v}
-                onClick={() => go(`/p/${encodeURIComponent(v.practice.id)}`)}
-              />
-            ))}
-          </div>
-        )}
-      </section>
     </div>
   );
 }

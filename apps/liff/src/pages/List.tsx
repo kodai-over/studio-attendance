@@ -29,6 +29,7 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
   const { me, practices: list, practicesAt, setPractices } = useApp();
   const [tab, setTab] = useState<Tab>(() => (initialTab === 'mine' || initialTab === 'all' ? initialTab : readTab()));
   const [viewMode, setViewMode] = useState<ScheduleViewMode>(() => readScheduleViewMode());
+  const [highlightedDate, setHighlightedDate] = useState<string | null>(null);
   const [run, busy] = useRunner();
 
   useEffect(() => {
@@ -45,9 +46,29 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
     }
   };
 
-  const handleSelectViewMode = (mode: ScheduleViewMode) => {
-    setViewMode(mode);
-    saveScheduleViewMode(mode);
+  const showCalendar = viewMode === 'calendar';
+
+  const handleToggleCalendar = () => {
+    const next: ScheduleViewMode = showCalendar ? 'list' : 'calendar';
+    setViewMode(next);
+    saveScheduleViewMode(next);
+    if (next === 'list') {
+      setHighlightedDate(null);
+    }
+  };
+
+  const handleSelectCalendarDate = (date: string) => {
+    setHighlightedDate(date);
+    if (typeof document !== 'undefined') {
+      const el = document.querySelector(`[data-ticket-date="${date}"]`);
+      if (el) {
+        const headSticky = document.querySelector('.schedule-head-sticky');
+        const headBottom = headSticky ? headSticky.getBoundingClientRect().bottom : 140;
+        const elRect = el.getBoundingClientRect();
+        const offsetTop = elRect.top - headBottom - 12;
+        window.scrollBy({ top: offsetTop, behavior: 'smooth' });
+      }
+    }
   };
 
   // 「予定」に出すのは、自分に招待が来た（入っているグループに募集された）練習と、自分が招待を送った（登録した）練習。
@@ -62,44 +83,41 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
 
   return (
     <>
-      <header class="tabs-head">
-        <Tabs
-          value={tab}
-          onChange={selectTab}
-          items={[
-            { key: 'all', label: 'すべて', count: list ? groups.all.length : undefined },
-            { key: 'mine', label: '行く', count: list ? groups.mine.length : undefined },
-          ]}
-        />
-        <div class="tabs-head-right">
-          <div class="view-mode-toggle" role="group" aria-label="表示形式">
+      <div class={`schedule-head-sticky${showCalendar ? ' has-calendar' : ''}`}>
+        <header class="tabs-head">
+          <Tabs
+            value={tab}
+            onChange={selectTab}
+            items={[
+              { key: 'all', label: 'すべて', count: list ? groups.all.length : undefined },
+              { key: 'mine', label: '行く', count: list ? groups.mine.length : undefined },
+            ]}
+          />
+          <div class="tabs-head-right">
             <button
               type="button"
-              class={`view-mode-btn ${viewMode === 'list' ? 'active' : ''}`}
-              onClick={() => handleSelectViewMode('list')}
-              aria-label="リスト表示"
-              title="リスト表示"
-            >
-              <Icon name="ticket" size={14} />
-            </button>
-            <button
-              type="button"
-              class={`view-mode-btn ${viewMode === 'calendar' ? 'active' : ''}`}
-              onClick={() => handleSelectViewMode('calendar')}
+              class={`cal-toggle-btn ${showCalendar ? 'active' : ''}`}
+              onClick={handleToggleCalendar}
+              aria-pressed={showCalendar}
               aria-label="カレンダー表示"
               title="カレンダー表示"
             >
               <Icon name="calendar" size={14} />
+              <span>カレンダー</span>
             </button>
+            {(practicesAt === 0 || busy) && <Syncing />}
           </div>
-          {(practicesAt === 0 || busy) && <Syncing />}
-        </div>
-      </header>
+        </header>
+
+        {showCalendar && (
+          <div class="cal-sticky-panel">
+            <CalendarView practices={shown} onSelectDate={handleSelectCalendarDate} />
+          </div>
+        )}
+      </div>
 
       {list == null ? (
         <Spinner />
-      ) : viewMode === 'calendar' ? (
-        <CalendarView practices={shown} tab={tab} />
       ) : shown.length === 0 ? (
         <div class="empty">
           <div>{tab === 'mine' ? '行く予約情報はありません。' : '登録されている予約情報はありません。'}</div>
@@ -110,7 +128,11 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
         <>
           <div class="ticket-grid">
             {shown.map((v) => (
-              <PracticeCard key={v.practice.id} v={v} />
+              <PracticeCard
+                key={v.practice.id}
+                v={v}
+                highlighted={highlightedDate === v.practice.date}
+              />
             ))}
           </div>
           <p class="note list-rsvp-note">
@@ -130,10 +152,12 @@ export function PracticeCard({
   v,
   onAnswer,
   busy,
+  highlighted,
 }: {
   v: PracticeView;
   onAnswer?: (a: Answer) => void;
   busy?: boolean;
+  highlighted?: boolean;
 }) {
   const { toast } = useApp();
   const [shaking, setShaking] = useState(false);
@@ -149,7 +173,12 @@ export function PracticeCard({
   };
 
   return (
-    <article class={`ticket${shaking ? ' is-shaking' : ''}`} data-answer={v.myAnswer ?? 'none'} data-status={p.status}>
+    <article
+      class={`ticket${shaking ? ' is-shaking' : ''}${highlighted ? ' is-cal-highlighted' : ''}`}
+      data-answer={v.myAnswer ?? 'none'}
+      data-status={p.status}
+      data-ticket-date={p.date}
+    >
       <Stub date={p.date} onClick={open} />
       <button class="ticket-main" onClick={open}>
         <span class="sr">{labelDate(p.date)}</span>

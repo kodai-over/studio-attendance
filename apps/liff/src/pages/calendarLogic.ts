@@ -1,4 +1,11 @@
-import { isHoliday, toJstDate, type PracticeView } from '@studio-attendance/shared';
+import {
+  computeCancelDeadline,
+  isActive,
+  isHoliday,
+  toJstDate,
+  type CancelRule,
+  type PracticeView,
+} from '@studio-attendance/shared';
 
 export interface CalendarDay {
   date: string; // 'YYYY-MM-DD'
@@ -166,6 +173,56 @@ export function getDayDotSummary(practicesOnDay?: PracticeView[]): DayDotSummary
   const totalCount = practicesOnDay.length;
   const allCanceled = canceledCount > 0 && goingCount === 0 && otherCount === 0;
   return { goingCount, otherCount, canceledCount, totalCount, allCanceled };
+}
+
+/**
+ * カレンダーセル内での予約情報の色分け種別
+ * - 'met-min': 最低人数達成（通常・緑系）
+ * - 'under-min': 最低人数未達（注意・黄/アンバー系）
+ * - 'under-min-urgent': 最低人数未達 かつ キャンセル期限間近(24h以内)または超過（警告・赤系）
+ * - 'inactive': 中止または終了（グレー系）
+ */
+export type CalendarEventTone = 'met-min' | 'under-min' | 'under-min-urgent' | 'inactive';
+
+export interface CalendarToneSettings {
+  minDefault: number;
+  cancelRules: CancelRule[];
+}
+
+export function getPracticeCalendarTone(
+  v: PracticeView,
+  settings: CalendarToneSettings,
+  now: Date = new Date(),
+): CalendarEventTone {
+  const p = v.practice;
+  if (!isActive(p)) {
+    return 'inactive';
+  }
+  const min = p.min ?? settings.minDefault;
+  if (v.goingCount >= min) {
+    return 'met-min';
+  }
+  const deadline = computeCancelDeadline(p.date, p.studio, settings.cancelRules ?? [], now);
+  if (deadline && (deadline.isSoon || deadline.isPast)) {
+    return 'under-min-urgent';
+  }
+  return 'under-min';
+}
+
+/**
+ * カレンダーセル内に収まりやすい場所表記（先頭の冗長な "studio " を省く）
+ */
+export function formatCalendarPlace(p: { studio: string; room: string }): string {
+  const shortStudio = p.studio.replace(/^studio\s+/i, '').trim();
+  return p.room ? `${shortStudio} ${p.room}` : shortStudio;
+}
+
+/**
+ * カレンダーセル内の参加人数（上限ありの場合は「going/max人」）表記
+ */
+export function formatCalendarCount(v: PracticeView): string {
+  const maxPart = v.practice.max != null ? `/${v.practice.max}` : '';
+  return `${v.goingCount}${maxPart}人`;
 }
 
 /**

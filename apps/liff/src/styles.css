@@ -2780,7 +2780,7 @@ button + .muted {
   line-height: 1.5;
 }
 
-/* ---------- 予定画面: ヘッダー表示切替（リスト ⇋ カレンダー） ---------- */
+/* ---------- 予定画面: カレンダー表示トグルボタン ---------- */
 .tabs-head:has(.tabs-head-right) {
   display: flex;
   align-items: center;
@@ -2797,348 +2797,321 @@ button + .muted {
   padding-right: var(--pad-x);
 }
 
-.view-mode-toggle {
-  display: inline-flex;
-  align-items: center;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 2px;
-  gap: 2px;
+/* ---------- 予定画面: 一体型 sticky ヘッダー（タブ＋カレンダー） ---------- */
+.schedule-head-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: 0 calc(var(--pad-x) * -1) 12px;
+  background: var(--bg);
+  transition: box-shadow 0.15s ease;
 }
-.view-mode-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 24px;
-  padding: 0;
-  border: none;
+.schedule-head-sticky .tabs-head {
+  position: static;
+  margin: 0;
   background: transparent;
-  color: var(--faint);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.15s ease;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
-.view-mode-btn.active {
-  background: var(--tint);
-  color: var(--ink);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+.schedule-head-sticky.has-calendar {
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+.cal-sticky-panel {
+  padding: 4px var(--pad-x) 10px;
+  background: var(--bg);
 }
 
-/* ---------- iOS カレンダービュー ---------- */
-.ios-calendar {
-  background: var(--paper);
+.cal-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 9px;
   border: 1px solid var(--line);
-  border-radius: 12px;
-  margin-top: 6px;
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--sub);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  white-space: nowrap;
+}
+.cal-toggle-btn:hover {
+  color: var(--ink);
+  border-color: var(--sub);
+}
+.cal-toggle-btn.active {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+
+/* ---------- カレンダー（端正なミニマルデザイン） ---------- */
+.ios-calendar {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .cal-nav-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 14px 8px;
+  padding: 8px 10px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
 }
 .cal-year-month {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--ink);
-  letter-spacing: -0.2px;
-}
-.cal-nav-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.cal-today-btn {
-  padding: 3px 10px;
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 600;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--bg);
-  color: #e5534b;
-  cursor: pointer;
-  transition: opacity 0.15s ease;
+  color: var(--ink);
+  letter-spacing: -0.01em;
 }
-.cal-today-btn:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-.cal-arrow-group {
+.cal-nav-controls {
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
-.cal-arrow-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
+.cal-nav-today-btn {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 4px;
   background: var(--bg);
   color: var(--ink);
   cursor: pointer;
+  transition: opacity 0.12s ease;
+}
+.cal-nav-today-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.cal-nav-pager {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg);
+  overflow: hidden;
+}
+.cal-pager-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.cal-pager-btn + .cal-pager-btn {
+  border-left: 1px solid var(--line);
+}
+.cal-pager-btn:active {
+  background: var(--paper);
 }
 
+/* 曜日バー */
 .cal-weekday-row {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  padding: 6px 4px 4px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  padding: 4px 0;
+  background: var(--paper);
   border-bottom: 1px solid var(--line);
   text-align: center;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--faint);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--sub);
 }
 .cal-weekday-cell.sun {
-  color: #e5534b;
+  color: var(--sun);
 }
 .cal-weekday-cell.sat {
-  color: #58a6ff;
+  color: var(--sat);
 }
 
+/* 7列グリッド */
 .cal-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  padding: 6px 4px 8px;
-  gap: 2px 0;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  background: var(--bg);
 }
 .cal-day-cell {
+  appearance: none;
+  -webkit-appearance: none;
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 44px;
+  align-items: stretch;
+  justify-content: flex-start;
+  min-height: 42px;
   border: none;
-  background: transparent;
+  border-bottom: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  background: var(--bg);
   cursor: pointer;
-  padding: 2px 0;
-  border-radius: 6px;
+  padding: 3px 2px 4px;
+  text-align: left;
+  min-width: 0;
+  transition: background 0.1s ease;
 }
-.cal-day-num {
+.cal-day-cell:nth-child(7n) {
+  border-right: none;
+}
+.cal-day-cell.other-month {
+  background: color-mix(in srgb, var(--paper) 45%, var(--bg));
+}
+.cal-day-cell.other-month .cal-day-num,
+.cal-day-cell.other-month .cal-day-events {
+  opacity: 0.3;
+}
+
+.cal-day-top {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
+  padding: 0 1px;
+  margin-bottom: 2px;
+}
+.cal-day-num {
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  min-width: 18px;
+  height: 18px;
   border-radius: 50%;
-  font-size: 14px;
+  font-size: 11px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   color: var(--ink);
   line-height: 1;
-  transition: all 0.12s ease;
-}
-.cal-day-cell.other-month .cal-day-num {
-  opacity: 0.28;
 }
 .cal-day-cell.holiday .cal-day-num {
-  color: #e5534b;
+  color: var(--sun);
+  font-weight: 600;
 }
 .cal-day-cell.sat .cal-day-num {
-  color: #58a6ff;
+  color: var(--sat);
+  font-weight: 600;
 }
 
-/* 今日の丸ハイライト (iOS標準: 鮮やかな赤丸に白文字) */
+/* 今日の日付: 反転インク（黒丸・白抜き数字）で端正に主張 */
 .cal-day-cell.is-today .cal-day-num {
-  background: #eb3b3b;
-  color: #ffffff !important;
-  font-weight: 700;
-}
-
-/* 選択中の日 (今日以外は枠付き強調) */
-.cal-day-cell.is-selected:not(.is-today) .cal-day-num {
-  background: var(--tint);
-  box-shadow: 0 0 0 1.5px var(--ink);
-  font-weight: 700;
-}
-/* 今日の選択中は二重丸枠 */
-.cal-day-cell.is-selected.is-today .cal-day-num {
-  box-shadow: 0 0 0 2px var(--paper), 0 0 0 3.5px #eb3b3b;
-}
-
-/* イベントドット */
-.cal-dots-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  height: 5px;
-  margin-top: 2px;
-}
-.cal-dot {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-}
-.cal-dot.going {
   background: var(--ink);
+  color: var(--bg) !important;
+  font-weight: 700;
 }
-.cal-dot.other {
-  background: var(--faint);
-  opacity: 0.7;
+
+/* 選択中の日: クリーンな外枠リング */
+.cal-day-cell.is-selected {
+  background: color-mix(in srgb, var(--ink) 4%, var(--bg));
+  box-shadow: inset 0 0 0 1.5px var(--ink);
+  z-index: 1;
 }
-.cal-dot.canceled {
-  background: #e5534b;
-  opacity: 0.5;
+.cal-day-cell.is-selected.is-today .cal-day-num {
+  box-shadow: 0 0 0 1.5px var(--bg), 0 0 0 3px var(--ink);
 }
-.cal-dot.more {
-  background: var(--faint);
+
+/* カレンダーセル内の人数表示（シグナルドット＋端正な等幅数字） */
+.cal-day-events {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  margin-top: 1px;
+}
+.cal-event-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 3px;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.cal-chip-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* 色分け1: 最低人数達成（上品なグリーン） */
+.cal-event-chip.tone-met-min .cal-chip-dot {
+  background: var(--brand-green);
+}
+.cal-event-chip.tone-met-min .cal-chip-count {
+  color: var(--ink);
+}
+
+/* 色分け2: 最低人数未達（落ち着いたアンバー） */
+.cal-event-chip.tone-under-min .cal-chip-dot {
+  background: var(--maybe-accent);
+}
+.cal-event-chip.tone-under-min .cal-chip-count {
+  color: var(--ink);
+}
+
+/* 色分け3: 最低人数未達 かつ キャンセル期限間近/超過（クリムゾンレッド） */
+.cal-event-chip.tone-under-min-urgent .cal-chip-dot {
+  background: var(--danger);
+}
+.cal-event-chip.tone-under-min-urgent .cal-chip-count {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+/* 中止・終了 */
+.cal-event-chip.tone-inactive {
   opacity: 0.4;
 }
-
-/* 下部: 選択日の予定セクション (iOS スプリットビュー風) */
-.cal-selected-day-section {
-  border-top: 1px solid var(--line);
-  padding: 12px 14px 16px;
-  background: var(--bg);
+.cal-event-chip.tone-inactive .cal-chip-dot {
+  background: var(--faint);
 }
-.cal-selected-day-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-.cal-selected-title-wrap {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.cal-selected-title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--ink);
-}
-.cal-today-badge {
-  font-size: 10px;
-  font-weight: 700;
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: #eb3b3b;
-  color: #fff;
-  letter-spacing: 0.5px;
-}
-.cal-selected-count {
-  font-size: 12px;
-  color: var(--sub);
-  font-weight: 500;
-}
-
-.cal-empty-day {
-  padding: 24px 12px;
-  text-align: center;
-  color: var(--faint);
-  font-size: 13px;
-  background: var(--paper);
-  border: 1px dashed var(--line);
-  border-radius: 8px;
-}
-
-.cal-practice-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.cal-practice-item {
-  appearance: none;
-  -webkit-appearance: none;
-  font: inherit;
-  text-align: left;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  position: relative;
-}
-.cal-practice-item:active {
-  background: var(--tint);
-}
-.cal-practice-item.is-going {
-  border-left: 3px solid var(--ink);
-}
-.cal-practice-item.is-canceled {
-  opacity: 0.7;
-  background: var(--bg);
-}
-.cal-practice-item.is-canceled .cal-item-title {
+.cal-event-chip.is-canceled .cal-chip-count {
   text-decoration: line-through;
-  color: var(--faint);
 }
-.cal-item-time-col {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  min-width: 44px;
-  font-size: 13px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.2;
-  color: var(--ink);
-}
-.cal-item-end {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--sub);
-}
-.cal-item-main {
-  flex: 1;
-  min-width: 0;
-}
-.cal-item-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 2px;
-}
-.cal-item-badges {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-.cal-item-title {
-  font-size: 13px;
+
+.cal-chip-count {
+  font-family: var(--mono);
+  font-size: 9.5px;
   font-weight: 600;
-  color: var(--ink);
+  line-height: 1.15;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  letter-spacing: -0.02em;
 }
-.cal-item-meta-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  color: var(--sub);
+
+/* カレンダーで日付をタップした際の該当チケットのハイライト（マスク輪郭に沿った端正な枠線と背景シフト） */
+.ticket.is-cal-highlighted {
+  --paper: #fafaf7;
+  box-shadow: inset 0 0 0 1.5px var(--ink) !important;
+  filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.08));
+  z-index: 2;
+  transition: all 0.2s ease;
 }
-.cal-meta-dot {
-  opacity: 0.5;
+:root[data-theme='dark'] .ticket.is-cal-highlighted {
+  --paper: #232323;
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.72) !important;
+  filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.12));
 }
-.cal-meta-booker {
-  max-width: 100px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.cal-item-arrow {
-  color: var(--faint);
-  opacity: 0.6;
-  flex-shrink: 0;
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .ticket.is-cal-highlighted {
+    --paper: #232323;
+    box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.72) !important;
+    filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.12));
+  }
 }
 
 
