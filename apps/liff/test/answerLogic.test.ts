@@ -18,6 +18,7 @@ import {
   loadDraftsFromStorage,
   mergePendingTellItems,
   mergePracticesWithKeep,
+  needsAnswer,
   processCommitItems,
   pruneResolvedTouches,
   pruneStaleDrafts,
@@ -718,6 +719,31 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       ]);
       // 先頭のチームAが未回答0件でも、未回答があるチームBが初期選択される
       expect(summary.initialGroupId).toBe('group-b');
+    });
+
+    it('「未定」と答えた予約情報も、未回答として数える', () => {
+      const me = {
+        member: { userId: 'u1', name: '山田', role: 'member' as const, groups: ['group-a'] },
+        groups: [{ id: 'group-a', name: 'チームA' }],
+        settings: { groups: [] },
+      } as any;
+      const list: PracticeView[] = [
+        { practice: { ...mockPractice1, id: 'x1', date: '2026-11-20' }, myAnswer: '保留', attendees: [] },
+        { practice: { ...mockPractice1, id: 'x2', date: '2026-11-21' }, myAnswer: '行く', attendees: [] },
+        { practice: { ...mockPractice1, id: 'x3', date: '2026-11-22' }, myAnswer: null, attendees: [] },
+      ];
+      const summary = getUnansweredSummary(list, me, '2026-11-01', '12:00');
+      expect(summary.totalCount).toBe(2);
+      expect(summary.groups[0].unansweredCount).toBe(2);
+    });
+  });
+
+  describe('needsAnswer', () => {
+    it('未回答と未定は true、行く・行かないは false', () => {
+      expect(needsAnswer({ myAnswer: null })).toBe(true);
+      expect(needsAnswer({ myAnswer: '保留' })).toBe(true);
+      expect(needsAnswer({ myAnswer: '行く' })).toBe(false);
+      expect(needsAnswer({ myAnswer: '行かない' })).toBe(false);
     });
   });
 

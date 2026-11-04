@@ -89,7 +89,7 @@ export function HomePage() {
         <button class="banner" onClick={() => go('/answer')}>
           <span class="count-badge">{todoCount}</span>
           <span class="grow">
-            <strong>未回答の予約情報が{todoCount}件あります</strong>
+            <strong>未回答・未定の予約情報が{todoCount}件あります</strong>
           </span>
           <Icon name="chevron" size={18} />
         </button>

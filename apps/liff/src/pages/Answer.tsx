@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import {
-  answerChangeReport,
   answerReport,
   isRsvpTarget,
   toJstDate,
@@ -27,6 +26,7 @@ import {
   getModifiedItems,
   getUnansweredSummary,
   globalDrafts,
+  needsAnswer,
   mergePendingTellItems,
   processCommitItems,
   pruneStaleDrafts,
@@ -142,9 +142,9 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
     ? allTargets
     : filterGroupPractices(allTargets, selectedGroup, me.member.userId, myGroupIds);
 
-  // 未回答・回答済の分類（タブ分類の基準は元の回答 myAnswer に固定し、回答変更してもチケットが消えないようにする）
-  const todos = groupFiltered.filter((v) => v.myAnswer == null);
-  const answereds = groupFiltered.filter((v) => v.myAnswer != null);
+  // 未回答（未定も含む）・回答済の分類（タブ分類の基準は元の回答 myAnswer に固定し、回答変更してもチケットが消えないようにする）
+  const todos = groupFiltered.filter(needsAnswer);
+  const answereds = groupFiltered.filter((v) => !needsAnswer(v));
   const todoCount = todos.length;
   const answeredCount = answereds.length;
 
@@ -352,17 +352,11 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
         report = answerReport(answeredItems.map((v) => ({ practice: v.practice, answer: v.myAnswer }))) ?? '';
       }
     }
-  } else if (subTab === 'unanswered') {
-    // 未回答タブ: 「回答しました」形式（回答が入力された項目のみ。reportModifiedItems に揃える）
-    const activeUnanswered = reportModifiedItems.filter((item) => item.practice.status !== '中止');
-    report = answerReport(activeUnanswered.map((item) => ({ practice: item.practice, answer: item.answer }))) ?? '';
   } else {
-    // 回答済タブ: 「回答を変更しました」形式（どういう変更をしたかを明示）
-    const activeModified = reportModifiedItems.filter((item) => item.practice.status !== '中止');
-    report =
-      answerChangeReport(
-        activeModified.map((item) => ({ practice: item.practice, from: item.originalAnswer, to: item.answer })),
-      ) ?? '';
+    // 未回答からの回答は「回答しました」、未定や回答済からの変更は「回答を変更しました」として伝える
+    report = generateSpecificReport(
+      reportModifiedItems.map((item) => ({ practice: item.practice, from: item.originalAnswer, to: item.answer })),
+    );
   }
 
   const text = draft ?? report;
@@ -528,8 +522,8 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
             ? '予約情報が見つかりません（終了した・削除された・見られない予約情報です）'
             : subTab === 'unanswered'
             ? userGroups.length > 1 && unansweredSummary.totalCount > 0
-              ? 'このグループの未回答の募集はありません（他のグループに未回答の募集があります）'
-              : '未回答の募集はありません。すべて回答済です。'
+              ? 'このグループの未回答・未定の募集はありません（他のグループにあります）'
+              : '未回答・未定の募集はありません'
             : '回答済の今後の予約情報はありません。'}
         </div>
       ) : (

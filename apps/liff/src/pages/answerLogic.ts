@@ -441,6 +441,13 @@ export async function runTellWorkflow({
 }
 
 /**
+ * まだ回答を決めきれていない予約情報か。未回答に加え、「未定」と答えたものも RSVP の「未回答」に入れる
+ */
+export function needsAnswer(v: Pick<PracticeView, 'myAnswer'>): boolean {
+  return v.myAnswer == null || v.myAnswer === '保留';
+}
+
+/**
  * 選択中グループに合致する予約情報を抽出する。
  * groups が空の予約情報（登録のみ等）や、自分が予約者の予約情報はどのグループ選択時にも表示する。
  * また、参加リンク回答やグループ脱退後など、所属外グループ宛でも自分が回答済みの予約情報は回答変更できるよう表示する。
@@ -584,7 +591,7 @@ export function getUnansweredSummary(
   const rsvpTargets = practices.filter((v) =>
     isRsvpTarget(v, me.member.userId, me.member.groups, today, currentTime),
   );
-  const totalCount = rsvpTargets.filter((v) => v.myAnswer == null).length;
+  const totalCount = rsvpTargets.filter(needsAnswer).length;
 
   const groups = userGroups.map((g) => {
     const unansweredCount = filterGroupPractices(
@@ -592,7 +599,7 @@ export function getUnansweredSummary(
       g.id,
       me.member.userId,
       myGroupIds,
-    ).filter((v) => v.myAnswer == null).length;
+    ).filter(needsAnswer).length;
     return { id: g.id, name: g.name, unansweredCount };
   });
 
