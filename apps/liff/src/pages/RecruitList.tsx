@@ -2,7 +2,8 @@ import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { isAdmin, labelDate, type PracticeView } from '@studio-attendance/shared';
 import { api } from '../api';
-import { CancelDeadlineBadge, DeleteConfirmDialog, Icon, Spinner, StatusBadge, Stub, TopBar, go, place, useApp, useRunner } from '../ui';
+import { TicketSub } from './List';
+import { DeleteConfirmDialog, Icon, Spinner, StatusBadge, Stub, TopBar, go, place, useApp, useRunner } from '../ui';
 
 /**
  * 「募集」。自分が登録した練習（管理者はすべての練習）を並べ、押すと募集・編集の画面へ。
@@ -92,35 +93,31 @@ function RecruitTicket({ v }: { v: PracticeView }) {
 
   return (
     <article class="ticket" data-status={p.status}>
-      <div class="ticket-body">
-        <Stub date={p.date} onClick={open} />
-        <button class="ticket-main" onClick={open}>
-          <span class="sr">{labelDate(p.date)}</span>
-          <div class="time">
-            <span>
-              {p.start}–{p.end}
-            </span>
-            <StatusBadge v={v} />
+      <Stub date={p.date} onClick={open} />
+      <button class="ticket-main" onClick={open}>
+        <span class="sr">{labelDate(p.date)}</span>
+        <div class="time">
+          <span>
+            {p.start}–{p.end}
+          </span>
+          <StatusBadge v={v} />
+        </div>
+        <div class="place">{place(p)}</div>
+        <div class="ticket-meta">
+          <div class="ticket-groups">
+            {hasGroups ? (
+              targetGroups.map((name) => (
+                <span class="label" key={name}>
+                  {name}
+                </span>
+              ))
+            ) : (
+              <span>未募集</span>
+            )}
           </div>
-          <div class="place">{place(p)}</div>
-          <div class="ticket-meta">
-            <div class="ticket-groups">
-              {hasGroups ? (
-                targetGroups.map((name) => (
-                  <span class="label" key={name}>
-                    {name}
-                  </span>
-                ))
-              ) : (
-                <span>未募集</span>
-              )}
-            </div>
-          </div>
-          <div class="ticket-meta">
-            <CancelDeadlineBadge date={p.date} studio={p.studio} />
-          </div>
-        </button>
-      </div>
+        </div>
+        <TicketSub booker={v.bookerName} date={p.date} studio={p.studio} />
+      </button>
     </article>
   );
 }

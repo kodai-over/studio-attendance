@@ -132,6 +132,21 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
   );
 }
 
+/** チケットの下の段。予約者とキャンセル期限 */
+export function TicketSub({ booker, date, studio }: { booker?: string | null; date: string; studio: string }) {
+  return (
+    <div class="ticket-sub">
+      {booker && (
+        <span class="meta-item" title={`予約者: ${booker}`}>
+          <Icon name="user" size={13} />
+          {booker}
+        </span>
+      )}
+      <CancelDeadlineBadge date={date} studio={studio} />
+    </div>
+  );
+}
+
 /**
  * 押した瞬間の見た目。記号・行く人数・満員かどうかを先に変える
  * （名前の並びと1人あたりはサーバーの結果で差し替える）
@@ -162,29 +177,27 @@ export function PracticeCard({
       data-status={p.status}
       data-ticket-date={p.date}
     >
-      <div class="ticket-body">
-        <Stub date={p.date} onClick={open} />
-        <button class="ticket-main" onClick={open}>
-          <span class="sr">{labelDate(p.date)}</span>
-          <div class="time">
-            <span>
-              {p.start}–{p.end}
-            </span>
-            <StatusBadge v={v} />
-            {!onAnswer && <MyAnswerBadge answer={v.myAnswer} />}
-          </div>
-          <div class="place">{place(p)}</div>
-          <div class="ticket-meta">
-            <span class="meta-item" aria-label={`行く ${v.goingCount}人`}>
-              <Icon name="people" size={16} />
-              {v.goingCount}
-              {p.max ? `/${p.max}` : ''}
-            </span>
-            <CancelDeadlineBadge date={p.date} studio={p.studio} soonOnly />
-            <Fee v={v} />
-          </div>
-        </button>
-      </div>
+      <Stub date={p.date} onClick={open} />
+      <button class="ticket-main" onClick={open}>
+        <span class="sr">{labelDate(p.date)}</span>
+        <div class="time">
+          <span>
+            {p.start}–{p.end}
+          </span>
+          <StatusBadge v={v} />
+          {!onAnswer && <MyAnswerBadge answer={v.myAnswer} />}
+        </div>
+        <div class="place">{place(p)}</div>
+        <div class="ticket-meta">
+          <span class="meta-item" aria-label={`行く ${v.goingCount}人`}>
+            <Icon name="people" size={16} />
+            {v.goingCount}
+            {p.max ? `/${p.max}` : ''}
+          </span>
+          <Fee v={v} />
+        </div>
+        <TicketSub booker={v.bookerName} date={p.date} studio={p.studio} />
+      </button>
       {onAnswer && <RsvpButtons value={v.myAnswer} status={p.status} busy={busy} onAnswer={onAnswer} onBlocked={handleBlocked} />}
     </article>
   );

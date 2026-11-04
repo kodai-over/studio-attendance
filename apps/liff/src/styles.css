@@ -520,49 +520,45 @@ a {
   grid-template-columns: 1fr;
   gap: var(--sp-3);
 }
+/* 左が日付の半券、右が本体。あいだに切り込みと点線を入れてチケットに見せる */
 .ticket {
+  --stub-w: 64px;
   position: relative;
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: var(--stub-w) minmax(0, 1fr);
+  grid-template-rows: 1fr auto;
   height: 100%;
   border-radius: var(--r-md);
   background: var(--surface);
-  transition: box-shadow 0.2s;
-}
-.ticket-body {
-  display: flex;
-  gap: var(--sp-4);
-  min-width: 0;
-  padding: var(--sp-4);
-  grid-column: 1 / -1;
+  -webkit-mask: radial-gradient(circle 8px at var(--stub-w) 0, transparent 7.5px, #000 8px) top / 100% 51% no-repeat,
+    radial-gradient(circle 8px at var(--stub-w) 100%, transparent 7.5px, #000 8px) bottom / 100% 51% no-repeat;
+  mask: radial-gradient(circle 8px at var(--stub-w) 0, transparent 7.5px, #000 8px) top / 100% 51% no-repeat,
+    radial-gradient(circle 8px at var(--stub-w) 100%, transparent 7.5px, #000 8px) bottom / 100% 51% no-repeat;
 }
 .ticket-main {
   all: unset;
   box-sizing: border-box;
   display: flex;
-  flex: 1;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  padding: var(--sp-3) var(--sp-4);
   cursor: pointer;
 }
 .ticket-main:focus-visible,
 .rsvp button:focus-visible {
   outline: 2px solid var(--text);
-  outline-offset: 2px;
+  outline-offset: -3px;
   border-radius: var(--r-sm);
 }
 .stub {
   display: flex;
-  flex: none;
+  grid-row: span 2;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  align-self: start;
-  width: 52px;
-  height: 60px;
-  border-radius: 10px;
-  background: var(--bg);
+  border-radius: var(--r-md) 0 0 var(--r-md);
+  border-right: 1.5px dashed var(--separator);
   line-height: 1;
   cursor: pointer;
   transition: background 0.2s, color 0.2s;
@@ -572,7 +568,7 @@ a {
   color: var(--text-2);
 }
 .stub .d {
-  margin: 3px 0;
+  margin: 4px 0;
   font-size: var(--fs-xl);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -582,6 +578,12 @@ a {
   font-weight: 600;
   color: var(--text-2);
 }
+.stub.sat {
+  background: color-mix(in srgb, var(--sat) 7%, var(--surface));
+}
+.stub.sun {
+  background: color-mix(in srgb, var(--sun) 7%, var(--surface));
+}
 .stub.sat .d,
 .stub.sat .w {
   color: var(--sat);
@@ -590,14 +592,26 @@ a {
 .stub.sun .w {
   color: var(--sun);
 }
-/* 行くと決めた予約情報は日付が反転する */
+/* 行くと決めた予約情報は半券が反転する */
 .ticket[data-answer='行く'] .stub {
   background: var(--accent);
   color: var(--on-accent);
+  border-right-color: transparent;
 }
 .ticket[data-answer='行く'] .stub .m,
 .ticket[data-answer='行く'] .stub .w {
   color: color-mix(in srgb, var(--on-accent) 70%, transparent);
+}
+.ticket[data-answer='行く'] .stub.sat .d,
+.ticket[data-answer='行く'] .stub.sat .w {
+  color: color-mix(in srgb, var(--sat) 55%, var(--on-accent));
+}
+.ticket[data-answer='行く'] .stub.sun .d,
+.ticket[data-answer='行く'] .stub.sun .w {
+  color: color-mix(in srgb, var(--sun) 55%, var(--on-accent));
+}
+.ticket[data-answer='保留'] .stub {
+  box-shadow: inset 3px 0 0 var(--warning);
 }
 .ticket[data-answer='行かない'],
 .ticket[data-status='中止'],
@@ -608,7 +622,7 @@ a {
   text-decoration: line-through;
 }
 .ticket.is-cal-highlighted {
-  box-shadow: 0 0 0 2px var(--text);
+  background: var(--surface-2);
 }
 .time {
   display: flex;
@@ -635,7 +649,7 @@ a {
   align-items: center;
   gap: var(--sp-3);
   min-width: 0;
-  margin-top: var(--sp-2);
+  margin-top: var(--sp-1);
   font-size: var(--fs-sm);
   color: var(--text-2);
 }
@@ -676,6 +690,19 @@ a {
 .deadline.is-past {
   color: var(--text-3);
 }
+.ticket-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--sp-3);
+  margin-top: var(--sp-1);
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.ticket-sub .meta-item {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .fee {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -714,7 +741,6 @@ a {
 /* ---------- 回答 ○ △ ✕ ---------- */
 .rsvp {
   display: flex;
-  grid-column: 1 / -1;
   box-shadow: 0 -0.5px 0 var(--separator);
 }
 .rsvp button {
@@ -1167,6 +1193,7 @@ details[open] > summary.menu-row > .icon:last-child {
 .section-gap-bottom {
   margin-bottom: var(--sp-3);
 }
+.ticket-sub:empty,
 .ticket-meta:empty {
   display: none;
 }

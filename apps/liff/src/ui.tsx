@@ -498,19 +498,16 @@ export const shareData = (v: PracticeView, url: string) => ({
   url,
 });
 
-/**
- * チケットに出すキャンセル期限。soonOnly なら期限間近のときだけ出す（参加者の一覧）。
- * そうでなければ期限前は日時を出し、過ぎたら出さない（予約者の「募集」）
- */
-export function CancelDeadlineBadge({ date, studio, soonOnly }: { date: string; studio: string; soonOnly?: boolean }) {
+/** チケットに出すキャンセル期限。間近は色を付け、過ぎたら薄く「超過」と出す */
+export function CancelDeadlineBadge({ date, studio }: { date: string; studio: string }) {
   const { me } = useApp();
   const deadline = computeCancelDeadline(date, studio, me?.settings?.cancelRules ?? []);
-  if (!deadline || deadline.isPast || (soonOnly && !deadline.isSoon)) return null;
+  if (!deadline) return null;
 
   return (
-    <span class={`deadline${deadline.isSoon ? ' is-soon' : ''}`}>
-      <Icon name="clock" size={14} />
-      <span>キャンセル期限 {deadline.formatted}</span>
+    <span class={`deadline${deadline.isSoon ? ' is-soon' : ''}${deadline.isPast ? ' is-past' : ''}`}>
+      <Icon name="clock" size={13} />
+      <span>{deadline.isPast ? 'キャンセル期限超過' : `キャンセル期限 ${deadline.formatted}`}</span>
     </span>
   );
 }
