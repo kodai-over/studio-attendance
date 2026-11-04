@@ -376,6 +376,11 @@ a {
   box-shadow: 0 -0.5px 0 var(--separator);
   backdrop-filter: saturate(1.8) blur(20px);
   -webkit-backdrop-filter: saturate(1.8) blur(20px);
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* 下にスクロールしている間は画面の外へ隠す */
+.navbar.is-hidden {
+  transform: translateY(calc(100% + 1px));
 }
 .navbar button {
   flex: 1;
@@ -421,6 +426,9 @@ a {
     padding: 6px;
     border-radius: var(--r-full);
     box-shadow: 0 0 0 0.5px var(--separator), var(--shadow);
+  }
+  :root:is([data-client='line'], [data-client='app']) .navbar.is-hidden {
+    transform: translate(-50%, calc(100% + 16px + env(safe-area-inset-bottom)));
   }
   :root:is([data-client='line'], [data-client='app']) .navbar button {
     border-radius: var(--r-full);
@@ -1997,6 +2005,10 @@ details[open] > .more-summary {
     padding: max(var(--sp-3), env(safe-area-inset-top)) var(--sp-2) max(var(--sp-3), env(safe-area-inset-bottom)) calc(var(--sp-2) + env(safe-area-inset-left));
     box-shadow: 0.5px 0 0 var(--separator);
     overflow-y: auto;
+  }
+  /* 左に並べるときは隠さない */
+  .navbar.is-hidden {
+    transform: none;
   }
   .navbar button {
     flex: none;

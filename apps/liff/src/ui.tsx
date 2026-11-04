@@ -306,6 +306,38 @@ export function resolveActiveNavKey(path: string[]): string {
   return first;
 }
 
+/**
+ * 下にスクロールしている間は true、上に戻したり画面の上端近くに来たら false。
+ * 指の細かな揺れで出たり消えたりしないよう、少し動いてから切り替える
+ */
+export function useHideOnScroll(threshold = 8) {
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    let last = window.scrollY;
+    let ticking = false;
+    const update = () => {
+      ticking = false;
+      const y = window.scrollY;
+      const dy = y - last;
+      const atBottom = window.innerHeight + y >= document.documentElement.scrollHeight - 2;
+      if (y < 48) setHidden(false);
+      else if (dy > threshold && !atBottom) setHidden(true);
+      else if (dy < -threshold) setHidden(false);
+      else return;
+      last = y;
+    };
+    const onScroll = () => {
+      if (!ticking) {
+        ticking = true;
+        requestAnimationFrame(update);
+      }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [threshold]);
+  return hidden;
+}
+
 /** 画面下のナビゲーション。どの画面からでも主要画面に移れる */
 export function NavBar() {
   const { me, practices } = useApp();
@@ -335,8 +367,9 @@ export function NavBar() {
     { to: '/settings', key: 'settings', icon: 'user', label: 'アカウント' },
   ];
   const active = resolveActiveNavKey(path);
+  const hidden = useHideOnScroll();
   return (
-    <nav class="navbar">
+    <nav class={`navbar${hidden ? ' is-hidden' : ''}`}>
       {items.map((it) => (
         <button aria-current={active === it.key ? 'page' : undefined} onClick={() => go(it.to)}>
           <span class="nav-icon">
