@@ -18,11 +18,6 @@ import {
 
 const WEEKDAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
 
-const DEFAULT_TONE_SETTINGS: CalendarToneSettings = {
-  minDefault: 3,
-  cancelRules: [],
-};
-
 export function CalendarEventChip({
   v,
   tone,
@@ -55,7 +50,7 @@ export function CalendarView({
   onSelectDate?: (date: string) => void;
 }) {
   const app = useApp();
-  const toneSettings: CalendarToneSettings = app?.me?.settings ?? DEFAULT_TONE_SETTINGS;
+  const toneSettings = app?.me?.settings;
 
   const todayIso = toJstDate(new Date());
   const [tY, tM] = todayIso.split('-').map(Number);
@@ -76,18 +71,14 @@ export function CalendarView({
     const prev = getPrevMonth(currentYear, currentMonth);
     setCurrentYear(prev.year);
     setCurrentMonth(prev.month);
-    const newDate = resolveInitialSelectedDate(prev.year, prev.month, practicesByDate, todayIso);
-    setSelectedDate(newDate);
-    onSelectDate?.(newDate);
+    setSelectedDate(resolveInitialSelectedDate(prev.year, prev.month, practicesByDate, todayIso));
   };
 
   const handleNextMonth = () => {
     const next = getNextMonth(currentYear, currentMonth);
     setCurrentYear(next.year);
     setCurrentMonth(next.month);
-    const newDate = resolveInitialSelectedDate(next.year, next.month, practicesByDate, todayIso);
-    setSelectedDate(newDate);
-    onSelectDate?.(newDate);
+    setSelectedDate(resolveInitialSelectedDate(next.year, next.month, practicesByDate, todayIso));
   };
 
   const handleToday = () => {

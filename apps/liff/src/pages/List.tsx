@@ -58,6 +58,7 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
     }
   };
 
+  // カレンダーの日付タップ時: 該当日に予約情報があれば、その日の先頭の予約情報チケットへスムーズにスクロール
   const handleSelectCalendarDate = (date: string) => {
     const hasPractice = shown.some((v) => v.practice.date === date);
     if (!hasPractice) {
@@ -66,6 +67,7 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
     }
     setHighlightedDate(date);
     if (typeof document !== 'undefined') {
+      // 同一日に複数の予約情報がある場合も、その日の先頭チケットの位置に合わせてスクロールする
       const el = document.querySelector(`[data-ticket-date="${date}"]`);
       if (el) {
         const headSticky = document.querySelector('.schedule-head-sticky');

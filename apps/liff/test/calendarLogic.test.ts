@@ -244,6 +244,14 @@ describe('カレンダーロジック（calendarLogic）', () => {
       saveScheduleViewMode('list');
       expect(readScheduleViewMode()).toBe('list');
     });
+
+    it('localStorage に不正な値や空文字が入っている場合は安全に list を返す', () => {
+      localStorage.setItem('pb:scheduleViewMode', 'invalid-mode');
+      expect(readScheduleViewMode()).toBe('list');
+
+      localStorage.setItem('pb:scheduleViewMode', '');
+      expect(readScheduleViewMode()).toBe('list');
+    });
   });
 
   describe('getPracticeCalendarTone / formatCalendarPlace / formatCalendarCount（カレンダーセル表示・色分け判定）', () => {
@@ -302,10 +310,20 @@ describe('カレンダーロジック（calendarLogic）', () => {
       expect(getPracticeCalendarTone(canceled, toneSettings)).toBe('inactive');
     });
 
+    it('設定が渡されていない場合は inactive になる', () => {
+      const v = createMockPracticeView({
+        id: 'p-no-settings',
+        date: '2026-11-10',
+        goingCount: 1,
+      });
+      expect(getPracticeCalendarTone(v, undefined)).toBe('inactive');
+      expect(getPracticeCalendarTone(v, null)).toBe('inactive');
+    });
+
     it('トーン種別ごとのアクセシビリティ用ラベルが正しく返る', () => {
       expect(getCalendarToneLabel('met-min')).toBe('最低人数達成');
       expect(getCalendarToneLabel('under-min')).toBe('最低人数未達');
-      expect(getCalendarToneLabel('under-min-urgent')).toBe('最低人数未達かつ期限間近');
+      expect(getCalendarToneLabel('under-min-urgent')).toBe('最低人数未達かつキャンセル期限間近');
       expect(getCalendarToneLabel('inactive')).toBe('中止または終了');
     });
 
@@ -336,7 +354,7 @@ describe('カレンダーロジック（calendarLogic）', () => {
       expect(vnode).toBeDefined();
       expect(vnode.props.class).toContain('cal-event-chip');
       expect(vnode.props.class).toContain('tone-under-min-urgent');
-      expect(vnode.props['aria-label']).toBe('2/8人 (最低人数未達かつ期限間近)');
+      expect(vnode.props['aria-label']).toBe('2/8人 (最低人数未達かつキャンセル期限間近)');
 
       const jsonStr = JSON.stringify(vnode);
       expect(jsonStr).toContain('2/8人');
