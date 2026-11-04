@@ -4,8 +4,33 @@
     {
       "name": "liff-mock",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:mock", "-w", "@studio-attendance/liff", "--", "--port", "5173", "--strictPort"],
+      "runtimeArgs": [
+        "run",
+        "dev:mock",
+        "-w",
+        "@studio-attendance/liff",
+        "--",
+        "--port",
+        "5173",
+        "--strictPort"
+      ],
       "port": 5173
+    },
+    {
+      "name": "liff-mock-lan",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:mock",
+        "-w",
+        "@studio-attendance/liff",
+        "--",
+        "--port",
+        "5175",
+        "--strictPort",
+        "--host"
+      ],
+      "port": 5175
     }
   ]
 }
