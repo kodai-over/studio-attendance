@@ -65,27 +65,30 @@ function JoinPage() {
 
   return (
     <>
-      <header class="topbar">
-        <h1>RSVP</h1>
-      </header>
+      <h1 class="large-title join-title">RSVP</h1>
       <Pass
         date={v.date}
         status={v.status}
         fields={[
           { label: '時間', value: `${v.start}–${v.end}`, wide: true },
-          { label: 'スタジオ', value: v.studio, jp: true, wide: !v.room },
-          ...(v.room ? [{ label: '部屋', value: v.room, note: v.roomInfo, jp: true }] : []),
-          { label: '参加人数', value: <>{v.goingCount} {v.status === '満員' && <span class="badge-full">FULL</span>}</> },
+          { label: 'スタジオ', value: v.studio, wide: !v.room },
+          ...(v.room ? [{ label: '部屋', value: v.room, note: v.roomInfo }] : []),
+          { label: '参加人数', value: v.goingCount },
           { label: '1人あたり', value: v.perPerson != null ? yen(v.perPerson) : '—' },
-          ...(v.memo ? [{ label: 'メモ', value: v.memo, jp: true, wide: true }] : []),
+          ...(v.memo ? [{ label: 'メモ', value: v.memo, wide: true }] : []),
         ]}
       />
 
       {!closed && (
         <>
-          <input type="text" value={name} maxLength={30} aria-label="名前" placeholder="名前" style={{ marginBottom: 12 }} onInput={(e) => setName(e.currentTarget.value)} />
-          <RsvpButtons solo value={v.myAnswer} status={v.status} busy={busy} onAnswer={answer} />
-          <p class="muted" style={{ textAlign: 'center' }}>LINE不要・押し直しで変更できます</p>
+          <label class="field">
+            <span>名前</span>
+            <input type="text" value={name} maxLength={30} placeholder="名前" onInput={(e) => setName(e.currentTarget.value)} />
+          </label>
+          <div class="section-gap">
+            <RsvpButtons solo value={v.myAnswer} status={v.status} busy={busy} onAnswer={answer} />
+          </div>
+          <p class="note center section-gap">LINEなしで回答できます。押し直すと変更できます</p>
         </>
       )}
       {toastNode}

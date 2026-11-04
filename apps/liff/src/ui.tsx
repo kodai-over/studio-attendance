@@ -1,5 +1,5 @@
 import { createContext, type ComponentChildren } from 'preact';
-import { useCallback, useContext, useEffect, useMemo, useState } from 'preact/hooks';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { canRegister, computeCancelDeadline, isActive, isHoliday, isPastPractice, labelDate, shouldNotifyPracticeCancellation, toJstDate, toJstTime, weekday, yen, type Answer, type MeView, type PracticeView } from '@studio-attendance/shared';
 import { getUnansweredSummary } from './pages/answerLogic';
 import { HOME_READ_EVENT, getHomeUnreadStatus } from './pages/homeLogic';
@@ -209,6 +209,10 @@ export function ThemeToggle() {
   );
 }
 
+/**
+ * 画面上部のバー。メニューから開く画面（戻るがない画面）は大きい見出しを出し、
+ * 見出しがバーの下に隠れたら、バーの中央に小さく出す
+ */
 export function TopBar({
   title,
   back,
@@ -222,28 +226,60 @@ export function TopBar({
   children?: ComponentChildren;
   showTheme?: boolean;
 }) {
+  const large = !!title && !back;
+  const barRef = useRef<HTMLElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const bar = barRef.current;
+      if (!bar) return;
+      const heading = titleRef.current;
+      const barBottom = bar.getBoundingClientRect().bottom;
+      setScrolled(heading ? heading.getBoundingClientRect().bottom <= barBottom : window.scrollY > 0);
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   if (!title && !back && children === undefined && !showTheme) return null;
   return (
-    <header class="topbar">
-      {back && (
-        <button
-          class="back-btn"
-          aria-label="戻る"
-          onClick={() => {
-            if (onBack) onBack();
-            else if (history.length > 1) history.back();
-            else go('/');
-          }}
-        >
-          <Icon name="back" size={20} />
-        </button>
+    <>
+      <header ref={barRef} class={`topbar${large ? ' has-large' : ''}${scrolled ? ' scrolled' : ''}`}>
+        {back && (
+          <button
+            class="back-btn"
+            aria-label="戻る"
+            onClick={() => {
+              if (onBack) onBack();
+              else if (history.length > 1) history.back();
+              else go('/');
+            }}
+          >
+            <Icon name="back" size={24} />
+          </button>
+        )}
+        {title &&
+          (large ? (
+            <div class="topbar-title" aria-hidden="true">
+              {title}
+            </div>
+          ) : (
+            <h1 class="topbar-title">{title}</h1>
+          ))}
+        <div class="topbar-actions">
+          {children}
+          {showTheme && <ThemeToggle />}
+        </div>
+      </header>
+      {large && (
+        <h1 ref={titleRef} class="large-title">
+          {title}
+        </h1>
       )}
-      <h1>{title}</h1>
-      <div class="topbar-actions">
-        {showTheme && <ThemeToggle />}
-        {children}
-      </div>
-    </header>
+    </>
   );
 }
 
@@ -303,14 +339,10 @@ export function NavBar() {
     <nav class="navbar">
       {items.map((it) => (
         <button aria-current={active === it.key ? 'page' : undefined} onClick={() => go(it.to)}>
-          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name={it.icon} />
-            {it.badge != null && it.badge > 0 && (
-              <span class="nav-badge" style={{ position: 'absolute', top: -5, right: -8 }}>
-                {it.badge}
-              </span>
-            )}
-          </div>
+          <span class="nav-icon">
+            <Icon name={it.icon} size={24} />
+            {it.badge != null && it.badge > 0 && <span class="count-badge">{it.badge}</span>}
+          </span>
           <span>{it.label}</span>
         </button>
       ))}
@@ -318,24 +350,27 @@ export function NavBar() {
   );
 }
 
-/** チケットの半券。日付を大きく。行くと決めた練習は黒く反転する */
+const dayClassOf = (date: string) => {
+  const w = weekday(date);
+  return isHoliday(date) || w === '日' ? 'sun' : w === '土' ? 'sat' : 'weekday';
+};
+
+/** チケットの日付。行くと決めた予約情報は反転する */
 export function Stub({ date, onClick }: { date: string; onClick?: () => void }) {
   const [, m, d] = date.split('-').map(Number);
-  const w = weekday(date);
-  const hol = isHoliday(date);
-  const dayClass = hol || w === '日' ? 'sun' : w === '土' ? 'sat' : 'weekday';
   return (
-    <div class={`stub ${dayClass}`} aria-hidden="true" onClick={onClick}>
-      <span class="m">{String(m).padStart(2, '0')}</span>
-      <span class="d">{String(d).padStart(2, '0')}</span>
-      <span class={`w ${dayClass}`}>{w}</span>
+    <div class={`stub ${dayClassOf(date)}`} aria-hidden="true" onClick={onClick}>
+      <span class="m">{m}月</span>
+      <span class="d">{d}</span>
+      <span class="w">{weekday(date)}</span>
     </div>
   );
 }
 
 export function StatusBadge({ v }: { v: { practice: { status: string } } | PracticeView }) {
   const s = v.practice.status;
-  if (s === '中止') return <span class="stamp cancel">中止</span>;
+  if (s === '中止') return <span class="label danger">中止</span>;
+  if (s === '満員') return <span class="label">満員</span>;
   return null;
 }
 
@@ -401,20 +436,7 @@ export const Avatar = ({ name, guest }: { name: string; guest?: boolean }) => (
   </span>
 );
 
-export function AvatarStack({ names, max = 4 }: { names: { name: string; guest?: boolean }[]; max?: number }) {
-  if (names.length === 0) return null;
-  const rest = names.length - max;
-  return (
-    <span class="stack" aria-label={names.map((n) => n.name).join('、')}>
-      {names.slice(0, max).map((n) => (
-        <Avatar name={n.name} guest={n.guest} />
-      ))}
-      {rest > 0 && <span class="avatar more">+{rest}</span>}
-    </span>
-  );
-}
-
-/** 練習のパス（詳細・参加リンクの画面の先頭）。fields は [ラベル, 値, 補足?, 横いっぱい?] */
+/** 予約情報のパス（詳細・参加リンクの画面の先頭）。大きな日付と、ラベルと値の並び */
 export function Pass({
   date,
   status,
@@ -422,26 +444,23 @@ export function Pass({
 }: {
   date: string;
   status: string;
-  fields: { label: string; value: ComponentChildren; note?: string | null; wide?: boolean; jp?: boolean }[];
+  fields: { label: string; value: ComponentChildren; note?: string | null; wide?: boolean }[];
 }) {
   const [, m, d] = date.split('-').map(Number);
-  const w = weekday(date);
-  const hol = isHoliday(date);
-  const dayClass = hol || w === '日' ? 'sun' : w === '土' ? 'sat' : 'weekday';
+  const dayClass = dayClassOf(date);
   return (
     <section class="pass" data-status={status}>
       <div class="pass-head">
-        <div class={`pass-date ${dayClass}`}>
-          {String(m).padStart(2, '0')}.{String(d).padStart(2, '0')}
-          <span class={`w ${dayClass}`}>{w}</span>
-        </div>
+        <h2 class="pass-date">
+          {m}月{d}日<span class={`w ${dayClass}`}>（{weekday(date)}）</span>
+        </h2>
         <StatusBadge v={{ practice: { status } }} />
       </div>
       <div class="pass-grid">
         {fields.map((f) => (
           <div class={`fld${f.wide ? ' wide' : ''}`}>
             <span>{f.label}</span>
-            <b class={f.jp ? 'jp' : undefined}>{f.value}</b>
+            <b>{f.value}</b>
             {f.note && <small>{f.note}</small>}
           </div>
         ))}
@@ -454,10 +473,10 @@ export function Pass({
 export function BusyOverlay({ message, note }: { message: string; note?: string }) {
   return (
     <div class="overlay" role="alertdialog" aria-busy="true" aria-label={message}>
-      <div class="overlay-box">
-        <div class="spinner" style={{ margin: '4px auto 14px' }} />
-        <strong>{message}</strong>
-        {note && <div class="muted">{note}</div>}
+      <div class="dialog center">
+        <div class="spinner" />
+        <h3>{message}</h3>
+        {note && <p class="muted">{note}</p>}
       </div>
     </div>
   );
@@ -479,17 +498,20 @@ export const shareData = (v: PracticeView, url: string) => ({
   url,
 });
 
-/** チケットに表示するキャンセル期限バッジ */
-export function CancelDeadlineBadge({ date, studio }: { date: string; studio: string }) {
+/**
+ * チケットに出すキャンセル期限。soonOnly なら期限間近のときだけ出す（参加者の一覧）。
+ * そうでなければ期限前は日時を出し、過ぎたら出さない（予約者の「募集」）
+ */
+export function CancelDeadlineBadge({ date, studio, soonOnly }: { date: string; studio: string; soonOnly?: boolean }) {
   const { me } = useApp();
   const deadline = computeCancelDeadline(date, studio, me?.settings?.cancelRules ?? []);
-  if (!deadline) return null;
+  if (!deadline || deadline.isPast || (soonOnly && !deadline.isSoon)) return null;
 
   return (
-    <div class={`ticket-deadline${deadline.isSoon ? ' is-soon' : ''}${deadline.isPast ? ' is-past' : ''}`}>
-      <Icon name="clock" size={10} />
-      <span>{deadline.isPast ? 'キャンセル期限超過' : `キャンセル期限: ${deadline.formatted}`}</span>
-    </div>
+    <span class={`deadline${deadline.isSoon ? ' is-soon' : ''}`}>
+      <Icon name="clock" size={14} />
+      <span>キャンセル期限 {deadline.formatted}</span>
+    </span>
   );
 }
 
@@ -532,54 +554,38 @@ export function DeleteConfirmDialog({
 
   return (
     <div class="overlay" role="dialog" aria-modal="true" aria-label="予約情報の削除">
-      <div class="overlay-box" style={{ maxWidth: 320, textAlign: 'left' }}>
-        <h3 style={{ margin: '0 0 10px', fontSize: '1.05rem', fontWeight: 600 }}>予約情報を削除</h3>
-        <p style={{ margin: '0 0 8px', fontSize: '0.9rem', lineHeight: 1.5 }}>
-          <b>{labelDate(p.date)} {p.start}〜{p.end}</b><br />
+      <div class="dialog">
+        <h3>予約情報を削除</h3>
+        <p>
+          <b>{labelDate(p.date)} {p.start}〜{p.end}</b>
+          <br />
           {place(p)}
         </p>
-        {answered > 0 ? (
-          <p class="muted" style={{ margin: '0 0 12px', fontSize: '0.8rem', lineHeight: 1.4 }}>
-            回答している人がいます（行く{v.goingCount}人・未定{v.maybe.length}人）。<br />
-            回答も一緒に削除されます。
-          </p>
-        ) : (
-          <p class="muted" style={{ margin: '0 0 12px', fontSize: '0.8rem' }}>
-            この予約情報を削除します。
-          </p>
-        )}
+        <p class="muted">
+          {answered > 0 ? `回答している人がいます（行く${v.goingCount}人・未定${v.maybe.length}人）。回答も一緒に削除されます。` : 'この予約情報を削除します。'}
+        </p>
 
         {canNotify ? (
-          <div style={{ padding: '10px 12px', background: 'var(--paper-subtle, rgb(0 0 0 / 4%))', borderRadius: 8, margin: '8px 0 16px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.88rem', fontWeight: 500 }}>
-              <input
-                type="checkbox"
-                checked={notify}
-                onChange={(e) => setNotify((e.target as HTMLInputElement).checked)}
-                disabled={busy}
-              />
-              <span>募集済のグループに削除の連絡を送る</span>
-            </label>
-            <div class="muted" style={{ fontSize: '0.75rem', marginTop: 4, paddingLeft: 24, lineHeight: 1.3 }}>
-              {notify ? 'グループに削除の連絡が送られます。' : 'チェックを外すとグループへは送られません。'}
-            </div>
-          </div>
+          <label class="check">
+            <input type="checkbox" checked={notify} onChange={(e) => setNotify((e.target as HTMLInputElement).checked)} disabled={busy} />
+            <span>募集済のグループに削除の連絡を送る</span>
+          </label>
         ) : (
-          <div class="muted" style={{ fontSize: '0.78rem', margin: '8px 0 16px', lineHeight: 1.3 }}>
+          <p class="muted">
             {isPast
-              ? '※終了した予約情報のため、グループへの削除の連絡は送られません。'
+              ? '終了した予約情報なので、グループへの削除の連絡は送られません。'
               : isCanceled
-              ? '※中止済の予約情報のため、グループへの削除の連絡は送られません。'
-              : '※まだグループに募集されていないため、グループへの削除の連絡は送られません。'}
-          </div>
+              ? '中止済の予約情報なので、グループへの削除の連絡は送られません。'
+              : 'まだグループに募集していないので、グループへの削除の連絡は送られません。'}
+          </p>
         )}
 
-        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-          <button class="btn ghost" style={{ flex: 1 }} onClick={onClose} disabled={busy}>
+        <div class="btn-row">
+          <button class="btn" onClick={onClose} disabled={busy}>
             キャンセル
           </button>
-          <button class="btn danger" style={{ flex: 1 }} onClick={() => onConfirm(canNotify && notify)} disabled={busy}>
-            {busy ? '削除中...' : '削除する'}
+          <button class="btn danger" onClick={() => onConfirm(canNotify && notify)} disabled={busy}>
+            {busy ? '削除中…' : '削除する'}
           </button>
         </div>
       </div>
@@ -587,85 +593,7 @@ export function DeleteConfirmDialog({
   );
 }
 
-/** 読み取り中の進捗オーバーレイ（スクショ・文章両対応、目安のステップ表示） */
+/** 読み取り中のオーバーレイ（スクショ・文章） */
 export function ParsingProgressOverlay({ kind }: { kind: 'image' | 'text' }) {
-  const [stepIndex, setStepIndex] = useState(0);
-
-  const steps =
-    kind === 'image'
-      ? [
-          { label: 'スクショから文字を読み取り中...', note: 'スクショから文字を読み取っています' },
-          { label: '日時・スタジオ情報を確認中...', note: '日時やスタジオ・部屋を調べています' },
-          { label: 'スタジオ代・キャンセル期限を計算中...', note: '入力内容を準備しています' },
-        ]
-      : [
-          { label: '文章から予約内容を読み取り中...', note: '文章から予約内容を読み取っています' },
-          { label: '日時・スタジオ情報を確認中...', note: '日時やスタジオ・部屋を調べています' },
-          { label: 'スタジオ代・キャンセル期限を計算中...', note: '入力内容を準備しています' },
-        ];
-
-  useEffect(() => {
-    const t1 = setTimeout(() => setStepIndex(1), 1800);
-    const t2 = setTimeout(() => setStepIndex(2), 3600);
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
-  }, []);
-
-  return (
-    <div class="overlay" role="alertdialog" aria-busy="true" aria-label="読み取り中">
-      <div class="overlay-box" style={{ maxWidth: 300, textAlign: 'left', padding: '20px 18px 18px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-          <div class="spinner" style={{ width: 20, height: 20, margin: 0 }} />
-          <strong style={{ fontSize: '0.98rem' }}>予約内容を読み取り中</strong>
-        </div>
-        <p class="muted" style={{ fontSize: '0.75rem', margin: '0 0 14px' }}>
-          ※処理状況の目安です。数秒ほどかかる場合があります
-        </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {steps.map((st, i) => {
-            const isCurrent = i === stepIndex;
-            const isPassed = i < stepIndex;
-            return (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 8,
-                  opacity: isCurrent ? 1 : isPassed ? 0.7 : 0.35,
-                  transition: 'opacity 0.2s',
-                }}
-              >
-                <div
-                  style={{
-                    width: 18,
-                    height: 18,
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginTop: 2,
-                    flexShrink: 0,
-                    background: isCurrent ? 'var(--ink)' : isPassed ? 'var(--forest, #065F46)' : 'var(--line)',
-                    color: isCurrent || isPassed ? '#fff' : 'var(--muted)',
-                  }}
-                >
-                  <span style={{ fontSize: '0.65rem', fontWeight: 'bold' }}>{i + 1}</span>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.84rem', fontWeight: isCurrent ? 600 : 400, color: 'var(--ink)' }}>{st.label}</div>
-                  {isCurrent && (
-                    <div class="muted" style={{ fontSize: '0.72rem', marginTop: 1 }}>
-                      {st.note}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
+  return <BusyOverlay message="予約内容を読み取り中" note={kind === 'image' ? 'スクショから日時・スタジオ・スタジオ代を読み取っています' : '文章から日時・スタジオ・スタジオ代を読み取っています'} />;
 }

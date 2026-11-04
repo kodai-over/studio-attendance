@@ -2,7 +2,7 @@ import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { isAdmin, labelDate, type PracticeView } from '@studio-attendance/shared';
 import { api } from '../api';
-import { CancelDeadlineBadge, DeleteConfirmDialog, Icon, Spinner, Stub, TopBar, go, place, useApp, useRunner } from '../ui';
+import { CancelDeadlineBadge, DeleteConfirmDialog, Icon, Spinner, StatusBadge, Stub, TopBar, go, place, useApp, useRunner } from '../ui';
 
 /**
  * 「募集」。自分が登録した練習（管理者はすべての練習）を並べ、押すと募集・編集の画面へ。
@@ -44,7 +44,13 @@ export function RecruitListPage() {
       {list == null ? (
         <Spinner />
       ) : list.length === 0 ? (
-        <div class="empty">登録されている予約情報はありません。</div>
+        <div class="empty">
+          <div>予約情報はまだありません</div>
+          <button class="btn primary" onClick={() => go('/register')}>
+            <Icon name="plus" size={18} />
+            スタジオ予約を登録
+          </button>
+        </div>
       ) : (
         <div class="ticket-grid">
           {list.map((v) => (
@@ -85,39 +91,36 @@ function RecruitTicket({ v }: { v: PracticeView }) {
   const hasGroups = targetGroups.length > 0;
 
   return (
-    <article class="ticket" data-answer={hasGroups ? 'sent' : 'none'} data-status={p.status}>
-      <Stub date={p.date} onClick={open} />
-      <button class="ticket-main" onClick={open}>
-        <span class="sr">{labelDate(p.date)}</span>
-        <div class="time">
-          <span>{p.start}–{p.end}</span>
-          {v.bookerName && (
-            <span class="booker" title={`予約者: ${v.bookerName}`}>
-              <Icon name="user" size={11} />
-              <span>{v.bookerName}</span>
+    <article class="ticket" data-status={p.status}>
+      <div class="ticket-body">
+        <Stub date={p.date} onClick={open} />
+        <button class="ticket-main" onClick={open}>
+          <span class="sr">{labelDate(p.date)}</span>
+          <div class="time">
+            <span>
+              {p.start}–{p.end}
             </span>
-          )}
-        </div>
-        <div class="place">{place(p)}</div>
-        <CancelDeadlineBadge date={p.date} studio={p.studio} />
-        <div class="ticket-foot">
-          <div class={`recruit-groups${hasGroups ? ' has-groups' : ''}`}>
-            <Icon name="send" size={12} />
-            {hasGroups ? (
-              targetGroups.map((name) => (
-                <span class="tag" key={name}>
-                  {name}
-                </span>
-              ))
-            ) : (
-              <span class="no-groups">No groups</span>
-            )}
+            <StatusBadge v={v} />
           </div>
-          <span class="fee">
-            <Icon name="chevron" size={15} />
-          </span>
-        </div>
-      </button>
+          <div class="place">{place(p)}</div>
+          <div class="ticket-meta">
+            <div class="ticket-groups">
+              {hasGroups ? (
+                targetGroups.map((name) => (
+                  <span class="label" key={name}>
+                    {name}
+                  </span>
+                ))
+              ) : (
+                <span>未募集</span>
+              )}
+            </div>
+          </div>
+          <div class="ticket-meta">
+            <CancelDeadlineBadge date={p.date} studio={p.studio} />
+          </div>
+        </button>
+      </div>
     </article>
   );
 }

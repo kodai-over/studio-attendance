@@ -461,9 +461,9 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
       </TopBar>
 
       {!isSpecific && hasAnyChanges && (
-        <div class="rsvp-unsaved-banner">
-          <Icon name="check" size={15} />
-          <span>
+        <div class="banner" role="status">
+          <Icon name="edit" size={18} />
+          <span class="grow">
             {draftGroupStatus.hasSelectedDraft
               ? userGroups.length > 1
                 ? `「${draftGroupStatus.selectedGroupName}」の下書きがあります。「グループに伝える」または「完了」を押すまで保存されません`
@@ -477,32 +477,26 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
         <>
           {/* 複数グループに所属している場合のグループ切り替え（下部メニューバッジとの対応が分かるようグループ別未回答件数を表示） */}
           {userGroups.length > 1 && (
-            <>
-              <div class="group-filter-bar">
-                {unansweredSummary.groups.map((g) => (
-                  <button
-                    key={g.id}
-                    class={`group-pill ${selectedGroup === g.id ? 'active' : ''}`}
-                    onClick={() => handleGroupFilterChange(g.id)}
-                  >
-                    <span>{g.name}</span>
-                    <span class="muted" style={{ marginLeft: 6, fontSize: 12 }}>
-                      未回答{g.unansweredCount}
+            <div class="chips scroll tabs-head" role="group" aria-label="グループ">
+              {unansweredSummary.groups.map((g) => (
+                <button
+                  key={g.id}
+                  class={`chip${selectedGroup === g.id ? ' active' : ''}`}
+                  aria-pressed={selectedGroup === g.id}
+                  onClick={() => handleGroupFilterChange(g.id)}
+                >
+                  <span>{g.name}</span>
+                  {g.unansweredCount > 0 && (
+                    <span class="count-badge chip-badge" aria-label={`未回答${g.unansweredCount}件`}>
+                      {g.unansweredCount}
                     </span>
-                    {g.unansweredCount > 0 && <span class="nav-badge" style={{ marginLeft: 4 }}>{g.unansweredCount}</span>}
-                  </button>
-                ))}
-              </div>
-              {unansweredSummary.totalCount > 0 && (
-                <p class="note" style={{ margin: '0 0 8px', fontSize: 12 }}>
-                  未回答 合計 {unansweredSummary.totalCount}件（
-                  {unansweredSummary.groups.map((g) => `${g.name}: ${g.unansweredCount}件`).join(' / ')}）
-                </p>
-              )}
-            </>
+                  )}
+                </button>
+              ))}
+            </div>
           )}
 
-          <header class="tabs-head" style={{ marginBottom: 12 }}>
+          <div class="tabs-head">
             <Tabs
               value={subTab}
               onChange={handleTabChange}
@@ -511,7 +505,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
                 { key: 'answered', label: '回答済', count: list ? answeredCount : undefined },
               ]}
             />
-          </header>
+          </div>
         </>
       )}
 
@@ -535,7 +529,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
             : '回答済の今後の予約情報はありません。'}
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div class="ticket-grid">
           {displayed.map((v) => (
             <PracticeCard
               key={v.practice.id}
@@ -552,20 +546,14 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
       )}
 
       {fresh && displayed.length > 0 && (
-        <section class="rsvp-tell-section">
-          <div class="sec-head">
-            <Icon name="chat" size={18} />
-            グループに伝える
-          </div>
+        <section class="section">
+          <div class="sec-head big">グループに伝える</div>
 
           {chat === 'outside' ? (
             <>
-              <p class="note" style={{ lineHeight: 1.5 }}>
-                グループのトークから開くと、回答をまとめてグループに伝えられます
-              </p>
+              <p class="note">グループのトークから開くと、回答をまとめてグループに伝えられます</p>
               <button
-                class="btn ghost block"
-                style={{ marginTop: 14 }}
+                class="btn block section-gap"
                 disabled={!text.trim() || saving || !fresh || (!isSpecific && subTab === 'answered' && !hasReportableChanges)}
                 onClick={() => handleTell('copy')}
               >
@@ -578,7 +566,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
               </button>
             </>
           ) : chat === 'noScope' ? (
-            <p class="note" style={{ lineHeight: 1.5 }}>
+            <p class="note">
               回答は記録されます。グループに送る設定がまだのため、伝えられません（管理者に知らせてください）
             </p>
           ) : (
@@ -602,14 +590,13 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
                 />
               </label>
               {draft != null && draft !== report && (
-                <button class="btn ghost block" style={{ marginBottom: 12 }} onClick={() => setDraft(null)} disabled={saving}>
+                <button class="btn plain small" onClick={() => setDraft(null)} disabled={saving}>
                   回答から作り直す
                 </button>
               )}
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div class="btn-row section-gap">
                 <button
-                  class="btn primary"
-                  style={{ flex: 1 }}
+                  class="btn primary grow"
                   disabled={!text.trim() || saving || !fresh || (!isSpecific && subTab === 'answered' && !hasReportableChanges)}
                   onClick={() => handleTell('send')}
                 >
@@ -621,8 +608,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
                     : 'グループに伝える'}
                 </button>
                 <button
-                  class="btn ghost"
-                  style={{ padding: '0 14px' }}
+                  class="btn"
                   title={hasTargetChanges ? '回答を反映してメッセージをコピー' : 'メッセージをコピー'}
                   aria-label={hasTargetChanges ? '回答を反映してメッセージをコピー' : 'メッセージをコピー'}
                   disabled={!text.trim() || saving || !fresh || (!isSpecific && subTab === 'answered' && !hasReportableChanges)}
@@ -631,10 +617,9 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
                   <Icon name="copy" size={18} />
                 </button>
               </div>
-              <p class="note rsvp-tell-note">
-                押すと、回答が反映され、あなたの発言として開いているトークに送ります。
-                {userGroups.length > 1 &&
-                  '（他のグループへ伝えたいときは、上のグループを切り替えて文をコピーし、そのトークに貼り付けてください）'}
+              <p class="note">
+                回答を保存して、あなたの発言としてこのトークに送ります。
+                {userGroups.length > 1 && 'ほかのグループには、グループを切り替えて文をコピーし、そのトークに貼り付けてください。'}
               </p>
             </>
           )}
@@ -643,25 +628,18 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
 
       {!isSpecific && displayed.length > 0 && (
         <>
-          {hasGroupAllChanges && (
-            <p class="note" style={{ textAlign: 'center', marginBottom: 8, color: 'var(--color-primary, #2563eb)', fontWeight: 600 }}>
-              ※まだ保存されていません。「完了」または「グループに伝える」を押して回答を反映してください
-            </p>
-          )}
           <button
-            class={`btn ${hasGroupAllChanges ? 'primary' : 'ghost'} block rsvp-done-btn`}
+            class={`btn ${hasGroupAllChanges ? 'primary' : ''} block section`}
             disabled={saving}
             onClick={handleDone}
           >
             {saving
-              ? '保存中...'
+              ? '保存中…'
               : hasGroupAllChanges
               ? `回答を反映して完了（${groupAllModifiedItems.length}件）`
               : '完了'}
           </button>
-          <p class="note rsvp-tell-note" style={{ textAlign: 'center', marginTop: 8 }}>
-            ※「完了」は回答の保存のみ行います。グループへ知らせたいときは「グループに伝える」を押してください。
-          </p>
+          <p class="note center">「完了」は回答を保存するだけで、グループには伝わりません</p>
         </>
       )}
     </>

@@ -37,7 +37,6 @@ export function CalendarEventChip({
       aria-label={chipAriaLabel}
     >
       <span class="cal-chip-dot" aria-hidden="true" />
-      <span class="cal-chip-count">{countStr}</span>
     </div>
   );
 }
@@ -100,41 +99,26 @@ export function CalendarView({
   };
 
   return (
-    <div class="ios-calendar">
-      {/* 1. 年月ヘッダー & ナビゲーション */}
-      <div class="cal-nav-header">
+    <div class="calendar">
+      <div class="cal-nav">
         <span class="cal-year-month">{formatYearMonth(currentYear, currentMonth)}</span>
-        <div class="cal-nav-controls">
-          <button
-            type="button"
-            class="cal-nav-today-btn"
-            onClick={handleToday}
-            disabled={currentYear === tY && currentMonth === tM && selectedDate === todayIso}
-          >
-            今日
-          </button>
-          <div class="cal-nav-pager">
-            <button
-              type="button"
-              class="cal-pager-btn"
-              onClick={handlePrevMonth}
-              aria-label="前月"
-            >
-              <Icon name="back" size={13} />
-            </button>
-            <button
-              type="button"
-              class="cal-pager-btn"
-              onClick={handleNextMonth}
-              aria-label="翌月"
-            >
-              <Icon name="chevron" size={13} />
-            </button>
-          </div>
-        </div>
+        <button
+          type="button"
+          class="btn plain small"
+          onClick={handleToday}
+          disabled={currentYear === tY && currentMonth === tM && selectedDate === todayIso}
+        >
+          今日
+        </button>
+        <button type="button" class="icon-btn" onClick={handlePrevMonth} aria-label="前月">
+          <Icon name="back" size={18} />
+        </button>
+        <button type="button" class="icon-btn" onClick={handleNextMonth} aria-label="翌月">
+          <Icon name="chevron" size={18} />
+        </button>
       </div>
 
-      {/* 2. 曜日バー */}
+      {/* 曜日 */}
       <div class="cal-weekday-row">
         {WEEKDAY_NAMES.map((w, idx) => (
           <div
@@ -146,7 +130,7 @@ export function CalendarView({
         ))}
       </div>
 
-      {/* 3. 月間グリッド */}
+      {/* 日付 */}
       <div class="cal-grid">
         {days.map((day) => {
           const isSelected = day.date === selectedDate;

@@ -81,174 +81,122 @@ export function HomePage() {
 
   return (
     <>
-      <TopBar title="ホーム" showTheme />
-      {(practicesAt === 0 || busy) && <Syncing />}
+      <TopBar title="ホーム" showTheme>
+        {(practicesAt === 0 || busy) && <Syncing />}
+      </TopBar>
 
-      {/* 1. 未回答の予約情報バナー（GitHub Announcement Banner 風） */}
       {todoCount > 0 && (
-        <button class="gh-flash-banner" onClick={() => go('/answer')}>
-          <div class="gh-flash-main">
-            <span class="gh-flash-badge">{todoCount}</span>
-            <div class="gh-flash-text">
-              <strong>未回答の予約情報が {todoCount} 件あります</strong>
-              <span>RSVP からまとめて回答できます</span>
-            </div>
-          </div>
-          <span class="gh-flash-action">
-            <span>回答する</span>
-            <Icon name="chevron" size={13} />
+        <button class="banner" onClick={() => go('/answer')}>
+          <span class="count-badge">{todoCount}</span>
+          <span class="grow">
+            <strong>未回答の予約情報が{todoCount}件あります</strong>
           </span>
+          <Icon name="chevron" size={18} />
         </button>
       )}
 
-      {/* 2. 次の参加予定（GitHub Pinned Repository 風） */}
-      <section class="home-section">
-        <div class="home-section-head">
-          <h2 class="gh-section-title">次の参加予定</h2>
-          <button class="gh-section-link" onClick={() => go('/?tab=mine')}>
-            <span>予定へ</span>
-            <Icon name="chevron" size={13} />
+      <section>
+        <div class="sec-head big">
+          <span class="grow">次の参加予定</span>
+          <button class="btn plain small link" onClick={() => go('/?tab=mine')}>
+            すべて見る
           </button>
         </div>
         {nextGoing ? (
-          <article
-            class="gh-pinned-card"
-            onClick={() => go(`/p/${encodeURIComponent(nextGoing.practice.id)}`)}
-          >
-            <div class="gh-pinned-header">
-              <div class="gh-pinned-title-wrap">
-                <Icon name="calendar" size={15} />
-                <span class="gh-pinned-title">
-                  {labelDate(nextGoing.practice.date)} {nextGoing.practice.start}–{nextGoing.practice.end}
-                </span>
-              </div>
-              <span class="gh-pill-badge">行く</span>
+          <button class="next-card" onClick={() => go(`/p/${encodeURIComponent(nextGoing.practice.id)}`)}>
+            <div class="when">
+              {labelDate(nextGoing.practice.date)} {nextGoing.practice.start}–{nextGoing.practice.end}
             </div>
-            <p class="gh-pinned-body">{place(nextGoing.practice)}</p>
-            <div class="gh-pinned-footer">
-              <span class="gh-meta-stat">
-                <span class="gh-stat-dot" />
-                <span>{nextGoing.going.length}人参加</span>
+            <div class="place">{place(nextGoing.practice)}</div>
+            <div class="ticket-meta">
+              <span class="meta-item">
+                <Icon name="people" size={16} />
+                {nextGoing.going.length}人
               </span>
-              <span class="gh-meta-stat">
-                1人あたり {nextGoing.perPerson != null ? yen(nextGoing.perPerson) : '—'}
-              </span>
-              {nextGoing.bookerName && (
-                <span class="gh-meta-stat">
-                  <Icon name="user" size={12} />
-                  <span>{nextGoing.bookerName}</span>
-                </span>
-              )}
+              <span class="fee">1人あたり {nextGoing.perPerson != null ? yen(nextGoing.perPerson) : '—'}</span>
             </div>
-          </article>
+          </button>
         ) : (
-          <div class="gh-blankslate">
-            <span>次の参加予定はありません。</span>
-          </div>
+          <div class="empty small">次の参加予定はありません</div>
         )}
       </section>
 
-      {/* 3. お知らせ / リリースノート（GitHub Contribution Activity タイムライン風） */}
-      <section class="home-section" style={{ marginTop: 24 }}>
-        <Tabs
-          value={subTab}
-          onChange={handleSelectSubTab}
-          items={[
-            {
-              key: 'notices',
-              label: 'お知らせ',
-              count: unreadStatus.unreadNoticesCount > 0 ? unreadStatus.unreadNoticesCount : undefined,
-            },
-            {
-              key: 'releases',
-              label: 'リリースノート',
-              count: unreadStatus.hasUnreadReleaseNote ? 1 : undefined,
-            },
-          ]}
-        />
+      <section class="section">
+        <div class="tabs-head">
+          <Tabs
+            value={subTab}
+            onChange={handleSelectSubTab}
+            items={[
+              {
+                key: 'notices',
+                label: 'お知らせ',
+                count: unreadStatus.unreadNoticesCount > 0 ? unreadStatus.unreadNoticesCount : undefined,
+              },
+              {
+                key: 'releases',
+                label: 'リリースノート',
+                count: unreadStatus.hasUnreadReleaseNote ? 1 : undefined,
+              },
+            ]}
+          />
+        </div>
 
         {subTab === 'notices' ? (
           notices.length === 0 ? (
-            <div class="gh-blankslate" style={{ marginTop: 12 }}>
-              <span>お知らせはありません。</span>
-            </div>
+            <div class="empty small">お知らせはありません</div>
           ) : (
-            <div class="gh-timeline">
+            <ul class="notice-list">
               {notices.map((n) => {
                 const isUnread = readAtBefore != null && n.updatedAt > readAtBefore;
                 return (
-                  <div key={n.id} class={`gh-timeline-item${isUnread ? ' is-unread' : ''}`}>
-                    <div class={`gh-timeline-badge ${n.kind}`}>
-                      <Icon
-                        name={
-                          n.kind === 'practice_canceled'
-                            ? 'x'
-                            : n.kind === 'practice_changed'
-                            ? 'edit'
-                            : 'user'
-                        }
-                        size={12}
-                      />
-                    </div>
-                    <button
-                      class="gh-timeline-body"
-                      onClick={() => go(`/p/${encodeURIComponent(n.practiceId)}`)}
-                    >
-                      <div class="gh-timeline-header">
-                        <span class="gh-timeline-title">
+                  <li key={n.id}>
+                    <button class={`notice${isUnread ? ' is-unread' : ''}`} onClick={() => go(`/p/${encodeURIComponent(n.practiceId)}`)}>
+                      <span class={`notice-icon ${n.kind}`}>
+                        <Icon name={n.kind === 'practice_canceled' ? 'x' : n.kind === 'practice_changed' ? 'edit' : 'user'} size={16} />
+                      </span>
+                      <span class="notice-body">
+                        <span class="notice-title">
+                          {isUnread && <span class="sr">未読 </span>}
                           {n.title}
-                          {isUnread && <span class="gh-unread-tag">未読</span>}
                         </span>
-                        <span class="gh-timeline-time">{formatNoticeTime(n.updatedAt)}</span>
-                      </div>
-                      <div class="gh-timeline-box">
-                        <span class="gh-timeline-detail">{n.detail}</span>
-                      </div>
+                        <span class="notice-sub">
+                          <span class="notice-detail">{n.detail}</span>
+                          <time>{formatNoticeTime(n.updatedAt)}</time>
+                        </span>
+                      </span>
                     </button>
-                  </div>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           )
         ) : RELEASE_NOTES.length === 0 ? (
-          <div class="gh-blankslate" style={{ marginTop: 12 }}>
-            <span>リリースノートはありません。</span>
-          </div>
+          <div class="empty small">リリースノートはありません</div>
         ) : (
-          <div class="gh-timeline">
-            {RELEASE_NOTES.map((rel) => {
-              const isLatest = rel.version === LATEST_RELEASE_VERSION;
-              return (
-                <div key={rel.version} class={`gh-timeline-item release${isLatest ? ' is-latest' : ''}`}>
-                  <div class="gh-timeline-badge release">
-                    <Icon name="note" size={12} />
+          <ul class="notice-list">
+            {RELEASE_NOTES.map((rel) => (
+              <li key={rel.version}>
+                <article class="release">
+                  <div class="release-head">
+                    <span class="ver">{rel.version}</span>
+                    {rel.version === LATEST_RELEASE_VERSION && <span class="label">最新</span>}
+                    <time>{rel.date}</time>
                   </div>
-                  <article class="gh-timeline-body release-body">
-                    <div class="gh-timeline-header">
-                      <div class="gh-release-title-row">
-                        <span class="gh-release-version">{rel.version}</span>
-                        {isLatest && <span class="gh-pill-badge latest">最新</span>}
-                      </div>
-                      <span class="gh-timeline-time">{rel.date}</span>
+                  {rel.summary && <p class="release-summary">{rel.summary}</p>}
+                  {rel.sections.map((sec) => (
+                    <div key={sec.heading} class="release-sec">
+                      <h4>{sec.heading}</h4>
+                      <ul>
+                        {sec.items.map((item, idx) => (
+                          <li key={idx}>{item}</li>
+                        ))}
+                      </ul>
                     </div>
-                    {rel.summary && <p class="gh-release-summary">{rel.summary}</p>}
-                    <div class="gh-release-content">
-                      {rel.sections.map((sec) => (
-                        <div key={sec.heading} class="gh-release-sec">
-                          <h4>{sec.heading}</h4>
-                          <ul>
-                            {sec.items.map((item, idx) => (
-                              <li key={idx}>{item}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      ))}
-                    </div>
-                  </article>
-                </div>
-              );
-            })}
-          </div>
+                  ))}
+                </article>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
     </>

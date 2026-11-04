@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { isMinePractice, labelDate, type Answer, type PracticeView } from '@studio-attendance/shared';
 import { api } from '../api';
-import { AvatarStack, CancelDeadlineBadge, FRESH_MS, Fee, Icon, RsvpButtons, Spinner, StatusBadge, Stub, Syncing, Tabs, go, place, useApp, useRunner } from '../ui';
+import { CancelDeadlineBadge, FRESH_MS, Fee, Icon, RsvpButtons, Spinner, StatusBadge, Stub, Syncing, Tabs, TopBar, go, place, useApp, useRunner } from '../ui';
 import { CalendarView } from './CalendarView';
 import { computeScrollOffset, hasPracticeOnDate, readScheduleViewMode, saveScheduleViewMode, type ScheduleViewMode } from './calendarLogic';
 
@@ -17,12 +17,12 @@ export function readTab(): Tab {
   }
 }
 
-/** 自分の回答状況を示すバッジ（シンプルな記号表示） */
+/** 自分の回答（○ △ ✕ の記号） */
 export function MyAnswerBadge({ answer }: { answer: Answer | null }) {
-  if (answer === '行く') return <span class="my-answer-badge going" title="行く" aria-label="行く">○</span>;
-  if (answer === '保留') return <span class="my-answer-badge maybe" title="未定" aria-label="未定">△</span>;
-  if (answer === '行かない') return <span class="my-answer-badge not-going" title="行かない" aria-label="行かない">✕</span>;
-  return <span class="my-answer-badge none" title="未回答" aria-label="未回答">—</span>;
+  if (answer === '行く') return <span class="my-answer going" title="行く" aria-label="行く">○</span>;
+  if (answer === '保留') return <span class="my-answer maybe" title="未定" aria-label="未定">△</span>;
+  if (answer === '行かない') return <span class="my-answer not-going" title="行かない" aria-label="行かない">✕</span>;
+  return <span class="my-answer none" title="未回答" aria-label="未回答">—</span>;
 }
 
 export function ListPage({ initialTab }: { initialTab?: string | null }) {
@@ -69,7 +69,7 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
       // 同一日に複数の予約情報がある場合も、その日の先頭チケットの位置に合わせてスクロールする
       const el = document.querySelector(`[data-ticket-date="${date}"]`);
       if (el) {
-        const headSticky = document.querySelector('.schedule-head-sticky');
+        const headSticky = document.querySelector('.schedule-head');
         const headBottom = headSticky ? headSticky.getBoundingClientRect().bottom : 140;
         const elRect = el.getBoundingClientRect();
         const offsetTop = computeScrollOffset(elRect.top, headBottom);
@@ -90,8 +90,15 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
 
   return (
     <>
-      <div class={`schedule-head-sticky${showCalendar ? ' has-calendar' : ''}`}>
-        <header class="tabs-head">
+      <TopBar title="予定">
+        {(practicesAt === 0 || busy) && <Syncing />}
+        <button type="button" class="icon-btn" onClick={handleToggleCalendar} aria-pressed={showCalendar} aria-label={showCalendar ? 'カレンダーを閉じる' : 'カレンダーを開く'}>
+          <Icon name={showCalendar ? 'x' : 'calendar'} />
+        </button>
+      </TopBar>
+
+      <div class="schedule-head">
+        <div class="tabs-head">
           <Tabs
             value={tab}
             onChange={selectTab}
@@ -100,51 +107,25 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
               { key: 'mine', label: '行く', count: list ? groups.mine.length : undefined },
             ]}
           />
-          <div class="tabs-head-right">
-            <button
-              type="button"
-              class={`cal-toggle-btn ${showCalendar ? 'active' : ''}`}
-              onClick={handleToggleCalendar}
-              aria-pressed={showCalendar}
-              aria-label="カレンダー"
-              title="カレンダー"
-            >
-              <Icon name="calendar" size={14} />
-              <span>カレンダー</span>
-            </button>
-            {(practicesAt === 0 || busy) && <Syncing />}
-          </div>
-        </header>
-
-        {showCalendar && (
-          <div class="cal-sticky-panel">
-            <CalendarView practices={shown} onSelectDate={handleSelectCalendarDate} />
-          </div>
-        )}
+        </div>
+        {showCalendar && <CalendarView practices={shown} onSelectDate={handleSelectCalendarDate} />}
       </div>
 
       {list == null ? (
         <Spinner />
       ) : shown.length === 0 ? (
         <div class="empty">
-          <div>{tab === 'mine' ? '行く予約情報はありません。' : '登録されている予約情報はありません。'}</div>
-          {tab === 'all' && <p class="note">所属グループの予約情報が出ないときは、そのグループの募集メッセージの「回答」から一度開いてください</p>}
-          {tab === 'all' && <p class="note">スタジオの予約は「募集」の右上の＋から登録できます</p>}
+          <div>{tab === 'mine' ? '行く予約情報はありません' : '予約情報はまだありません'}</div>
+          {tab === 'all' && <p class="note">グループの予約情報が出ないときは、そのグループの募集カードの「回答」から一度開いてください</p>}
         </div>
       ) : (
         <>
           <div class="ticket-grid">
             {shown.map((v) => (
-              <PracticeCard
-                key={v.practice.id}
-                v={v}
-                highlighted={highlightedDate === v.practice.date}
-              />
+              <PracticeCard key={v.practice.id} v={v} highlighted={highlightedDate === v.practice.date} />
             ))}
           </div>
-          <p class="note list-rsvp-note">
-            ※回答・変更は下のメニューの「RSVP」から行います
-          </p>
+          <p class="note center section">回答は下のメニューの「RSVP」からできます</p>
         </>
       )}
     </>
@@ -167,61 +148,44 @@ export function PracticeCard({
   highlighted?: boolean;
 }) {
   const { toast } = useApp();
-  const [shaking, setShaking] = useState(false);
   const p = v.practice;
   const open = () => go(`/p/${encodeURIComponent(p.id)}`);
 
   const handleBlocked = (reason: 'full' | 'closed') => {
-    if (reason === 'full') {
-      setShaking(true);
-      toast('満員のため「○ 行く」は選べません（未定または行かないを選択できます）', true);
-      setTimeout(() => setShaking(false), 450);
-    }
+    if (reason === 'full') toast('満員のため「行く」は選べません', true);
   };
 
   return (
     <article
-      class={`ticket${shaking ? ' is-shaking' : ''}${highlighted ? ' is-cal-highlighted' : ''}`}
+      class={`ticket${highlighted ? ' is-cal-highlighted' : ''}`}
       data-answer={v.myAnswer ?? 'none'}
       data-status={p.status}
       data-ticket-date={p.date}
     >
-      <Stub date={p.date} onClick={open} />
-      <button class="ticket-main" onClick={open}>
-        <span class="sr">{labelDate(p.date)}</span>
-        <div class="time">
-          {p.start}–{p.end}
-          <StatusBadge v={v} />
-          {v.bookerName && (
-            <span class="booker" title={`予約者: ${v.bookerName}`}>
-              <Icon name="user" size={11} />
-              <span>{v.bookerName}</span>
+      <div class="ticket-body">
+        <Stub date={p.date} onClick={open} />
+        <button class="ticket-main" onClick={open}>
+          <span class="sr">{labelDate(p.date)}</span>
+          <div class="time">
+            <span>
+              {p.start}–{p.end}
             </span>
-          )}
-        </div>
-        <div class="place">{place(p)}</div>
-        <CancelDeadlineBadge date={p.date} studio={p.studio} />
-        <div class="ticket-foot">
-          <AvatarStack names={v.going.map((a) => ({ name: a.name, guest: a.kind === 'ゲスト' }))} />
-          <span class="count">
-            <Icon name="people" size={14} />
-            {v.goingCount}
-            {p.max ? <small>/{p.max}</small> : null}
-            {p.status === '満員' && <span class="badge-full">FULL</span>}
-          </span>
-          <Fee v={v} />
-          <MyAnswerBadge answer={v.myAnswer} />
-        </div>
-      </button>
-      {onAnswer && (
-        <RsvpButtons
-          value={v.myAnswer}
-          status={p.status}
-          busy={busy}
-          onAnswer={onAnswer}
-          onBlocked={handleBlocked}
-        />
-      )}
+            <StatusBadge v={v} />
+            {!onAnswer && <MyAnswerBadge answer={v.myAnswer} />}
+          </div>
+          <div class="place">{place(p)}</div>
+          <div class="ticket-meta">
+            <span class="meta-item" aria-label={`行く ${v.goingCount}人`}>
+              <Icon name="people" size={16} />
+              {v.goingCount}
+              {p.max ? `/${p.max}` : ''}
+            </span>
+            <CancelDeadlineBadge date={p.date} studio={p.studio} soonOnly />
+            <Fee v={v} />
+          </div>
+        </button>
+      </div>
+      {onAnswer && <RsvpButtons value={v.myAnswer} status={p.status} busy={busy} onAnswer={onAnswer} onBlocked={handleBlocked} />}
     </article>
   );
 }

@@ -58,8 +58,8 @@ export function PracticePass({ v }: { v: PracticeView }) {
       status={p.status}
       fields={[
         { label: '時間', value: `${p.start}–${p.end}`, wide: true },
-        { label: 'スタジオ', value: p.studio, jp: true, wide: !p.room },
-        ...(p.room ? [{ label: '部屋', value: p.room, note: roomInfo(me.settings.studios, p.studio, p.room), jp: true }] : []),
+        { label: 'スタジオ', value: p.studio, wide: !p.room },
+        ...(p.room ? [{ label: '部屋', value: p.room, note: roomInfo(me.settings.studios, p.studio, p.room) }] : []),
         ...(deadline
           ? [
               {
@@ -69,16 +69,15 @@ export function PracticePass({ v }: { v: PracticeView }) {
                     {deadline.isPast ? 'キャンセル期限超過' : deadline.formatted}
                   </span>
                 ),
-                jp: true,
                 wide: true,
               },
             ]
           : []),
         { label: '1人あたり', value: v.perPerson != null ? yen(v.perPerson) : '—', note: p.feeOverride ? '調整済み' : null },
         { label: 'スタジオ代', value: yen(p.fee) },
-        { label: '参加人数', value: <>{v.goingCount}{p.max ? <small class="of">/{p.max}</small> : null} {p.status === '満員' && <span class="badge-full">FULL</span>}</>, note: p.min ? `最低人数 ${p.min}人` : null },
-        { label: '予約者', value: v.bookerName, jp: true },
-        ...(p.memo ? [{ label: 'メモ', value: p.memo, jp: true, wide: true }] : []),
+        { label: '参加人数', value: <>{v.goingCount}{p.max ? <small class="of"> / {p.max}</small> : null}</>, note: p.min ? `最低人数 ${p.min}人` : null },
+        { label: '予約者', value: v.bookerName },
+        ...(p.memo ? [{ label: 'メモ', value: p.memo, wide: true }] : []),
       ]}
     />
   );
@@ -98,7 +97,7 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
   if (!v) return <><TopBar back />{loading ? <Spinner /> : <div class="empty">予約情報が見つかりません</div>}</>;
   const p = v.practice;
   // 行くと答えたら、カレンダーに追加をすぐ下に出す
-  const calendar = <CalendarButtons v={v} highlight={going} compact={going} />;
+  const calendar = <CalendarButtons v={v} highlight={going} />;
 
   return (
     <>
@@ -107,7 +106,6 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
         {v.joinUrl && (
           <button
             class="icon-btn"
-            style={{ marginLeft: 'auto' }}
             aria-label="参加リンクを共有"
             onClick={async () => {
               if ((await shareLink(shareData(v, v.joinUrl!))) === 'copied') toast('参加リンクをコピーしました');
@@ -122,27 +120,19 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
         <div class="detail-primary">
           <PracticePass v={v} />
 
-          <div class="detail-rsvp-box">
-            <div class="detail-rsvp-row">
-              <div class="detail-rsvp-status">
-                <span class="muted" style={{ fontSize: '0.85rem' }}>あなたの回答:</span>
-                <MyAnswerBadge answer={v.myAnswer} />
-              </div>
-              {p.status !== '中止' && (
-                <button
-                  class="btn small primary"
-                  onClick={() => go(`/answer?r=${encodeURIComponent(p.id)}`)}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}
-                >
-                  <Icon name="check" size={14} />
-                  <span>{v.myAnswer == null ? '回答する' : '回答を変更'}</span>
-                </button>
-              )}
-            </div>
+          <div class="answer-row">
+            <span class="grow">あなたの回答</span>
+            <MyAnswerBadge answer={v.myAnswer} />
+            {p.status !== '中止' && (
+              <button class="btn small primary" onClick={() => go(`/answer?r=${encodeURIComponent(p.id)}`)}>
+                {v.myAnswer == null ? '回答する' : '回答を変更'}
+              </button>
+            )}
           </div>
 
           {going && (
-            <div ref={calRef} class="cal-inline" style={{ marginBottom: 20 }}>
+            <div ref={calRef}>
+              <div class="sec-head">カレンダーに追加</div>
               {calendar}
             </div>
           )}
@@ -156,7 +146,6 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
           {!going && (
             <>
               <div class="sec-head" ref={calRef}>
-                <Icon name="calendar" size={18} />
                 カレンダーに追加
               </div>
               {calendar}
@@ -165,7 +154,7 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
 
           {/* 古いお知らせのリンクなどから開いた予約者が、直す・消す場所に迷わないように */}
           {v.canEdit && (
-            <p class="note" style={{ marginTop: 20 }}>
+            <p class="note section">
               編集・削除は{' '}
               <a href={`#/recruit/${encodeURIComponent(p.id)}`}>「募集」のこの予約情報</a>
               から
@@ -178,17 +167,17 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
 }
 
 /** カレンダーに追加。iPhone・Mac なら iPhone のカレンダーを、それ以外なら Google を大きく出す */
-function CalendarButtons({ v, highlight, compact = false }: { v: PracticeView; highlight: boolean; compact?: boolean }) {
+function CalendarButtons({ v, highlight }: { v: PracticeView; highlight: boolean }) {
   const ics = { label: 'iPhone', open: () => openCalendar(v.icsUrl, 'ics') };
   const google = { label: 'Google', open: () => openCalendar(v.googleCalendarUrl, 'google') };
   const [first, second] = prefersIcs() ? [ics, google] : [google, ics];
   return (
-    <div class={`grid2${compact ? ' compact' : ''}`}>
-      <button class={`btn ${compact ? 'small ' : ''}${highlight ? 'primary' : 'ghost'}`} onClick={first.open}>
-        <Icon name="calendar" size={compact ? 13 : 16} />
+    <div class="grid2">
+      <button class={`btn${highlight ? ' primary' : ''}`} onClick={first.open}>
+        <Icon name="calendar" size={18} />
         {first.label}
       </button>
-      <button class={`btn ${compact ? 'small ' : ''}ghost`} onClick={second.open}>
+      <button class="btn" onClick={second.open}>
         {second.label}
       </button>
     </div>
@@ -207,9 +196,7 @@ function Attendees({ v, onRemove }: { v: PracticeView; onRemove: (a: AttendeeVie
   return (
     <div class="attendees-section">
       <div class="sec-head">
-        <Icon name="people" size={18} />
-        参加者
-        <span class="n">{total}</span>
+        参加者 <span class="n">{total}</span>
       </div>
       {groups.map(({ key, mark, label, people }) =>
         people.length === 0 ? null : (
@@ -218,8 +205,8 @@ function Attendees({ v, onRemove }: { v: PracticeView; onRemove: (a: AttendeeVie
               <span class="attendee-mark" aria-hidden="true">
                 {mark}
               </span>
-              <span class="attendee-label">{label}</span>
-              <span class="attendee-count">{people.length}</span>
+              <span>{label}</span>
+              <span class="n">{people.length}</span>
             </div>
             <div class={`people${key === 'notGoing' ? ' dim' : ''}`}>
               {people.map((a) => (
@@ -237,7 +224,7 @@ function Attendees({ v, onRemove }: { v: PracticeView; onRemove: (a: AttendeeVie
           </div>
         ),
       )}
-      {total === 0 && <div class="muted">まだ誰も回答していません</div>}
+      {total === 0 && <p class="note">まだ誰も回答していません</p>}
     </div>
   );
 }
@@ -272,13 +259,13 @@ export function EditForm({
 
   return (
     <>
-      <details class="menu edit">
+      <details class="menu section">
         <summary class="menu-row">
           <Icon name="edit" size={20} />
           <span class="grow">編集</span>
           <Icon name="chevron" size={18} />
         </summary>
-        <section class="card" style={{ margin: 0, borderRadius: 0 }}>
+        <div class="menu-item">
           <div class="grid2">
             <label class="field">
               <span>開始</span>
@@ -326,15 +313,10 @@ export function EditForm({
           >
             保存
           </button>
-          <button
-            class="btn danger block"
-            style={{ marginTop: 12 }}
-            disabled={busy}
-            onClick={() => setConfirming(true)}
-          >
+          <button class="btn danger block" disabled={busy} onClick={() => setConfirming(true)}>
             削除する
           </button>
-        </section>
+        </div>
       </details>
 
       <DeleteConfirmDialog
