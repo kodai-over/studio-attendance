@@ -7,7 +7,8 @@ import {
   type PracticeView,
 } from '@studio-attendance/shared';
 
-export type StageMap = Map<string, Answer>;
+/** 下書きの回答。null は「回答を取り消して未回答に戻す」 */
+export type StageMap = Map<string, Answer | null>;
 
 export interface DraftStore {
   specific: StageMap;
@@ -22,13 +23,13 @@ export function isValidAnswer(v: unknown): v is Answer {
   return typeof v === 'string' && VALID_ANSWERS.has(v as Answer);
 }
 
-function isValidDraftEntry(entry: unknown): entry is [string, Answer] {
+function isValidDraftEntry(entry: unknown): entry is [string, Answer | null] {
   return (
     Array.isArray(entry) &&
     entry.length === 2 &&
     typeof entry[0] === 'string' &&
     entry[0].length > 0 &&
-    isValidAnswer(entry[1])
+    (entry[1] === null || isValidAnswer(entry[1]))
   );
 }
 
@@ -162,7 +163,7 @@ export function pruneStaleDrafts(list: PracticeView[]): void {
 export interface SpecificChange {
   practice: PracticeView['practice'];
   from: Answer | null;
-  to: Answer;
+  to: Answer | null;
 }
 
 export type SpecificChangeMap = Map<string, SpecificChange>;
@@ -177,7 +178,7 @@ export function recordSpecificChange(
   current: SpecificChangeMap,
   practice: PracticeView['practice'],
   originalAnswer: Answer | null,
-  newAnswer: Answer,
+  newAnswer: Answer | null,
 ): SpecificChangeMap {
   const next = new Map(current);
   const existing = next.get(practice.id);
@@ -196,7 +197,8 @@ export function recordSpecificChange(
 
 export interface ModifiedItem {
   id: string;
-  answer: Answer;
+  /** null は回答の取り消し */
+  answer: Answer | null;
   originalAnswer: Answer | null;
   practice: PracticeView['practice'];
 }
@@ -208,7 +210,7 @@ export interface ModifiedItem {
 export function stageAnswer(
   staged: StageMap,
   id: string,
-  answer: Answer,
+  answer: Answer | null,
   originalAnswer: Answer | null,
 ): StageMap {
   const next = new Map(staged);
@@ -439,6 +441,13 @@ export async function runTellWorkflow({
 }
 
 /**
+ * まだ回答を決めきれていない予約情報か。未回答に加え、「未定」と答えたものも RSVP の「未回答」に入れる
+ */
+export function needsAnswer(v: Pick<PracticeView, 'myAnswer'>): boolean {
+  return v.myAnswer == null || v.myAnswer === '保留';
+}
+
+/**
  * 選択中グループに合致する予約情報を抽出する。
  * groups が空の予約情報（登録のみ等）や、自分が予約者の予約情報はどのグループ選択時にも表示する。
  * また、参加リンク回答やグループ脱退後など、所属外グループ宛でも自分が回答済みの予約情報は回答変更できるよう表示する。
@@ -523,7 +532,7 @@ export function generateSpecificReport(changes: Iterable<SpecificChange>): strin
   const items = Array.from(changes).filter((c) => c.practice.status !== '中止');
   if (items.length === 0) return '';
 
-  const newAnswers = items.filter((c) => c.from == null);
+  const newAnswers = items.filter((c) => c.from == null && c.to != null);
   const changedAnswers = items.filter((c) => c.from != null);
 
   const parts: string[] = [];
@@ -582,7 +591,7 @@ export function getUnansweredSummary(
   const rsvpTargets = practices.filter((v) =>
     isRsvpTarget(v, me.member.userId, me.member.groups, today, currentTime),
   );
-  const totalCount = rsvpTargets.filter((v) => v.myAnswer == null).length;
+  const totalCount = rsvpTargets.filter(needsAnswer).length;
 
   const groups = userGroups.map((g) => {
     const unansweredCount = filterGroupPractices(
@@ -590,7 +599,7 @@ export function getUnansweredSummary(
       g.id,
       me.member.userId,
       myGroupIds,
-    ).filter((v) => v.myAnswer == null).length;
+    ).filter(needsAnswer).length;
     return { id: g.id, name: g.name, unansweredCount };
   });
 
@@ -694,13 +703,14 @@ export function mergePracticesWithKeep(
  */
 export interface StageAnswerParams {
   id: string;
-  answer: Answer;
+  /** null は回答の取り消し（未回答に戻す） */
+  answer: Answer | null;
   isSpecific: boolean;
   fresh: boolean;
   busy: boolean;
   saving: boolean;
   originalPractice?: PracticeView;
-  apiSave: (id: string, answer: Answer) => Promise<PracticeView>;
+  apiSave: (id: string, answer: Answer | null) => Promise<PracticeView>;
   touchPractice: (id: string) => void;
   untouchPractice?: (id: string) => void;
   updatePractice: (updated: PracticeView) => void;
@@ -721,7 +731,7 @@ export async function executeStageAnswer(
       const updated = await params.apiSave(params.id, params.answer);
       params.updatePractice(updated);
       params.onSpecificSaved(updated, params.originalPractice.myAnswer);
-      params.toast('回答を記録しました');
+      params.toast(params.answer == null ? '回答を取り消しました' : '回答を記録しました');
       return 'saved';
     } catch (e) {
       params.untouchPractice?.(params.id);

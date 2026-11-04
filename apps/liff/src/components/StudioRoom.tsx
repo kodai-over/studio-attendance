@@ -25,7 +25,7 @@ export function StudioSelect({ studios, value, onChange }: { studios: StudioDef[
         <option value={OTHER_STUDIO}>{OTHER_STUDIO}</option>
       </select>
       {selected === OTHER_STUDIO && (
-        <input type="text" style={{ marginTop: 6 }} placeholder="スタジオ名" value={value} onInput={(e) => onChange(e.currentTarget.value)} />
+        <input type="text" placeholder="スタジオ名" value={value} onInput={(e) => onChange(e.currentTarget.value)} />
       )}
     </>
   );
@@ -58,18 +58,14 @@ export function RoomSelect({ studios, studio, value, onChange }: { studios: Stud
         <option value={OTHER_ROOM}>その他（手入力）</option>
       </select>
       {selected === OTHER_ROOM && (
-        <input type="text" style={{ marginTop: 6 }} placeholder="部屋名" value={value} onInput={(e) => onChange(e.currentTarget.value)} />
+        <input type="text" placeholder="部屋名" value={value} onInput={(e) => onChange(e.currentTarget.value)} />
       )}
     </>
   );
 }
 
 /** 部屋の広さなどの補足（一覧にあるときだけ） */
-export function RoomInfo({ studios, studio, room, style }: { studios: StudioDef[]; studio: string; room: string; style?: Record<string, string | number> }) {
+export function RoomInfo({ studios, studio, room }: { studios: StudioDef[]; studio: string; room: string }) {
   const info = roomInfo(studios, studio, room);
-  return info ? (
-    <div class="room-info" style={style}>
-      {info}
-    </div>
-  ) : null;
+  return info ? <div class="room-info">{info}</div> : null;
 }

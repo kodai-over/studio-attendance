@@ -407,7 +407,7 @@ export function answerReport(items: { practice: Pick<Practice, 'date' | 'start'>
  * 変更前と変更後の回答を明示し、どういう変更をしたかがわかるようにする。
  */
 export function answerChangeReport(
-  items: { practice: Pick<Practice, 'date' | 'start'>; from: Answer | null; to: Answer }[],
+  items: { practice: Pick<Practice, 'date' | 'start'>; from: Answer | null; to: Answer | null }[],
 ): string | null {
   if (items.length === 0) return null;
 

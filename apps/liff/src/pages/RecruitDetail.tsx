@@ -36,12 +36,10 @@ export function RecruitDetailPage({ id }: { id: string }) {
         <div class="detail-side">
           <section>
             <div class="sec-head">
-              <Icon name="people" size={18} />
-              ゲスト
-              {guests.length > 0 && <span class="n">{guests.length}</span>}
+              ゲスト {guests.length > 0 && <span class="n">{guests.length}</span>}
             </div>
             {guests.length > 0 && (
-              <div class="people" style={{ marginBottom: 10 }}>
+              <div class="people section-gap-bottom">
                 {guests.map((a) => (
                   <span class="person">
                     <Avatar name={a.name} guest />
@@ -106,24 +104,21 @@ function RecruitForm({ v, onSend, busy }: { v: PracticeView; onSend: (groups: st
   const canSend = v.canEdit && me.groups.some((g) => !sent(g.id));
   return (
     <section>
-      <div class="sec-head">
-        <Icon name="send" size={18} />
-        グループに募集
-      </div>
+      <div class="sec-head">グループに募集</div>
       {me.groups.length === 0 ? (
         <p class="note">Botをグループに招待すると送れます</p>
       ) : (
         <>
-          <div class="toggles">
+          <div class="chips">
             {me.groups.map((g) =>
               sent(g.id) || !v.canEdit ? (
-                <button class="toggle" disabled aria-label={`${g.name}（${sent(g.id) ? '募集済' : '未募集'}）`}>
+                <button class="chip" disabled aria-label={`${g.name}（${sent(g.id) ? '募集済' : '未募集'}）`}>
                   {sent(g.id) && <Icon name="check" size={16} />}
                   {g.name}
                 </button>
               ) : (
                 <button
-                  class="toggle"
+                  class="chip"
                   aria-pressed={picked.includes(g.id)}
                   onClick={() => setPicked(picked.includes(g.id) ? picked.filter((x) => x !== g.id) : [...picked, g.id])}
                 >
@@ -135,8 +130,7 @@ function RecruitForm({ v, onSend, busy }: { v: PracticeView; onSend: (groups: st
           {!v.canEdit && <p class="note">送れるのは予約者と管理者です</p>}
           {canSend && (
             <button
-              class="btn primary block"
-              style={{ marginTop: 12 }}
+              class="btn primary block section-gap"
               disabled={busy || picked.length === 0}
               onClick={async () => {
                 if (await onSend(picked)) setPicked([]);
@@ -169,11 +163,7 @@ function JoinLink({ v }: { v: PracticeView }) {
   };
   return (
     <section>
-      <div class="sec-head">
-        <Icon name="link" size={18} />
-        参加リンク
-        <span class="muted">LINEなしで回答</span>
-      </div>
+      <div class="sec-head">参加リンク</div>
       <div class="copy-row">
         <code>{url.replace(/^https?:\/\//, '')}</code>
         <button class="icon-btn" aria-label="参加リンクをコピー" onClick={copy}>
@@ -183,6 +173,7 @@ function JoinLink({ v }: { v: PracticeView }) {
           <Icon name="share" size={18} />
         </button>
       </div>
+      <p class="note">LINEを使わない人も、このリンクから回答できます</p>
     </section>
   );
 }

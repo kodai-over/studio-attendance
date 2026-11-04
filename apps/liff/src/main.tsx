@@ -17,22 +17,34 @@ import { AdminPage, SettingsPage } from './pages/Settings';
 import { resolveInitialHash } from './route';
 import './styles.css';
 import { initTheme } from './theme';
-import { AppContext, FRESH_MS, NavBar, Spinner, go, useRoute, useToast } from './ui';
+import { AppContext, FRESH_MS, NavBar, PullToRefresh, Spinner, go, useApp, useRoute, useToast } from './ui';
 
 initTheme();
 
 function Router() {
   const { path, query } = useRoute();
-  if (path[0] === 'home') return <HomePage />;
-  if (path[0] === 'p' && path[1]) return <DetailPage id={path[1]} focus={query.get('cal') === '1' ? 'calendar' : null} />;
-  if (path[0] === 'answer') return <AnswerPage ids={query.getAll('r')} />;
-  if (path[0] === 'recruit' && path[1]) return <RecruitDetailPage id={path[1]} />;
-  if (path[0] === 'recruit') return <RecruitListPage />;
-  if (path[0] === 'register') return <RegisterPage draftId={query.get('draft')} recruit={query.get('recruit') === '1'} />;
-  if (path[0] === 'settings') return <SettingsPage />;
-  if (path[0] === 'admin') return <AdminPage />;
-  if (path[0] === 'feedback') return <FeedbackPage />;
-  return <ListPage initialTab={query.get('tab')} />;
+  const { loadHome } = useApp();
+  const page =
+    path[0] === 'home' ? <HomePage />
+    : path[0] === 'p' && path[1] ? <DetailPage id={path[1]} focus={query.get('cal') === '1' ? 'calendar' : null} />
+    : path[0] === 'answer' ? <AnswerPage ids={query.getAll('r')} />
+    : path[0] === 'recruit' && path[1] ? <RecruitDetailPage id={path[1]} />
+    : path[0] === 'recruit' ? <RecruitListPage />
+    : path[0] === 'register' ? <RegisterPage draftId={query.get('draft')} recruit={query.get('recruit') === '1'} />
+    : path[0] === 'settings' ? <SettingsPage />
+    : path[0] === 'admin' ? <AdminPage />
+    : path[0] === 'feedback' ? <FeedbackPage />
+    : <ListPage initialTab={query.get('tab')} />;
+  // 引っ張って更新は一覧の画面だけ（入力中の画面や回答の下書きがある画面では使わない）
+  const refreshable = path.length === 0 || (path.length === 1 && (path[0] === 'home' || path[0] === 'recruit'));
+  return (
+    <>
+      {refreshable && <PullToRefresh onRefresh={loadHome} />}
+      <div class="page" key={path.join('/')}>
+        {page}
+      </div>
+    </>
+  );
 }
 
 const CACHE_KEY = 'pb:home';

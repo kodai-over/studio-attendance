@@ -37,7 +37,6 @@ export function CalendarEventChip({
       aria-label={chipAriaLabel}
     >
       <span class="cal-chip-dot" aria-hidden="true" />
-      <span class="cal-chip-count">{countStr}</span>
     </div>
   );
 }
@@ -45,9 +44,12 @@ export function CalendarEventChip({
 export function CalendarView({
   practices,
   onSelectDate,
+  compact = false,
 }: {
   practices: PracticeView[];
   onSelectDate?: (date: string) => void;
+  /** スクロール中は、選んだ日（なければ今日）の週だけに縮める */
+  compact?: boolean;
 }) {
   const app = useApp();
   const toneSettings = app?.me?.settings;
@@ -65,7 +67,14 @@ export function CalendarView({
     resolveInitialSelectedDate(currentYear, currentMonth, practicesByDate, todayIso),
   );
 
-  const days = buildMonthDays(currentYear, currentMonth, todayIso);
+  const monthDays = buildMonthDays(currentYear, currentMonth, todayIso);
+  const anchor = Math.max(
+    0,
+    [selectedDate, todayIso].map((d) => monthDays.findIndex((x) => x.date === d)).find((i) => i >= 0) ??
+      monthDays.findIndex((x) => x.isCurrentMonth),
+  );
+  const anchorWeek = Math.floor(anchor / 7);
+  const weeks = Array.from({ length: Math.ceil(monthDays.length / 7) }, (_, i) => monthDays.slice(i * 7, i * 7 + 7));
 
   const handlePrevMonth = () => {
     const prev = getPrevMonth(currentYear, currentMonth);
@@ -100,41 +109,31 @@ export function CalendarView({
   };
 
   return (
-    <div class="ios-calendar">
-      {/* 1. 年月ヘッダー & ナビゲーション */}
-      <div class="cal-nav-header">
+    <div class={`calendar${compact ? ' compact' : ''}`}>
+      <div class="cal-fold" aria-hidden={compact} data-open={!compact}>
+        <div class="cal-fold-inner">
+      <div class="cal-nav">
         <span class="cal-year-month">{formatYearMonth(currentYear, currentMonth)}</span>
-        <div class="cal-nav-controls">
-          <button
-            type="button"
-            class="cal-nav-today-btn"
-            onClick={handleToday}
-            disabled={currentYear === tY && currentMonth === tM && selectedDate === todayIso}
-          >
-            今日
-          </button>
-          <div class="cal-nav-pager">
-            <button
-              type="button"
-              class="cal-pager-btn"
-              onClick={handlePrevMonth}
-              aria-label="前月"
-            >
-              <Icon name="back" size={13} />
-            </button>
-            <button
-              type="button"
-              class="cal-pager-btn"
-              onClick={handleNextMonth}
-              aria-label="翌月"
-            >
-              <Icon name="chevron" size={13} />
-            </button>
-          </div>
+        <button
+          type="button"
+          class="btn plain small"
+          onClick={handleToday}
+          disabled={currentYear === tY && currentMonth === tM && selectedDate === todayIso}
+        >
+          今日
+        </button>
+        <button type="button" class="icon-btn" onClick={handlePrevMonth} aria-label="前月">
+          <Icon name="back" size={18} />
+        </button>
+        <button type="button" class="icon-btn" onClick={handleNextMonth} aria-label="翌月">
+          <Icon name="chevron" size={18} />
+        </button>
+      </div>
+
         </div>
       </div>
 
-      {/* 2. 曜日バー */}
+      {/* 曜日 */}
       <div class="cal-weekday-row">
         {WEEKDAY_NAMES.map((w, idx) => (
           <div
@@ -146,8 +145,10 @@ export function CalendarView({
         ))}
       </div>
 
-      {/* 3. 月間グリッド */}
-      <div class="cal-grid">
+      {/* 日付。縮めたときは選んだ日の週だけを残し、ほかの週はたたむ */}
+      {weeks.map((days, wi) => (
+        <div key={days[0].date} class="cal-fold" aria-hidden={compact && wi !== anchorWeek} data-open={!compact || wi === anchorWeek}>
+          <div class="cal-fold-inner cal-grid">
         {days.map((day) => {
           const isSelected = day.date === selectedDate;
           const practicesOnDay = practicesByDate.get(day.date) ?? [];
@@ -182,7 +183,9 @@ export function CalendarView({
             </button>
           );
         })}
-      </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

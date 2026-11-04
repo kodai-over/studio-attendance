@@ -24,19 +24,15 @@ function ActAsSwitch() {
   };
   return (
     <>
-      <div class="section-title">見え方の確認</div>
-      <section class="card">
-        <div class="muted" style={{ marginBottom: 8, fontSize: 12 }}>
-          「一般」では所属グループの予約情報のみ表示。「admin」（予約者）で予約情報を登録・募集し、自分に切り替えることで参加者からの見え方をテストできます。アプリを閉じると管理者に戻ります。
-        </div>
-        <div class="toggles">
-          {(['self', 'member', 'test'] as ActAs[]).map((v) => (
-            <button class="toggle" aria-pressed={me.actAs === v} disabled={busy} onClick={() => me.actAs !== v && change(v)}>
-              {ACT_AS_LABEL[v]}
-            </button>
-          ))}
-        </div>
-      </section>
+      <div class="sec-head">見え方の確認</div>
+      <div class="chips">
+        {(['self', 'member', 'test'] as ActAs[]).map((v) => (
+          <button class="chip" aria-pressed={me.actAs === v} disabled={busy} onClick={() => me.actAs !== v && change(v)}>
+            {ACT_AS_LABEL[v]}
+          </button>
+        ))}
+      </div>
+      <p class="note">参加者からの見え方を確かめられます。アプリを閉じると管理者に戻ります</p>
     </>
   );
 }
@@ -72,103 +68,84 @@ export function SettingsPage() {
     <>
       <TopBar title="アカウント" showTheme />
 
-      {/* プロフィールカード（添付画像スタイル） */}
-      <section class="account-card">
-        <div class="account-avatar-wrap">
-          {profile?.pictureUrl ? (
-            <img class="account-avatar-img" src={profile.pictureUrl} alt={me.member.name} />
-          ) : (
-            <div class="account-avatar-fallback">
-              {[...me.member.name.trim()][0] ?? '?'}
-            </div>
-          )}
-        </div>
-        <div class="account-details">
-          {editing ? (
-            <form
-              class="account-edit-form"
-              onSubmit={(e) => {
-                e.preventDefault();
-                save();
-              }}
-            >
-              <input
-                type="text"
-                value={name}
-                maxLength={20}
-                aria-label="表示名"
-                autoFocus
-                onInput={(e) => setName(e.currentTarget.value)}
-              />
-              <button class="account-icon-btn check" aria-label="保存" disabled={busy || !name.trim()}>
-                <Icon name="check" size={16} />
-              </button>
-              <button
-                type="button"
-                class="account-icon-btn cancel"
-                aria-label="キャンセル"
-                onClick={() => {
-                  setName(me.member.name);
-                  setEditing(false);
-                }}
-              >
-                <Icon name="x" size={16} />
-              </button>
-            </form>
-          ) : (
-            <div class="account-name-row">
-              <span class="account-name">{me.member.name}</span>
-              <button class="account-edit-trigger" aria-label="表示名を変更" onClick={() => setEditing(true)}>
-                <Icon name="edit" size={15} />
-              </button>
-            </div>
-          )}
-          <div class="account-status-badge">
-            <span class="check-dot">✓</span>
-            <span>LINEアカウント連携済み</span>
-            {isBoss && <span class="role-pill">管理者</span>}
+      <section class="profile">
+        {profile?.pictureUrl ? (
+          <img class="profile-avatar" src={profile.pictureUrl} alt="" />
+        ) : (
+          <div class="profile-avatar" aria-hidden="true">
+            {[...me.member.name.trim()][0] ?? '?'}
           </div>
-        </div>
+        )}
+        {editing ? (
+          <form
+            class="profile-edit"
+            onSubmit={(e) => {
+              e.preventDefault();
+              save();
+            }}
+          >
+            <input type="text" value={name} maxLength={20} aria-label="表示名" autoFocus onInput={(e) => setName(e.currentTarget.value)} />
+            <button class="round-btn" aria-label="保存" disabled={busy || !name.trim()}>
+              <Icon name="check" size={20} />
+            </button>
+          </form>
+        ) : (
+          <div>
+            <div class="profile-name">
+              <span>{me.member.name}</span>
+              <button class="icon-btn" aria-label="表示名を変更" onClick={() => setEditing(true)}>
+                <Icon name="edit" size={18} />
+              </button>
+            </div>
+            <div class="profile-sub">
+              <span>LINEと連携済み</span>
+              {isBoss && <span class="label">管理者</span>}
+            </div>
+          </div>
+        )}
+        {editing && (
+          <button
+            type="button"
+            class="btn plain small"
+            onClick={() => {
+              setName(me.member.name);
+              setEditing(false);
+            }}
+          >
+            キャンセル
+          </button>
+        )}
       </section>
 
-      {/* 管理者のみ表示 */}
-      {isBoss && (
-        <>
-          {me.canSwitch && <ActAsSwitch />}
+      {isBoss && me.canSwitch && <ActAsSwitch />}
 
-          <div class="section-title">管理</div>
-          <ul class="menu" style={{ marginTop: 8 }}>
-            <li>
-              <button class="menu-row" onClick={() => go('/admin')}>
-                <Icon name="gear" size={20} />
-                <span class="grow">管理画面</span>
-                <span class="val">グループ・メンバー・スタジオ・料金</span>
-                <Icon name="chevron" size={18} />
-              </button>
-            </li>
-          </ul>
-        </>
-      )}
-
-      <div class="section-title">要望</div>
-      <ul class="menu" style={{ marginTop: 8 }}>
+      <div class="sec-head">{isBoss ? '管理と要望' : '要望'}</div>
+      <ul class="menu">
+        {isBoss && (
+          <li>
+            <button class="menu-row" onClick={() => go('/admin')}>
+              <Icon name="gear" size={22} />
+              <span class="grow">管理画面</span>
+              <Icon name="chevron" size={18} />
+            </button>
+          </li>
+        )}
         <li>
           <button class="menu-row" onClick={() => go('/feedback')}>
-            <Icon name="chat" size={20} />
+            <Icon name="chat" size={22} />
             <span class="grow">要望を送る</span>
-            <span class="val">管理者に送信</span>
             <Icon name="chevron" size={18} />
           </button>
         </li>
       </ul>
 
-      {/* ログアウトボタン（添付画像スタイル） */}
-      <div class="account-logout-section">
-        <button class="account-logout-btn" onClick={() => confirm('ログアウトしますか？') && logoutApp()}>
-          <Icon name="logout" size={18} />
-          <span>ログアウト</span>
-        </button>
-      </div>
+      <ul class="menu section">
+        <li>
+          <button class="menu-row danger" onClick={() => confirm('ログアウトしますか？') && logoutApp()}>
+            ログアウト
+          </button>
+        </li>
+      </ul>
     </>
   );
 }
@@ -220,58 +197,56 @@ export function AdminPage() {
   };
 
   const tabs = [
-    { key: 'members' as const, label: 'メンバー・グループ', count: members?.length },
-    { key: 'studios' as const, label: 'スタジオ・部屋', count: studios.length },
-    { key: 'fees' as const, label: '料金・共通ルール' },
+    { key: 'members' as const, label: 'メンバー', count: members?.length },
+    { key: 'studios' as const, label: 'スタジオ', count: studios.length },
+    { key: 'fees' as const, label: '料金・ルール' },
   ];
 
   return (
     <>
       <TopBar title="管理画面" back showTheme />
 
-      <Tabs items={tabs} value={tab} onChange={setTab} />
+      <div class="tabs-head">
+        <Tabs items={tabs} value={tab} onChange={setTab} />
+      </div>
 
       {tab === 'members' && (
-        <div class="admin-tab-pane">
-          <div class="section-title">登録グループ（{me.groups.length}）</div>
-          <section class="card">
-            {me.groups.length === 0 ? (
-              <div class="muted">Botをグループに招待すると自動で登録されます</div>
-            ) : (
-              <div class="admin-groups-list">
-                {me.groups.map((g) => (
-                  <div key={g.id} class="admin-group-item">
-                    <Icon name="people" size={16} />
-                    <strong>{g.name}</strong>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div class="muted" style={{ marginTop: 8, fontSize: 11 }}>
-              ※ グループ名はLINEのグループ名に1時間ごとに自動同期されます
-            </div>
-          </section>
-
-          <div class="section-title">メンバー一覧</div>
-          <div class="muted" style={{ marginBottom: 10, fontSize: 12 }}>
-            予約情報が見えるのは、予約者・送り先グループのメンバー・回答者・管理者です。
+        <div>
+          <div class="sec-head">
+            登録グループ <span class="n">{me.groups.length}</span>
           </div>
+          {me.groups.length === 0 ? (
+            <p class="note">Botをグループに招待すると自動で登録されます</p>
+          ) : (
+            <>
+              <ul class="menu">
+                {me.groups.map((g) => (
+                  <li key={g.id}>
+                    <div class="menu-row">
+                      <Icon name="people" size={20} />
+                      <span class="grow">{g.name}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <p class="note">グループ名はLINEのグループ名と1時間ごとにそろえます</p>
+            </>
+          )}
+
+          <div class="sec-head">メンバー</div>
+          <p class="note">予約情報が見えるのは、予約者・送り先のメンバー・回答者・管理者です</p>
 
           {members == null ? (
             <Spinner />
           ) : (
             <div class="card-grid">
               {members.map((m) => (
-                <section class="card admin-member-card" key={m.userId}>
-                  <div class="row" style={{ alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-                      <Avatar name={m.name} />
-                      <strong class="grow" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {m.name}
-                      </strong>
-                    </div>
+                <section class="card" key={m.userId}>
+                  <div class="row">
+                    <Avatar name={m.name} />
+                    <strong class="grow ellipsis">{m.name}</strong>
                     <select
-                      style={{ width: 'auto', minWidth: 90 }}
+                      class="auto"
                       value={m.role}
                       disabled={busy}
                       onChange={(e) => saveMember(m.userId, { role: e.currentTarget.value as Role })}
@@ -283,13 +258,11 @@ export function AdminPage() {
                   </div>
 
                   {me.groups.length > 0 && (
-                    <div class="admin-member-groups" style={{ marginTop: 10 }}>
-                      <div class="muted" style={{ fontSize: 11, marginBottom: 4 }}>
-                        所属グループ（発言や予約閲覧で自動付与）:
-                      </div>
-                      <div class="check-chips">
+                    <div>
+                      <div class="field-label">所属（発言や予約情報を開くと自動で付きます）</div>
+                      <div class="chips">
                         {me.groups.map((g) => (
-                          <label key={g.id} class="check-chip">
+                          <label key={g.id} class="chip">
                             <input
                               type="checkbox"
                               checked={m.groups.includes(g.id)}
@@ -305,12 +278,10 @@ export function AdminPage() {
                         ))}
                       </div>
 
-                      <div class="muted" style={{ fontSize: 11, marginTop: 8, marginBottom: 4 }}>
-                        ふだんの送り先:
-                      </div>
-                      <div class="check-chips">
+                      <div class="field-label">ふだんの送り先</div>
+                      <div class="chips">
                         {me.groups.map((g) => (
-                          <label key={g.id} class="check-chip">
+                          <label key={g.id} class="chip">
                             <input
                               type="checkbox"
                               checked={m.defaultGroups.includes(g.id)}
@@ -337,23 +308,21 @@ export function AdminPage() {
       )}
 
       {tab === 'studios' && (
-        <div class="admin-tab-pane">
+        <div>
           <StudioEditor studios={studios} onChange={setStudios} />
-          <button class="btn primary block" style={{ marginTop: 20 }} disabled={busy} onClick={saveSettings}>
+          <button class="btn primary block section" disabled={busy} onClick={saveSettings}>
             スタジオ・部屋の変更を保存
           </button>
         </div>
       )}
 
       {tab === 'fees' && (
-        <div class="admin-tab-pane">
-          <div class="section-title">スタジオ代の料金表（30分あたり）</div>
-          <section class="card">
-            <div class="muted" style={{ marginBottom: 10, fontSize: 12 }}>
-              予約登録時に料金を自動計算します。部屋が空欄＝全部屋共通、時間が空欄＝終日適用。
-            </div>
+        <div>
+          <div class="sec-head">スタジオ代の料金表（30分あたり）</div>
+          <p class="note">予約登録のときにスタジオ代を計算します。部屋が空欄なら全部屋、時間が空欄なら終日に使います</p>
+          <div class="card-grid">
             {fees.map((f, i) => (
-              <div class="fee-rule-card" key={i}>
+              <section class="card" key={i}>
                 <div class="grid3">
                   <input type="text" placeholder="スタジオ" value={f.studio} onInput={(e) => setFee(i, { studio: e.currentTarget.value })} />
                   <input type="text" placeholder="部屋" value={f.room} onInput={(e) => setFee(i, { room: e.currentTarget.value })} />
@@ -363,7 +332,7 @@ export function AdminPage() {
                     <option value="土日祝">土日祝</option>
                   </select>
                 </div>
-                <div class="grid3" style={{ marginTop: 6 }}>
+                <div class="grid3">
                   <input
                     type="text"
                     inputMode="numeric"
@@ -385,23 +354,22 @@ export function AdminPage() {
                     onInput={(e) => setFee(i, { fee: Number(e.currentTarget.value) })}
                   />
                 </div>
-                <button class="btn small danger" style={{ marginTop: 8 }} onClick={() => setFees(fees.filter((_, j) => j !== i))}>
+                <button class="btn small danger section-gap" onClick={() => setFees(fees.filter((_, j) => j !== i))}>
                   このルールを削除
                 </button>
-              </div>
+              </section>
             ))}
-            <button class="btn small" onClick={() => setFees([...fees, { studio: '', room: '', days: '', from: '', to: '', fee: 0 }])}>
-              ＋ 料金ルールを追加
-            </button>
-          </section>
+          </div>
+          <button class="btn plain section-gap" onClick={() => setFees([...fees, { studio: '', room: '', days: '', from: '', to: '', fee: 0 }])}>
+            <Icon name="plus" size={18} />
+            料金ルールを追加
+          </button>
 
-          <div class="section-title">キャンセル期限前のお知らせ</div>
+          <div class="sec-head">キャンセル期限前のお知らせ</div>
+          <p class="note">スタジオごとの無料キャンセル期限です。最低人数に届かないとき、この日時に予約者へお知らせが届きます</p>
           <section class="card">
-            <div class="muted" style={{ marginBottom: 8, fontSize: 12 }}>
-              各スタジオの無料キャンセル期限（何日前・時刻）を設定します。最低人数未満のとき、この日時に予約者へお知らせが届きます。
-            </div>
             {rules.map((r, i) => (
-              <div class="grid3" style={{ marginBottom: 8 }} key={i}>
+              <div class="grid3" key={i}>
                 <input
                   type="text"
                   placeholder="スタジオ名"
@@ -421,12 +389,13 @@ export function AdminPage() {
                 />
               </div>
             ))}
-            <button class="btn small" onClick={() => setRules([...rules, { studio: '', daysBefore: 1, time: '10:00' }])}>
-              ＋ キャンセルルールを追加
+            <button class="btn plain section-gap" onClick={() => setRules([...rules, { studio: '', daysBefore: 1, time: '10:00' }])}>
+              <Icon name="plus" size={18} />
+              キャンセルルールを追加
             </button>
           </section>
 
-          <div class="section-title">共通ルール</div>
+          <div class="sec-head">共通ルール</div>
           <section class="card">
             <div class="grid2">
               <label class="field">
@@ -440,7 +409,7 @@ export function AdminPage() {
             </div>
           </section>
 
-          <button class="btn primary block" style={{ marginTop: 20 }} disabled={busy} onClick={saveSettings}>
+          <button class="btn primary block section" disabled={busy} onClick={saveSettings}>
             料金・共通ルールの変更を保存
           </button>
         </div>
@@ -454,116 +423,114 @@ function StudioEditor({ studios, onChange }: { studios: StudioDef[]; onChange: (
   const setStudio = (i: number, patch: Partial<StudioDef>) => onChange(studios.map((s, j) => (j === i ? { ...s, ...patch } : s)));
   return (
     <>
-      <div class="section-title">スタジオと部屋</div>
-      <section class="card">
-        <div class="muted" style={{ marginBottom: 8, fontSize: 12 }}>
-          スタジオ名と部屋（定員目安・広さ）を登録しておくと、予約登録時に補完されます。
-        </div>
+      <div class="sec-head">スタジオと部屋</div>
+      <p class="note">登録しておくと、予約登録のときに部屋や広さを選べます</p>
+      <ul class="menu">
         {studios.map((s, i) => (
-          <details key={i} class="studio-details" style={{ marginBottom: 12 }}>
-            <summary class="row" style={{ alignItems: 'center' }}>
-              <strong class="grow">{s.name || '（新しいスタジオ）'}</strong>
-              <button
-                type="button"
-                class="btn small danger"
-                style={{ marginLeft: 8 }}
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (confirm(`${s.name}を削除しますか？`)) onChange(studios.filter((_, j) => j !== i));
-                }}
-              >
-                削除
-              </button>
-            </summary>
-            <div style={{ marginTop: 8 }}>
-              <input
-                type="text"
-                placeholder="スタジオ名"
-                value={s.name}
-                onInput={(e) => setStudio(i, { name: e.currentTarget.value })}
-              />
-              <input
-                type="text"
-                placeholder="表記ゆれ（カンマ区切り）"
-                style={{ marginTop: 6 }}
-                value={s.aliases.join(', ')}
-                onInput={(e) =>
-                  setStudio(i, {
-                    aliases: e.currentTarget.value
-                      .split(',')
-                      .map((x) => x.trim())
-                      .filter(Boolean),
-                  })
-                }
-              />
-              <div class="section-title" style={{ marginTop: 12, fontSize: 11 }}>
-                部屋一覧
+          <li key={i}>
+            <details>
+              <summary class="menu-row">
+                <span class="grow">{s.name || '新しいスタジオ'}</span>
+                <button
+                  type="button"
+                  class="btn small plain danger"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (confirm(`${s.name}を削除しますか？`)) onChange(studios.filter((_, j) => j !== i));
+                  }}
+                >
+                  削除
+                </button>
+              </summary>
+              <div class="menu-item">
+                <input
+                  type="text"
+                  placeholder="スタジオ名"
+                  value={s.name}
+                  onInput={(e) => setStudio(i, { name: e.currentTarget.value })}
+                />
+                <input
+                  type="text"
+                  placeholder="表記ゆれ（カンマ区切り）"
+                  value={s.aliases.join(', ')}
+                  onInput={(e) =>
+                    setStudio(i, {
+                      aliases: e.currentTarget.value
+                        .split(',')
+                        .map((x) => x.trim())
+                        .filter(Boolean),
+                    })
+                  }
+                />
+                <div class="field-label">部屋</div>
+                {s.rooms.map((r, ri) => (
+                  <div class="row section-gap-sm" key={ri}>
+                    <input
+                      type="text"
+                      placeholder="部屋名（例: 202）"
+                      value={r.name}
+                      onInput={(e) =>
+                        setStudio(i, {
+                          rooms: s.rooms.map((x, j) => (j === ri ? { ...x, name: e.currentTarget.value } : x)),
+                        })
+                      }
+                    />
+                    <input
+                      type="text"
+                      placeholder="広さ（例: 30㎡）"
+                      value={r.size}
+                      onInput={(e) =>
+                        setStudio(i, {
+                          rooms: s.rooms.map((x, j) => (j === ri ? { ...x, size: e.currentTarget.value } : x)),
+                        })
+                      }
+                    />
+                    <button
+                      type="button"
+                      class="icon-btn"
+                      aria-label="この部屋を削除"
+                      onClick={() =>
+                        setStudio(i, {
+                          rooms: s.rooms.filter((_, j) => j !== ri),
+                        })
+                      }
+                    >
+                      <Icon name="x" size={18} />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  class="btn plain section-gap"
+                  onClick={() =>
+                    setStudio(i, {
+                      rooms: [...s.rooms, { name: '', size: '' }],
+                    })
+                  }
+                >
+                  <Icon name="plus" size={18} />
+                  部屋を追加
+                </button>
               </div>
-              {s.rooms.map((r, ri) => (
-                <div class="row" style={{ marginTop: 6, gap: 6 }} key={ri}>
-                  <input
-                    type="text"
-                    placeholder="部屋名（例: 202）"
-                    value={r.name}
-                    onInput={(e) =>
-                      setStudio(i, {
-                        rooms: s.rooms.map((x, j) => (j === ri ? { ...x, name: e.currentTarget.value } : x)),
-                      })
-                    }
-                  />
-                  <input
-                    type="text"
-                    placeholder="広さ（例: 30㎡）"
-                    value={r.size}
-                    onInput={(e) =>
-                      setStudio(i, {
-                        rooms: s.rooms.map((x, j) => (j === ri ? { ...x, size: e.currentTarget.value } : x)),
-                      })
-                    }
-                  />
-                  <button
-                    type="button"
-                    class="btn small"
-                    onClick={() =>
-                      setStudio(i, {
-                        rooms: s.rooms.filter((_, j) => j !== ri),
-                      })
-                    }
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                class="btn small"
-                style={{ marginTop: 8 }}
-                onClick={() =>
-                  setStudio(i, {
-                    rooms: [...s.rooms, { name: '', size: '' }],
-                  })
-                }
-              >
-                ＋ 部屋を追加
-              </button>
-            </div>
-          </details>
+            </details>
+          </li>
         ))}
-        <div class="row" style={{ marginTop: 14 }}>
-          <button class="btn small" onClick={() => onChange([...studios, { name: '', aliases: [], rooms: [] }])}>
-            ＋ スタジオを追加
-          </button>
-          <button
-            class="btn small"
-            onClick={() =>
-              confirm('スタジオと部屋の一覧を初期値に戻しますか？') &&
-              onChange(DEFAULT_STUDIOS.map((s) => ({ ...s, rooms: s.rooms.map((r) => ({ ...r })) })))
-            }
-          >
-            初期値に戻す
-          </button>
-        </div>
-      </section>
+      </ul>
+      <div class="row section-gap">
+        <button class="btn plain" onClick={() => onChange([...studios, { name: '', aliases: [], rooms: [] }])}>
+          <Icon name="plus" size={18} />
+          スタジオを追加
+        </button>
+        <button
+          class="btn plain"
+          onClick={() =>
+            confirm('スタジオと部屋の一覧を初期値に戻しますか？') &&
+            onChange(DEFAULT_STUDIOS.map((s) => ({ ...s, rooms: s.rooms.map((r) => ({ ...r })) })))
+          }
+        >
+          初期値に戻す
+        </button>
+      </div>
     </>
   );
 }

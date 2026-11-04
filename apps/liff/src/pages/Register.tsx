@@ -44,9 +44,9 @@ const fromReservation = (r: Partial<Reservation>, kind: FormRow['kind'], groups:
 
 /** 読み取り結果の印。延長は既存の練習を更新し、登録済みは飛ばす */
 const KIND_TAG: Record<string, { label: string; cls: string }> = {
-  extension: { label: '延長', cls: '' },
-  duplicate: { label: '登録済み', cls: 'soft' },
-  incomplete: { label: '要入力', cls: 'alert' },
+  extension: { label: '延長', cls: 'solid' },
+  duplicate: { label: '登録済み', cls: '' },
+  incomplete: { label: '要入力', cls: 'danger' },
 };
 
 /** 画像を描画できる形で読み込む。createImageBitmap が使えない・失敗する端末では <img> で読む */
@@ -236,7 +236,7 @@ export function RegisterPage({ draftId, recruit = false }: { draftId: string | n
       {phase === 'saving' && <BusyOverlay message={recruiting ? '登録して募集中' : '登録中'} />}
 
       <div class="sources">
-        <label class="source primary">
+        <label class="btn primary source">
           <input
             type="file"
             accept="image/*"
@@ -250,32 +250,32 @@ export function RegisterPage({ draftId, recruit = false }: { draftId: string | n
             disabled={busy}
             aria-label="予約画面のスクショから入力"
           />
-          <Icon name="camera" size={22} />
+          <Icon name="camera" size={20} />
           <span>スクショから</span>
         </label>
-        <button class="source" aria-expanded={textOpen} onClick={() => setTextOpen(!textOpen)}>
-          <Icon name="text" size={22} />
+        <button class="btn" aria-expanded={textOpen} onClick={() => setTextOpen(!textOpen)}>
+          <Icon name="text" size={20} />
           <span>文章から</span>
         </button>
       </div>
-      <p class="note">一度に読み取れるスクショは{MAX_SCREENSHOTS}枚までです</p>
+      <p class="note">スクショは一度に{MAX_SCREENSHOTS}枚まで読み取れます</p>
 
       {textOpen && (
-        <div class="card">
+        <div class="card section-gap">
           <textarea rows={5} maxLength={5000} placeholder="予約完了メールなどを貼り付け" aria-label="予約内容の文章" value={pasted} onInput={(e) => setPasted(e.currentTarget.value)} />
-          <button class="btn primary block" style={{ marginTop: 14 }} disabled={busy || !pasted.trim()} onClick={onText}>
+          <button class="btn primary block section-gap" disabled={busy || !pasted.trim()} onClick={onText}>
             読み取る
           </button>
         </div>
       )}
 
-      <div class="draft-grid">
+      <div class="draft-list">
         {rows.map((r, i) => {
           return (
             <section class="draft" key={r.key} data-kind={r.kind}>
               <div class="draft-head">
-                <span class="grow">{r.date ? labelDate(r.date) : String(i + 1).padStart(2, '0')}</span>
-                {r.kind && KIND_TAG[r.kind] && <span class={`tag ${KIND_TAG[r.kind].cls}`}>{KIND_TAG[r.kind].label}</span>}
+                <span class="grow">{r.date ? labelDate(r.date) : `予約情報 ${i + 1}`}</span>
+                {r.kind && KIND_TAG[r.kind] && <span class={`label ${KIND_TAG[r.kind].cls}`}>{KIND_TAG[r.kind].label}</span>}
                 {rows.length > 1 && (
                   <button class="icon-btn" aria-label="この予約情報を削除" onClick={() => setRows(rows.filter((x) => x.key !== r.key))}>
                     <Icon name="x" size={18} />
@@ -312,19 +312,19 @@ export function RegisterPage({ draftId, recruit = false }: { draftId: string | n
                   <RoomSelect key={r.studio} studios={me.settings.studios} studio={r.studio} value={r.room} onChange={(v) => update(r.key, 'room', v)} />
                 </div>
               </div>
-              <RoomInfo studios={me.settings.studios} studio={r.studio} room={r.room} style={{ marginTop: -4, marginBottom: 10 }} />
+              <RoomInfo studios={me.settings.studios} studio={r.studio} room={r.room} />
               <label class="field">
                 <span>
-                  スタジオ代 ¥{r.feeAuto && r.fee !== '' && <span class="tag soft" title="スタジオの料金表（曜日・時間帯）から計算">自動</span>}
+                  スタジオ代 ¥{r.feeAuto && r.fee !== '' && <span class="label" title="スタジオの料金表（曜日・時間帯）から計算">自動</span>}
                 </span>
                 <input type="number" inputMode="numeric" placeholder="円" value={r.fee} onInput={(e) => update(r.key, 'fee', e.currentTarget.value)} />
               </label>
-              <details style={{ marginBottom: 8 }}>
+              <details class="section-gap-bottom">
                 <summary class="more-summary">
                   <Icon name="plus" size={16} />
                   人数・メモ
                 </summary>
-                <div class="grid2" style={{ marginTop: 8 }}>
+                <div class="grid2">
                   <label class="field">
                     <span>上限人数</span>
                     <input type="number" inputMode="numeric" placeholder="なし" value={r.max} onInput={(e) => update(r.key, 'max', e.currentTarget.value)} />
@@ -340,7 +340,7 @@ export function RegisterPage({ draftId, recruit = false }: { draftId: string | n
                 </label>
               </details>
               {r.parts && r.parts.length > 1 && (
-                <div class="row muted" style={{ marginBottom: 10 }}>
+                <div class="row muted section-gap-bottom">
                   <span class="grow">続けて取った予約情報{r.parts.length}件をまとめています</span>
                   <button class="btn small" onClick={() => splitRow(r)}>
                     分ける
@@ -365,27 +365,20 @@ export function RegisterPage({ draftId, recruit = false }: { draftId: string | n
 
       {me.groups.length > 0 && rows.filter(pickable).length > 1 && (
         <>
-          <div class="sec-head">
-            <Icon name="send" size={18} />
-            すべての予約情報の送り先
-          </div>
-          <div class="toggles">
+          <div class="sec-head">すべての予約情報の送り先</div>
+          <div class="chips">
             {me.groups.map((g) => (
-              <button class="toggle" aria-pressed={allHave(g.id)} onClick={() => toggleAll(g.id)}>
+              <button class="chip" aria-pressed={allHave(g.id)} onClick={() => toggleAll(g.id)}>
                 {g.name}
               </button>
             ))}
           </div>
-          <div class="muted" style={{ marginTop: 6 }}>
-            押すと、すべての予約情報に付けたり外したりします。予約情報ごとに変えるときは、それぞれの「送り先」で選んでください
-          </div>
+          <p class="note">押すと、すべての予約情報に付けたり外したりします</p>
         </>
       )}
 
       {recruit && !recruiting && me.groups.length > 0 && (
-        <div class="muted" style={{ marginTop: 12 }}>
-          募集するときは、予約情報ごとの「送り先」でグループを選んでください（選ばなければ登録のみ）
-        </div>
+        <p class="note section-gap">募集するときは、予約情報ごとに「送り先」を選んでください</p>
       )}
       <button class="btn primary block submit" disabled={busy} onClick={submit}>
         {recruiting ? <><Icon name="send" size={18} />登録して募集</> : <><Icon name="check" size={18} />登録</>}
@@ -397,9 +390,9 @@ export function RegisterPage({ draftId, recruit = false }: { draftId: string | n
 /** 募集先のグループを選ぶチップ。点はふだんの送り先 */
 function GroupToggles({ groups, defaults, value, onChange }: { groups: { id: string; name: string }[]; defaults: string[]; value: string[]; onChange: (v: string[]) => void }) {
   return (
-    <div class="toggles">
+    <div class="chips">
       {groups.map((g) => (
-        <button class="toggle" aria-pressed={value.includes(g.id)} onClick={() => onChange(value.includes(g.id) ? value.filter((x) => x !== g.id) : [...value, g.id])}>
+        <button class="chip" aria-pressed={value.includes(g.id)} onClick={() => onChange(value.includes(g.id) ? value.filter((x) => x !== g.id) : [...value, g.id])}>
           {g.name}
           {defaults.includes(g.id) && <span class="dot" title="ふだんの送り先" />}
         </button>
