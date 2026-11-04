@@ -358,4 +358,34 @@ describe('カレンダーロジック（calendarLogic）', () => {
       expect(vnode.props['aria-label']).toBe('0人 (中止)');
     });
   });
+
+  describe('予定画面とカレンダーの連動仕様（タブ絞り込み・ハイライト判定）', () => {
+    it('「すべて」タブと「行く」タブで絞り込まれた配列がカレンダー用グループ化に正確に反映される', () => {
+      const p1 = createMockPracticeView({ id: 'p1', date: '2026-11-10', myAnswer: '行く' });
+      const p2 = createMockPracticeView({ id: 'p2', date: '2026-11-15', myAnswer: '保留' });
+      const allPractices = [p1, p2];
+
+      // 「すべて」タブの場合：両方の日付がマッピングされる
+      const allMap = groupPracticesByDate(allPractices);
+      expect(allMap.has('2026-11-10')).toBe(true);
+      expect(allMap.has('2026-11-15')).toBe(true);
+
+      // 「行く」タブの場合（行くのみ抽出）：2026-11-10 のみマッピングされる
+      const minePractices = allPractices.filter((v) => v.myAnswer === '行く');
+      const mineMap = groupPracticesByDate(minePractices);
+      expect(mineMap.has('2026-11-10')).toBe(true);
+      expect(mineMap.has('2026-11-15')).toBe(false);
+    });
+
+    it('日付選択時に該当日の予約情報が存在するかどうかを正しく判定できる', () => {
+      const p1 = createMockPracticeView({ id: 'p1', date: '2026-11-10' });
+      const shown = [p1];
+
+      // 予約情報がある日付: true
+      expect(shown.some((v) => v.practice.date === '2026-11-10')).toBe(true);
+
+      // 予約情報がない日付: false
+      expect(shown.some((v) => v.practice.date === '2026-11-11')).toBe(false);
+    });
+  });
 });

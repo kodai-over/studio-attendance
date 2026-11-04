@@ -39,6 +39,7 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
 
   const selectTab = (t: Tab) => {
     setTab(t);
+    setHighlightedDate(null);
     try {
       localStorage.setItem(TAB_KEY, t);
     } catch {
@@ -58,6 +59,11 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
   };
 
   const handleSelectCalendarDate = (date: string) => {
+    const hasPractice = shown.some((v) => v.practice.date === date);
+    if (!hasPractice) {
+      setHighlightedDate(null);
+      return;
+    }
     setHighlightedDate(date);
     if (typeof document !== 'undefined') {
       const el = document.querySelector(`[data-ticket-date="${date}"]`);
@@ -99,8 +105,8 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
               class={`cal-toggle-btn ${showCalendar ? 'active' : ''}`}
               onClick={handleToggleCalendar}
               aria-pressed={showCalendar}
-              aria-label="カレンダー表示"
-              title="カレンダー表示"
+              aria-label="カレンダー"
+              title="カレンダー"
             >
               <Icon name="calendar" size={14} />
               <span>カレンダー</span>
