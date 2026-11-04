@@ -146,35 +146,6 @@ export function groupPracticesByDate(practices: PracticeView[]): Map<string, Pra
   return map;
 }
 
-export interface DayDotSummary {
-  goingCount: number; // 中止以外の自分が「行く」予約情報の件数（アクセント色ドット）
-  otherCount: number; // 中止以外のそれ以外の予約情報の件数（グレー色ドット）
-  canceledCount: number; // 中止の予約情報の件数
-  totalCount: number;
-  allCanceled: boolean; // 予定がすべて中止かどうか
-}
-
-export function getDayDotSummary(practicesOnDay?: PracticeView[]): DayDotSummary {
-  if (!practicesOnDay || practicesOnDay.length === 0) {
-    return { goingCount: 0, otherCount: 0, canceledCount: 0, totalCount: 0, allCanceled: false };
-  }
-  let goingCount = 0;
-  let otherCount = 0;
-  let canceledCount = 0;
-  for (const v of practicesOnDay) {
-    if (v.practice.status === '中止') {
-      canceledCount++;
-    } else if (v.myAnswer === '行く') {
-      goingCount++;
-    } else {
-      otherCount++;
-    }
-  }
-  const totalCount = practicesOnDay.length;
-  const allCanceled = canceledCount > 0 && goingCount === 0 && otherCount === 0;
-  return { goingCount, otherCount, canceledCount, totalCount, allCanceled };
-}
-
 /**
  * カレンダーセル内での予約情報の色分け種別
  * - 'met-min': 最低人数達成（通常・緑系）
@@ -183,6 +154,19 @@ export function getDayDotSummary(practicesOnDay?: PracticeView[]): DayDotSummary
  * - 'inactive': 中止または終了（グレー系）
  */
 export type CalendarEventTone = 'met-min' | 'under-min' | 'under-min-urgent' | 'inactive';
+
+export function getCalendarToneLabel(tone: CalendarEventTone): string {
+  switch (tone) {
+    case 'met-min':
+      return '最低人数達成';
+    case 'under-min':
+      return '最低人数未達';
+    case 'under-min-urgent':
+      return '最低人数未達かつ期限間近';
+    case 'inactive':
+      return '中止または終了';
+  }
+}
 
 export interface CalendarToneSettings {
   minDefault: number;
@@ -207,14 +191,6 @@ export function getPracticeCalendarTone(
     return 'under-min-urgent';
   }
   return 'under-min';
-}
-
-/**
- * カレンダーセル内に収まりやすい場所表記（先頭の冗長な "studio " を省く）
- */
-export function formatCalendarPlace(p: { studio: string; room: string }): string {
-  const shortStudio = p.studio.replace(/^studio\s+/i, '').trim();
-  return p.room ? `${shortStudio} ${p.room}` : shortStudio;
 }
 
 /**

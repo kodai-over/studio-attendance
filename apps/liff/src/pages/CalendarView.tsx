@@ -5,6 +5,7 @@ import {
   buildMonthDays,
   formatCalendarCount,
   formatYearMonth,
+  getCalendarToneLabel,
   getNextMonth,
   getPracticeCalendarTone,
   getPrevMonth,
@@ -31,11 +32,17 @@ export function CalendarEventChip({
 }) {
   const p = v.practice;
   const isCanceled = p.status === '中止';
+  const countStr = formatCalendarCount(v);
+  const toneLabel = getCalendarToneLabel(tone);
+  const chipAriaLabel = isCanceled ? `${countStr} (中止)` : `${countStr} (${toneLabel})`;
 
   return (
-    <div class={`cal-event-chip tone-${tone}${isCanceled ? ' is-canceled' : ''}`}>
+    <div
+      class={`cal-event-chip tone-${tone}${isCanceled ? ' is-canceled' : ''}`}
+      aria-label={chipAriaLabel}
+    >
       <span class="cal-chip-dot" aria-hidden="true" />
-      <span class="cal-chip-count">{formatCalendarCount(v)}</span>
+      <span class="cal-chip-count">{countStr}</span>
     </div>
   );
 }
@@ -69,14 +76,18 @@ export function CalendarView({
     const prev = getPrevMonth(currentYear, currentMonth);
     setCurrentYear(prev.year);
     setCurrentMonth(prev.month);
-    setSelectedDate(resolveInitialSelectedDate(prev.year, prev.month, practicesByDate, todayIso));
+    const newDate = resolveInitialSelectedDate(prev.year, prev.month, practicesByDate, todayIso);
+    setSelectedDate(newDate);
+    onSelectDate?.(newDate);
   };
 
   const handleNextMonth = () => {
     const next = getNextMonth(currentYear, currentMonth);
     setCurrentYear(next.year);
     setCurrentMonth(next.month);
-    setSelectedDate(resolveInitialSelectedDate(next.year, next.month, practicesByDate, todayIso));
+    const newDate = resolveInitialSelectedDate(next.year, next.month, practicesByDate, todayIso);
+    setSelectedDate(newDate);
+    onSelectDate?.(newDate);
   };
 
   const handleToday = () => {
@@ -143,7 +154,7 @@ export function CalendarView({
       </div>
 
       {/* 3. 月間グリッド */}
-      <div class="cal-grid" role="grid">
+      <div class="cal-grid">
         {days.map((day) => {
           const isSelected = day.date === selectedDate;
           const practicesOnDay = practicesByDate.get(day.date) ?? [];
@@ -161,7 +172,7 @@ export function CalendarView({
               aria-label={`${day.date}${
                 practicesOnDay.length > 0 ? ` ${practicesOnDay.length}件の予約情報` : ''
               }`}
-              aria-selected={isSelected}
+              aria-pressed={isSelected}
             >
               <span class="cal-day-num">{day.day}</span>
               {practicesOnDay.length > 0 && (

@@ -3,9 +3,8 @@ import type { Answer, AttendeeView, PracticeStatus, PracticeView } from '@studio
 import {
   buildMonthDays,
   formatCalendarCount,
-  formatCalendarPlace,
   formatYearMonth,
-  getDayDotSummary,
+  getCalendarToneLabel,
   getNextMonth,
   getPracticeCalendarTone,
   getPrevMonth,
@@ -131,17 +130,19 @@ describe('カレンダーロジック（calendarLogic）', () => {
     });
 
     it('1月の前月（前年12月）や12月の翌月（翌年1月）の年またぎが正常に計算される', () => {
+      // 2027年1月1日は金曜日。日〜木の5日間が前月2026年12月（12/27〜12/31）
       const janDays = buildMonthDays(2027, 1);
       const prevDec = janDays.find((d) => d.month === 12);
-      if (prevDec) {
-        expect(prevDec.year).toBe(2026);
-      }
+      expect(prevDec).toBeDefined();
+      expect(prevDec!.year).toBe(2026);
+      expect(prevDec!.date).toBe('2026-12-27');
 
+      // 2026年12月31日は木曜日。金・土の2日間が翌月2027年1月（1/1〜1/2）
       const decDays = buildMonthDays(2026, 12);
       const nextJan = decDays.find((d) => d.month === 1);
-      if (nextJan) {
-        expect(nextJan.year).toBe(2027);
-      }
+      expect(nextJan).toBeDefined();
+      expect(nextJan!.year).toBe(2027);
+      expect(nextJan!.date).toBe('2027-01-01');
     });
 
     it('うるう年の2月（29日）と平年の2月（28日）が正確に生成される', () => {
@@ -174,7 +175,7 @@ describe('カレンダーロジック（calendarLogic）', () => {
     });
   });
 
-  describe('groupPracticesByDate & getDayDotSummary（予約情報のマッピングとドット集計）', () => {
+  describe('groupPracticesByDate（予約情報の日付別マッピング）', () => {
     it('予約情報を日付ごとにまとめ、開始時刻順にソートする', () => {
       const p1 = createMockPracticeView({ id: 'p1', date: '2026-11-10', start: '19:00' });
       const p2 = createMockPracticeView({ id: 'p2', date: '2026-11-10', start: '13:00' });
@@ -191,42 +192,6 @@ describe('カレンダーロジック（calendarLogic）', () => {
 
       const nov15 = map.get('2026-11-15')!;
       expect(nov15).toHaveLength(1);
-    });
-
-    it('getDayDotSummary が「行く」「その他」「中止」の件数と中止判定を正確に返す', () => {
-      const p1 = createMockPracticeView({ id: 'p1', date: '2026-11-10', myAnswer: '行く' });
-      const p2 = createMockPracticeView({ id: 'p2', date: '2026-11-10', myAnswer: '保留' });
-      const p3 = createMockPracticeView({ id: 'p3', date: '2026-11-10', myAnswer: null });
-      const p4 = createMockPracticeView({ id: 'p4', date: '2026-11-10', myAnswer: '行く', status: '中止' });
-
-      const summary = getDayDotSummary([p1, p2, p3, p4]);
-      expect(summary.goingCount).toBe(1); // p1
-      expect(summary.otherCount).toBe(2); // p2, p3
-      expect(summary.canceledCount).toBe(1); // p4
-      expect(summary.totalCount).toBe(4);
-      expect(summary.allCanceled).toBe(false);
-
-      // 中止の予定のみの場合
-      const canceledSummary = getDayDotSummary([p4]);
-      expect(canceledSummary.goingCount).toBe(0);
-      expect(canceledSummary.otherCount).toBe(0);
-      expect(canceledSummary.canceledCount).toBe(1);
-      expect(canceledSummary.allCanceled).toBe(true);
-
-      expect(getDayDotSummary(undefined)).toEqual({
-        goingCount: 0,
-        otherCount: 0,
-        canceledCount: 0,
-        totalCount: 0,
-        allCanceled: false,
-      });
-      expect(getDayDotSummary([])).toEqual({
-        goingCount: 0,
-        otherCount: 0,
-        canceledCount: 0,
-        totalCount: 0,
-        allCanceled: false,
-      });
     });
   });
 
@@ -337,10 +302,14 @@ describe('カレンダーロジック（calendarLogic）', () => {
       expect(getPracticeCalendarTone(canceled, toneSettings)).toBe('inactive');
     });
 
-    it('場所と人数（上限あり・なし）のフォーマットが正しく返る', () => {
-      expect(formatCalendarPlace({ studio: 'studio worcle 横浜', room: '202' })).toBe('worcle 横浜 202');
-      expect(formatCalendarPlace({ studio: 'BUZZ横浜東口', room: 'Bst' })).toBe('BUZZ横浜東口 Bst');
+    it('トーン種別ごとのアクセシビリティ用ラベルが正しく返る', () => {
+      expect(getCalendarToneLabel('met-min')).toBe('最低人数達成');
+      expect(getCalendarToneLabel('under-min')).toBe('最低人数未達');
+      expect(getCalendarToneLabel('under-min-urgent')).toBe('最低人数未達かつ期限間近');
+      expect(getCalendarToneLabel('inactive')).toBe('中止または終了');
+    });
 
+    it('参加人数（上限あり・なし）のフォーマットが正しく返る', () => {
       const vNoMax = createMockPracticeView({ id: 'p1', date: '2026-11-10', goingCount: 4, max: null });
       expect(formatCalendarCount(vNoMax)).toBe('4人');
 
@@ -350,7 +319,7 @@ describe('カレンダーロジック（calendarLogic）', () => {
   });
 
   describe('CalendarEventChip（カレンダーセル内チップ部品テスト）', () => {
-    it('参加人数（上限込み）のみをシンプルに描画し、色分けクラスを適用する', () => {
+    it('参加人数（上限込み）のみをシンプルに描画し、色分けクラスとaria-labelを適用する', () => {
       const p1 = createMockPracticeView({
         id: 'p1',
         date: '2026-11-10',
@@ -367,6 +336,7 @@ describe('カレンダーロジック（calendarLogic）', () => {
       expect(vnode).toBeDefined();
       expect(vnode.props.class).toContain('cal-event-chip');
       expect(vnode.props.class).toContain('tone-under-min-urgent');
+      expect(vnode.props['aria-label']).toBe('2/8人 (最低人数未達かつ期限間近)');
 
       const jsonStr = JSON.stringify(vnode);
       expect(jsonStr).toContain('2/8人');
@@ -374,16 +344,18 @@ describe('カレンダーロジック（calendarLogic）', () => {
       expect(jsonStr).not.toContain('19:00');
     });
 
-    it('中止の予約情報の場合、is-canceled クラスと tone-inactive が適用される', () => {
+    it('中止の予約情報の場合、is-canceled クラスと tone-inactive、中止のaria-labelが適用される', () => {
       const canceledPractice = createMockPracticeView({
         id: 'p-canceled',
         date: '2026-11-10',
         status: '中止',
+        goingCount: 0,
       });
 
       const vnode = CalendarEventChip({ v: canceledPractice, tone: 'inactive' });
       expect(vnode.props.class).toContain('tone-inactive');
       expect(vnode.props.class).toContain('is-canceled');
+      expect(vnode.props['aria-label']).toBe('0人 (中止)');
     });
   });
 });
