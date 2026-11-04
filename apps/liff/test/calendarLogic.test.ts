@@ -311,7 +311,7 @@ describe('カレンダーロジック（calendarLogic）', () => {
       expect(getPracticeCalendarTone(v, toneSettings, nowPast)).toBe('under-min-urgent');
     });
 
-    it('中止または終了の予約情報は inactive になる', () => {
+    it('中止または終了、および過去日付の予約情報は inactive になる', () => {
       const canceled = createMockPracticeView({
         id: 'p-canceled',
         date: '2026-11-10',
@@ -319,6 +319,16 @@ describe('カレンダーロジック（calendarLogic）', () => {
         goingCount: 0,
       });
       expect(getPracticeCalendarTone(canceled, toneSettings)).toBe('inactive');
+
+      // ステータスが募集中でも日付が過去の場合は inactive
+      const pastPractice = createMockPracticeView({
+        id: 'p-past',
+        date: '2026-11-01',
+        status: '募集中',
+        goingCount: 1,
+      });
+      const now = new Date('2026-11-05T00:00:00Z');
+      expect(getPracticeCalendarTone(pastPractice, toneSettings, now)).toBe('inactive');
     });
 
     it('設定が渡されていない場合は neutral になる', () => {
@@ -334,7 +344,7 @@ describe('カレンダーロジック（calendarLogic）', () => {
     it('トーン種別ごとのアクセシビリティ用ラベルが正しく返る', () => {
       expect(getCalendarToneLabel('met-min')).toBe('最低人数達成');
       expect(getCalendarToneLabel('under-min')).toBe('最低人数未達');
-      expect(getCalendarToneLabel('under-min-urgent')).toBe('最低人数未達かつキャンセル期限間近');
+      expect(getCalendarToneLabel('under-min-urgent')).toBe('最低人数未達かつキャンセル期限間近または超過');
       expect(getCalendarToneLabel('inactive')).toBe('中止または終了');
       expect(getCalendarToneLabel('neutral')).toBe('最低人数未確認');
     });
@@ -366,7 +376,7 @@ describe('カレンダーロジック（calendarLogic）', () => {
       expect(vnode).toBeDefined();
       expect(vnode.props.class).toContain('cal-event-chip');
       expect(vnode.props.class).toContain('tone-under-min-urgent');
-      expect(vnode.props['aria-label']).toBe('2/8人 (最低人数未達かつキャンセル期限間近)');
+      expect(vnode.props['aria-label']).toBe('2/8人 (最低人数未達かつキャンセル期限間近または超過)');
 
       const jsonStr = JSON.stringify(vnode);
       expect(jsonStr).toContain('2/8人');

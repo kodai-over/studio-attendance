@@ -163,7 +163,7 @@ export function getCalendarToneLabel(tone: CalendarEventTone): string {
     case 'under-min':
       return '最低人数未達';
     case 'under-min-urgent':
-      return '最低人数未達かつキャンセル期限間近';
+      return '最低人数未達かつキャンセル期限間近または超過';
     case 'inactive':
       return '中止または終了';
     case 'neutral':
@@ -182,7 +182,8 @@ export function getPracticeCalendarTone(
   now: Date = new Date(),
 ): CalendarEventTone {
   const p = v.practice;
-  if (!isActive(p)) {
+  const todayJst = toJstDate(now);
+  if (!isActive(p) || p.date < todayJst) {
     return 'inactive';
   }
   if (!settings) {
