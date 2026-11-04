@@ -22,6 +22,10 @@
   --sat: #0040dd;
   --sun: #d70015;
   --badge: #ff3b30;
+  --on-color: #ffffff;
+  --seg-thumb: #ffffff;
+  --scrim: rgb(0 0 0 / 32%);
+  --shadow-sm: 0 1px 3px rgb(0 0 0 / 10%);
   --shadow: 0 8px 24px rgb(0 0 0 / 10%);
 
   /* 余白（4pt 刻み） */
@@ -42,12 +46,16 @@
   --r-full: 999px;
 
   /* 文字 */
+  --fs-2xs: 11px;
   --fs-xs: 12px;
   --fs-sm: 13px;
   --fs-md: 15px;
   --fs-lg: 17px;
   --fs-xl: 22px;
   --fs-2xl: 28px;
+  --fs-3xl: 32px;
+  /* iPhone では16px未満の入力欄にフォーカスすると画面が拡大されるため、入力欄だけこの大きさにする */
+  --fs-input: 16px;
   --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Hiragino Sans', 'Noto Sans JP', 'Segoe UI', sans-serif;
 
   --bar-h: calc(44px + env(safe-area-inset-top));
@@ -72,6 +80,7 @@
     --sat: #409cff;
     --sun: #ff453a;
     --badge: #ff453a;
+    --seg-thumb: #636366;
     --shadow: 0 8px 24px rgb(0 0 0 / 50%);
     color-scheme: dark;
   }
@@ -91,6 +100,7 @@
   --sat: #409cff;
   --sun: #ff453a;
   --badge: #ff453a;
+  --seg-thumb: #636366;
   --shadow: 0 8px 24px rgb(0 0 0 / 50%);
   color-scheme: dark;
 }
@@ -286,7 +296,7 @@ a {
   min-height: 32px;
   padding: var(--sp-1) var(--sp-2);
   border: 0;
-  border-radius: 7px;
+  border-radius: calc(var(--r-sm) - 2px);
   background: transparent;
   color: var(--text);
   font-size: var(--fs-sm);
@@ -294,17 +304,9 @@ a {
   white-space: nowrap;
 }
 .tabs button[aria-selected='true'] {
-  background: var(--bg);
+  background: var(--seg-thumb);
   font-weight: 600;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 10%);
-}
-:root[data-theme='dark'] .tabs button[aria-selected='true'] {
-  background: #636366;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .tabs button[aria-selected='true'] {
-    background: #636366;
-  }
+  box-shadow: var(--shadow-sm);
 }
 .tabs .count {
   margin-left: var(--sp-1);
@@ -407,7 +409,7 @@ a {
   border-radius: var(--r-sm);
   background: transparent;
   color: var(--text-3);
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   white-space: nowrap;
   transition: color 0.15s;
@@ -463,8 +465,8 @@ a {
   padding: 0 5px;
   border-radius: var(--r-full);
   background: var(--badge);
-  color: #ffffff;
-  font-size: 11px;
+  color: var(--on-color);
+  font-size: var(--fs-2xs);
   font-weight: 600;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -477,7 +479,7 @@ a {
   border-radius: var(--r-full);
   background: var(--surface-2);
   color: var(--text-2);
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   line-height: 1;
   white-space: nowrap;
@@ -523,7 +525,7 @@ a {
   width: 82px;
   border: 0;
   background: var(--danger);
-  color: #ffffff;
+  color: var(--on-color);
   font-size: var(--fs-xs);
   font-weight: 600;
 }
@@ -584,7 +586,7 @@ a {
   transition: background 0.2s, color 0.2s;
 }
 .stub .m {
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   color: var(--text-2);
 }
 .stub .d {
@@ -594,7 +596,7 @@ a {
   font-variant-numeric: tabular-nums;
 }
 .stub .w {
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   color: var(--text-2);
 }
@@ -1380,8 +1382,7 @@ textarea {
   border: 0;
   border-radius: var(--r-sm);
   background-color: var(--surface);
-  /* iPhone では16px未満だと入力時に画面が拡大される */
-  font-size: 16px;
+  font-size: var(--fs-input);
   -webkit-appearance: none;
   appearance: none;
   box-shadow: inset 0 0 0 1px transparent;
@@ -1722,7 +1723,7 @@ details[open] > .more-summary {
   border-radius: 50%;
   background: var(--surface-2);
   object-fit: cover;
-  font-size: 32px;
+  font-size: var(--fs-3xl);
   font-weight: 600;
 }
 .profile-name {
@@ -1779,7 +1780,7 @@ details[open] > .more-summary {
 .toast.error {
   border-radius: var(--r-md);
   background: var(--danger);
-  color: #ffffff;
+  color: var(--on-color);
 }
 @keyframes rise {
   from {
@@ -1795,7 +1796,7 @@ details[open] > .more-summary {
   align-items: center;
   justify-content: center;
   padding: var(--sp-4);
-  background: rgb(0 0 0 / 32%);
+  background: var(--scrim);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
 }
@@ -2000,7 +2001,7 @@ html {
 .cal-weekday-row {
   padding-bottom: var(--sp-1);
   color: var(--text-3);
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   text-align: center;
 }
@@ -2116,7 +2117,7 @@ html {
     width: 100%;
     padding: var(--sp-2) var(--sp-1);
     border-radius: var(--r-md);
-    font-size: 11px;
+    font-size: var(--fs-2xs);
   }
   .navbar button[aria-current='page'] {
     background: var(--surface);
