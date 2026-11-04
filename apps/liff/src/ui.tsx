@@ -327,14 +327,19 @@ export function useHideOnScroll(threshold = 8) {
     const update = () => {
       ticking = false;
       const y = window.scrollY;
+      // 画面の上端近くでは、いつでも出す
+      if (y < 48) {
+        set(false);
+        last = y;
+        return;
+      }
       if (performance.now() < quietUntil) {
         last = y;
         return;
       }
       const dy = y - last;
       const atBottom = window.innerHeight + y >= document.documentElement.scrollHeight - 2;
-      if (y < 48) set(false);
-      else if (dy > threshold && !atBottom) set(true);
+      if (dy > threshold && !atBottom) set(true);
       else if (dy < -threshold) set(false);
       else return;
       last = y;
@@ -506,6 +511,7 @@ export function RsvpButtons({
   value,
   status,
   onAnswer,
+  onClear,
   onBlocked,
   busy,
   solo,
@@ -513,6 +519,8 @@ export function RsvpButtons({
   value: Answer | null;
   status: string;
   onAnswer: (a: Answer) => void;
+  /** 選んでいる記号をもう一度押したとき（未回答に戻す）。なければ何もしない */
+  onClear?: () => void;
   /** 満員や締切などで選択がブロックされたときの通知コールバック */
   onBlocked?: (reason: 'full' | 'closed') => void;
   busy?: boolean;
@@ -540,6 +548,7 @@ export function RsvpButtons({
                 return;
               }
               if (value !== a) onAnswer(a);
+              else onClear?.();
             }}
           >
             <span class="mark" aria-hidden="true">

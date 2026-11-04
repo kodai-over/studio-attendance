@@ -73,8 +73,8 @@ export function CalendarView({
     [selectedDate, todayIso].map((d) => monthDays.findIndex((x) => x.date === d)).find((i) => i >= 0) ??
       monthDays.findIndex((x) => x.isCurrentMonth),
   );
-  const week = Math.floor(anchor / 7);
-  const days = compact ? monthDays.slice(week * 7, week * 7 + 7) : monthDays;
+  const anchorWeek = Math.floor(anchor / 7);
+  const weeks = Array.from({ length: Math.ceil(monthDays.length / 7) }, (_, i) => monthDays.slice(i * 7, i * 7 + 7));
 
   const handlePrevMonth = () => {
     const prev = getPrevMonth(currentYear, currentMonth);
@@ -110,6 +110,8 @@ export function CalendarView({
 
   return (
     <div class={`calendar${compact ? ' compact' : ''}`}>
+      <div class="cal-fold" aria-hidden={compact} data-open={!compact}>
+        <div class="cal-fold-inner">
       <div class="cal-nav">
         <span class="cal-year-month">{formatYearMonth(currentYear, currentMonth)}</span>
         <button
@@ -128,6 +130,9 @@ export function CalendarView({
         </button>
       </div>
 
+        </div>
+      </div>
+
       {/* 曜日 */}
       <div class="cal-weekday-row">
         {WEEKDAY_NAMES.map((w, idx) => (
@@ -140,8 +145,10 @@ export function CalendarView({
         ))}
       </div>
 
-      {/* 日付 */}
-      <div class="cal-grid">
+      {/* 日付。縮めたときは選んだ日の週だけを残し、ほかの週はたたむ */}
+      {weeks.map((days, wi) => (
+        <div key={days[0].date} class="cal-fold" aria-hidden={compact && wi !== anchorWeek} data-open={!compact || wi === anchorWeek}>
+          <div class="cal-fold-inner cal-grid">
         {days.map((day) => {
           const isSelected = day.date === selectedDate;
           const practicesOnDay = practicesByDate.get(day.date) ?? [];
@@ -176,7 +183,9 @@ export function CalendarView({
             </button>
           );
         })}
-      </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

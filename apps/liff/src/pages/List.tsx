@@ -156,11 +156,13 @@ export function TicketSub({ booker, date, studio }: { booker?: string | null; da
 export function PracticeCard({
   v,
   onAnswer,
+  onClear,
   busy,
   highlighted,
 }: {
   v: PracticeView;
   onAnswer?: (a: Answer) => void;
+  onClear?: () => void;
   busy?: boolean;
   highlighted?: boolean;
 }) {
@@ -200,7 +202,7 @@ export function PracticeCard({
         </div>
         <TicketSub booker={v.bookerName} date={p.date} studio={p.studio} />
       </button>
-      {onAnswer && <RsvpButtons value={v.myAnswer} status={p.status} busy={busy} onAnswer={onAnswer} onBlocked={handleBlocked} />}
+      {onAnswer && <RsvpButtons value={v.myAnswer} status={p.status} busy={busy} onAnswer={onAnswer} onClear={onClear} onBlocked={handleBlocked} />}
     </article>
   );
 }

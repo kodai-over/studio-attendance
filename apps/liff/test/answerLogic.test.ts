@@ -90,6 +90,18 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       const updated = stageAnswer(initial, 'p1', '行かない', null);
       expect(updated.get('p1')).toBe('行かない');
     });
+
+    it('未回答の予約情報で同じ記号を押し直すと（取り消し）、下書きから消えて未回答に戻る', () => {
+      const initial = new Map([['p1', '行く' as const]]);
+      const updated = stageAnswer(initial, 'p1', null, null);
+      expect(updated.has('p1')).toBe(false);
+    });
+
+    it('回答済の予約情報で取り消すと、未回答（null）として下書きに残る', () => {
+      const updated = stageAnswer(new Map(), 'p2', null, '保留');
+      expect(updated.has('p2')).toBe(true);
+      expect(updated.get('p2')).toBeNull();
+    });
   });
 
   describe('getModifiedItems', () => {
@@ -103,6 +115,16 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       expect(items[0].id).toBe('p1');
       expect(items[0].answer).toBe('行く');
       expect(items[0].originalAnswer).toBeNull();
+    });
+
+    it('取り消し（null）の下書きは、元の回答との差分として抽出される', () => {
+      const items = getModifiedItems(new Map([['p2', null]]), mockList);
+      expect(items).toEqual([{ id: 'p2', answer: null, originalAnswer: '保留', practice: mockPractice2 }]);
+    });
+
+    it('取り消した予約情報は、画面上で未回答として表示される', () => {
+      const shown = computeDisplayedPractices(mockList, new Map([['p2', null]]));
+      expect(shown[1].myAnswer).toBeNull();
     });
 
     it('リストが空または null の場合は空配列を返す', () => {
@@ -258,6 +280,12 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       const report = generateSpecificReport(changes);
       expect(report).toContain('○');
       expect(report).toContain('未定 → 行かない');
+    });
+
+    it('回答を取り消した場合は「未回答」への変更として伝える', () => {
+      const report = generateSpecificReport([{ practice: mockPractice2, from: '保留' as const, to: null }]);
+      expect(report).toContain('回答を変更しました');
+      expect(report).toContain('未定 → 未回答');
     });
 
     it('中止の練習はメッセージから除外される', () => {
@@ -569,6 +597,7 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
         clearGlobalDrafts();
         globalDrafts.unanswered.set('p1', '行く');
         globalDrafts.answered.set('p2', '行かない');
+        globalDrafts.answered.set('p4', null);
         saveDraftsToStorage('user-1');
 
         // メモリ上の下書きを一度空にして（WebView再起動をシミュレート）、同一ユーザーでストレージから復元
@@ -579,6 +608,9 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
         loadDraftsFromStorage('user-1');
         expect(globalDrafts.unanswered.get('p1')).toBe('行く');
         expect(globalDrafts.answered.get('p2')).toBe('行かない');
+        // 取り消し（未回答に戻す）の下書きも復元される
+        expect(globalDrafts.answered.has('p4')).toBe(true);
+        expect(globalDrafts.answered.get('p4')).toBeNull();
 
         // 別アカウントや「見え方の確認（admin）」に切り替わった場合は、前の人の下書きが破棄される
         const adminKey = getDraftOwnerKey({
@@ -1007,6 +1039,35 @@ describe('answerLogic (RSVP画面の純粋ロジック)', () => {
       expect(toast).toHaveBeenCalledWith('回答を記録しました');
       // 下書きハンドラは呼ばれない
       expect(onDraftStaged).not.toHaveBeenCalled();
+    });
+
+    it('特定予約モードで同じ記号を押し直すと、回答の取り消し（null）として保存され、取り消しのトーストが出る', async () => {
+      const original: PracticeView = { practice: mockPractice2, myAnswer: '保留', attendees: [] };
+      const updated: PracticeView = { practice: mockPractice2, myAnswer: null, attendees: [] };
+      const apiSave = vi.fn().mockResolvedValue(updated);
+      const toast = vi.fn();
+      const onSpecificSaved = vi.fn();
+
+      const outcome = await executeStageAnswer({
+        id: 'p2',
+        answer: null,
+        isSpecific: true,
+        fresh: true,
+        busy: false,
+        saving: false,
+        originalPractice: original,
+        apiSave,
+        touchPractice: vi.fn(),
+        updatePractice: vi.fn(),
+        toast,
+        onSpecificSaved,
+        onDraftStaged: vi.fn(),
+      });
+
+      expect(outcome).toBe('saved');
+      expect(apiSave).toHaveBeenCalledWith('p2', null);
+      expect(onSpecificSaved).toHaveBeenCalledWith(updated, '保留');
+      expect(toast).toHaveBeenCalledWith('回答を取り消しました');
     });
 
     it('通常メニューからの回答の場合、即時API保存は呼ばれず下書きステート更新のみ行われる', async () => {

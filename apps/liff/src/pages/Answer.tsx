@@ -70,6 +70,10 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   const [run, busy] = useRunner();
   const [saving, setSaving] = useState(false);
 
+  /** 回答を保存する。null なら自分の回答を消して未回答に戻す */
+  const saveAnswer = (id: string, answer: Answer | null) =>
+    answer == null ? api('removeAttendance', { id, participant: me.member.userId }) : api('rsvp', { id, answer });
+
   // 現在時刻と未回答サマリーの判定
   const now = new Date();
   const today = toJstDate(now);
@@ -208,7 +212,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   }, []);
 
   // 個別の回答変更（特定予約指定時は即時保存、通常画面では下書き更新）
-  const handleStageAnswer = async (id: string, a: Answer) => {
+  const handleStageAnswer = async (id: string, a: Answer | null) => {
     if (isOperatingRef.current || !fresh || busy || saving) return;
     isOperatingRef.current = true;
     const original = list?.find((x) => x.practice.id === id);
@@ -222,7 +226,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
         busy,
         saving,
         originalPractice: original,
-        apiSave: (pId, pAnswer) => api('rsvp', { id: pId, answer: pAnswer }),
+        apiSave: (pId, pAnswer) => saveAnswer(pId, pAnswer),
         touchPractice,
         untouchPractice,
         updatePractice,
@@ -294,7 +298,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
       async (item) => {
         touchPractice(item.id);
         try {
-          const updated = await api('rsvp', { id: item.id, answer: item.answer });
+          const updated = await saveAnswer(item.id, item.answer);
           updatePractice(updated);
         } catch (err) {
           untouchPractice?.(item.id);
@@ -536,6 +540,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
               v={v}
               busy={!fresh || saving}
               onAnswer={(a) => handleStageAnswer(v.practice.id, a)}
+              onClear={() => handleStageAnswer(v.practice.id, null)}
             />
           ))}
         </div>

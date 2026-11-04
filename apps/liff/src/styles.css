@@ -120,6 +120,12 @@ textarea {
   font: inherit;
   color: inherit;
 }
+/* Safari はタップした要素ごとに見るため、すべての要素でダブルタップの拡大を止める */
+*,
+*::before,
+*::after {
+  touch-action: manipulation;
+}
 button {
   cursor: pointer;
 }
@@ -762,7 +768,7 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
+  min-height: 34px;
   border: 0;
   background: transparent;
   color: var(--text-3);
@@ -774,10 +780,10 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  font-size: var(--fs-md);
+  font-size: var(--fs-sm);
   line-height: 1;
   transition: background 0.2s, color 0.2s;
 }
@@ -1950,11 +1956,26 @@ html {
   border-radius: var(--r-md);
   background: var(--surface);
 }
+/* 縮めるときは、たたむ週の高さを 0 へなめらかに縮める */
+.calendar {
+  transition: padding-top 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
 .calendar.compact {
   padding-top: var(--sp-2);
 }
-.calendar.compact .cal-nav {
-  display: none;
+.cal-fold {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s ease;
+}
+.cal-fold[data-open='false'] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+.cal-fold-inner {
+  min-height: 0;
+  overflow: hidden;
 }
 .cal-nav {
   display: flex;
