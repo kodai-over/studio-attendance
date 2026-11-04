@@ -209,6 +209,9 @@ export function ThemeToggle() {
   );
 }
 
+/** 大きい見出しを出すか。見出しがあり、戻るがない画面（メニューから開く画面）だけ */
+export const hasLargeTitle = (title?: string, back?: boolean) => !!title && !back;
+
 /**
  * 画面上部のバー。メニューから開く画面（戻るがない画面）は大きい見出しを出し、
  * 見出しがバーの下に隠れたら、バーの中央に小さく出す
@@ -226,7 +229,7 @@ export function TopBar({
   children?: ComponentChildren;
   showTheme?: boolean;
 }) {
-  const large = !!title && !back;
+  const large = hasLargeTitle(title, back);
   const barRef = useRef<HTMLElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const [scrolled, setScrolled] = useState(false);
@@ -630,16 +633,25 @@ export const shareData = (v: PracticeView, url: string) => ({
   url,
 });
 
-/** チケットに出すキャンセル期限。間近は色を付け、過ぎたら薄く「超過」と出す */
+/** キャンセル期限の出し方。間近は色を付け、過ぎたら薄く「キャンセル期限超過」と出す。ルールがなければ出さない */
+export function cancelDeadlineDisplay(
+  deadline: { formatted: string; isSoon: boolean; isPast: boolean } | null,
+): { text: string; tone: 'normal' | 'soon' | 'past' } | null {
+  if (!deadline) return null;
+  if (deadline.isPast) return { text: 'キャンセル期限超過', tone: 'past' };
+  return { text: `キャンセル期限 ${deadline.formatted}`, tone: deadline.isSoon ? 'soon' : 'normal' };
+}
+
+/** チケットに出すキャンセル期限 */
 export function CancelDeadlineBadge({ date, studio }: { date: string; studio: string }) {
   const { me } = useApp();
-  const deadline = computeCancelDeadline(date, studio, me?.settings?.cancelRules ?? []);
-  if (!deadline) return null;
+  const shown = cancelDeadlineDisplay(computeCancelDeadline(date, studio, me?.settings?.cancelRules ?? []));
+  if (!shown) return null;
 
   return (
-    <span class={`deadline${deadline.isSoon ? ' is-soon' : ''}${deadline.isPast ? ' is-past' : ''}`}>
+    <span class={`deadline${shown.tone === 'normal' ? '' : ` is-${shown.tone}`}`}>
       <Icon name="clock" size={13} />
-      <span>{deadline.isPast ? 'キャンセル期限超過' : `キャンセル期限 ${deadline.formatted}`}</span>
+      <span>{shown.text}</span>
     </span>
   );
 }

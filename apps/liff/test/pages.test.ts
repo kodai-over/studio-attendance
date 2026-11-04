@@ -17,7 +17,7 @@ import {
 } from '../src/pages/answerLogic';
 import { MyAnswerBadge, readTab } from '../src/pages/List';
 import { resolveInitialHash } from '../src/route';
-import { RsvpButtons, go, handleHashChangeGuard, parseHash, setNavigationGuard } from '../src/ui';
+import { RsvpButtons, cancelDeadlineDisplay, go, handleHashChangeGuard, hasLargeTitle, parseHash, setNavigationGuard } from '../src/ui';
 
 describe('MyAnswerBadge（予定一覧・詳細の回答ステータスバッジ）', () => {
   it('行く（○）のバッジが正しく返る', () => {
@@ -525,5 +525,65 @@ describe('募集カード（?r= 指定）から開いたときの即時保存と
     } finally {
       clearGlobalDrafts();
     }
+  });
+});
+
+describe('cancelDeadlineDisplay（チケットのキャンセル期限の出し方）', () => {
+  it('期限前は日時を出し、色は付けない', () => {
+    expect(cancelDeadlineDisplay({ formatted: '11/9(月) 10:00', isSoon: false, isPast: false })).toEqual({ text: 'キャンセル期限 11/9(月) 10:00', tone: 'normal' });
+  });
+
+  it('期限が近いときは日時を出し、目立たせる', () => {
+    expect(cancelDeadlineDisplay({ formatted: '11/6(金) 10:00', isSoon: true, isPast: false })).toEqual({ text: 'キャンセル期限 11/6(金) 10:00', tone: 'soon' });
+  });
+
+  it('期限を過ぎたら「キャンセル期限超過」と出す（予約者の「募集」でも消えない）', () => {
+    expect(cancelDeadlineDisplay({ formatted: '11/4(水) 10:00', isSoon: true, isPast: true })).toEqual({ text: 'キャンセル期限超過', tone: 'past' });
+  });
+
+  it('スタジオにキャンセルのルールがなければ出さない', () => {
+    expect(cancelDeadlineDisplay(null)).toBeNull();
+  });
+});
+
+describe('hasLargeTitle（画面上部の大きい見出し）', () => {
+  it('メニューから開く画面（見出しあり・戻るなし）だけ大きい見出しを出す', () => {
+    expect(hasLargeTitle('ホーム', false)).toBe(true);
+    expect(hasLargeTitle('ホーム')).toBe(true);
+  });
+
+  it('戻るがある画面や、見出しのない画面では出さない', () => {
+    expect(hasLargeTitle('管理画面', true)).toBe(false);
+    expect(hasLargeTitle(undefined, true)).toBe(false);
+    expect(hasLargeTitle(undefined, false)).toBe(false);
+  });
+});
+
+describe('RsvpButtons の取り消し（同じ記号をもう一度押す）', () => {
+  const buttons = (props: Partial<Parameters<typeof RsvpButtons>[0]>) => {
+    const vnode = RsvpButtons({ value: '行く', status: '募集中', onAnswer: () => {}, ...props });
+    return vnode.props.children as { props: { class: string; onClick: () => void } }[];
+  };
+
+  it('選んでいる記号を押すと onClear が呼ばれ、onAnswer は呼ばれない', () => {
+    const onAnswer = vi.fn();
+    const onClear = vi.fn();
+    buttons({ onAnswer, onClear })[0].props.onClick();
+    expect(onClear).toHaveBeenCalledTimes(1);
+    expect(onAnswer).not.toHaveBeenCalled();
+  });
+
+  it('別の記号を押すと onAnswer が呼ばれる', () => {
+    const onAnswer = vi.fn();
+    const onClear = vi.fn();
+    buttons({ onAnswer, onClear })[1].props.onClick();
+    expect(onAnswer).toHaveBeenCalledWith('保留');
+    expect(onClear).not.toHaveBeenCalled();
+  });
+
+  it('onClear がない画面（参加リンク）では、同じ記号を押しても何も起きない', () => {
+    const onAnswer = vi.fn();
+    expect(() => buttons({ onAnswer })[0].props.onClick()).not.toThrow();
+    expect(onAnswer).not.toHaveBeenCalled();
   });
 });
