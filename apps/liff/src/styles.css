@@ -22,7 +22,7 @@
   --sat: #0040dd;
   --sun: #d70015;
   --badge: #ff3b30;
-  --on-color: var(--on-color);
+  --on-color: #ffffff;
   --seg-thumb: #ffffff;
   --scrim: rgb(0 0 0 / 32%);
   --shadow-sm: 0 1px 3px rgb(0 0 0 / 10%);

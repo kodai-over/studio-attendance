@@ -64,6 +64,25 @@ describe('デザインの決まり（docs/design.md）', () => {
     expect([...used].filter((v) => !defined.has(v) && !fromScript.has(v))).toEqual([]);
   });
 
+  it('変数の定義が自分自身や互いを参照し合っていない（循環すると値が無効になる）', () => {
+    // 名前 → 定義の中で参照している変数（ライト・ダークのどの塊の定義も含める）
+    const refs = new Map<string, Set<string>>();
+    for (const m of css.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)) {
+      const set = refs.get(m[1]) ?? new Set<string>();
+      for (const r of m[2].matchAll(/var\((--[\w-]+)/g)) set.add(r[1]);
+      refs.set(m[1], set);
+    }
+    const cycles: string[] = [];
+    const visit = (name: string, path: string[]) => {
+      for (const next of refs.get(name) ?? []) {
+        if (next === path[0]) cycles.push([...path, next].join(' → '));
+        else if (!path.includes(next)) visit(next, [...path, next]);
+      }
+    };
+    for (const name of refs.keys()) visit(name, [name]);
+    expect(cycles).toEqual([]);
+  });
+
   it('画面の部品に色を直接書かない', () => {
     const bad = tsxFiles().flatMap((f) =>
       readFileSync(f, 'utf8')
