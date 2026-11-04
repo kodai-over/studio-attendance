@@ -1556,34 +1556,6 @@ details[open] > .more-summary {
 }
 
 /* ---------- ホーム ---------- */
-.next-card {
-  all: unset;
-  box-sizing: border-box;
-  display: block;
-  width: 100%;
-  padding: var(--sp-4);
-  border-radius: var(--r-md);
-  background: var(--surface);
-  cursor: pointer;
-}
-.next-card:active {
-  background: var(--surface-2);
-}
-.next-card .when {
-  font-size: var(--fs-lg);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-.next-card .place {
-  margin-top: 2px;
-}
-.next-card .when,
-.next-card .place {
-  display: block;
-}
-.next-card .ticket-meta {
-  margin-top: var(--sp-3);
-}
 .notice-list {
   margin: 0;
   padding: 0;

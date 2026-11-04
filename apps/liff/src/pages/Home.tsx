@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { labelDate, toJstDate, toJstTime, yen } from '@studio-attendance/shared';
+import { toJstDate, toJstTime } from '@studio-attendance/shared';
 import { api } from '../api';
-import { FRESH_MS, Icon, Spinner, Syncing, Tabs, TopBar, go, place, useApp, useRunner } from '../ui';
+import { FRESH_MS, Icon, Spinner, Syncing, Tabs, TopBar, go, useApp, useRunner } from '../ui';
 import { getDraftOwnerKey, getUnansweredSummary } from './answerLogic';
 import {
   LATEST_RELEASE_VERSION,
@@ -103,19 +103,7 @@ export function HomePage() {
           </button>
         </div>
         {nextGoing ? (
-          <button class="next-card" onClick={() => go(`/p/${encodeURIComponent(nextGoing.practice.id)}`)}>
-            <div class="when">
-              {labelDate(nextGoing.practice.date)} {nextGoing.practice.start}–{nextGoing.practice.end}
-            </div>
-            <div class="place">{place(nextGoing.practice)}</div>
-            <div class="ticket-meta">
-              <span class="meta-item">
-                <Icon name="people" size={16} />
-                {nextGoing.going.length}人
-              </span>
-              <span class="fee">1人あたり {nextGoing.perPerson != null ? yen(nextGoing.perPerson) : '—'}</span>
-            </div>
-          </button>
+          <PracticeCard v={nextGoing} />
         ) : (
           <div class="empty small">次の参加予定はありません</div>
         )}
