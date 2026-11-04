@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { isMinePractice, labelDate, type Answer, type PracticeView } from '@studio-attendance/shared';
 import { api } from '../api';
-import { CancelDeadlineBadge, FRESH_MS, Fee, Icon, RsvpButtons, Spinner, StatusBadge, Stub, Syncing, Tabs, TopBar, go, place, useApp, useRunner } from '../ui';
+import { CancelDeadlineBadge, FRESH_MS, Fee, Icon, RsvpButtons, Spinner, StatusBadge, Stub, Syncing, Tabs, TopBar, go, place, useApp, useHideOnScroll, useRunner } from '../ui';
 import { CalendarView } from './CalendarView';
 import { computeScrollOffset, hasPracticeOnDate, readScheduleViewMode, saveScheduleViewMode, type ScheduleViewMode } from './calendarLogic';
 
@@ -31,6 +31,8 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
   const [viewMode, setViewMode] = useState<ScheduleViewMode>(() => readScheduleViewMode());
   const [highlightedDate, setHighlightedDate] = useState<string | null>(null);
   const [run, busy] = useRunner();
+  // 下にスクロールしている間は、カレンダーを1週間分に縮めてチケットを広く見せる
+  const collapsed = useHideOnScroll();
 
   useEffect(() => {
     // 起動時のまとめ取得から時間がたっていれば取り直す（前回の表示のときは起動処理が取り直すので待つ）
@@ -108,7 +110,7 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
             ]}
           />
         </div>
-        {showCalendar && <CalendarView practices={shown} onSelectDate={handleSelectCalendarDate} />}
+        {showCalendar && <CalendarView practices={shown} onSelectDate={handleSelectCalendarDate} compact={collapsed} />}
       </div>
 
       {list == null ? (

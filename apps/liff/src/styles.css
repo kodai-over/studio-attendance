@@ -165,7 +165,11 @@ a {
   backdrop-filter: saturate(1.8) blur(20px);
   -webkit-backdrop-filter: saturate(1.8) blur(20px);
   box-shadow: 0 0.5px 0 transparent;
-  transition: box-shadow 0.2s;
+  transition: box-shadow 0.2s, transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* 下にスクロールしている間は、上のバーと下のナビを画面の外へ隠す */
+:root[data-chrome='hidden'] .topbar {
+  transform: translateY(-100%);
 }
 .topbar.scrolled {
   box-shadow: 0 0.5px 0 var(--separator);
@@ -786,6 +790,24 @@ a {
 .rsvp button.no[aria-checked='true'] .mark {
   background: var(--text-2);
   color: var(--bg);
+}
+/* 押した記号が軽く弾み、行くなら半券も反転して見せる */
+.rsvp button[aria-checked='true'] .mark {
+  animation: pop 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.4);
+}
+.ticket:has(> .rsvp)[data-answer='行く'] .stub {
+  animation: pop 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.4);
+}
+@keyframes pop {
+  0% {
+    transform: scale(0.82);
+  }
+  60% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 .rsvp button:disabled {
   opacity: 0.35;
@@ -1825,6 +1847,50 @@ details[open] > .more-summary {
   }
 }
 
+/* 画面を切り替えたときの軽いフェード */
+.page {
+  animation: page-in 0.22s ease-out;
+}
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* 引っ張って更新 */
+html {
+  overscroll-behavior-y: contain;
+}
+.ptr {
+  position: fixed;
+  top: calc(var(--bar-h) - 36px);
+  left: calc(50% + var(--nav-w) / 2);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--bg);
+  box-shadow: var(--shadow);
+  opacity: var(--progress);
+  transform: translate(-50%, var(--pull));
+  pointer-events: none;
+}
+.ptr-ring {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--surface-2);
+  border-top-color: var(--text);
+  border-radius: 50%;
+  transform: rotate(calc(var(--progress) * 300deg));
+}
+.ptr-ring.spinning {
+  animation: spin 0.8s linear infinite;
+}
+
 /* 管理者が別のアカウントとして見ているときの帯 */
 .acting-banner {
   display: block;
@@ -1848,6 +1914,7 @@ details[open] > .more-summary {
     transition: none !important;
   }
   .spinner,
+  .ptr-ring.spinning,
   .syncing::after {
     animation-iteration-count: infinite !important;
     animation-duration: 1.6s !important;
@@ -1858,6 +1925,7 @@ details[open] > .more-summary {
 .schedule-head {
   position: sticky;
   top: var(--bar-h);
+  transition: top 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), padding-top 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
   z-index: 4;
   margin: 0 calc(var(--pad-x) * -1) var(--sp-5);
   padding: 0 var(--pad-x) var(--sp-3);
@@ -1865,6 +1933,10 @@ details[open] > .more-summary {
 }
 .schedule-head .tabs-head {
   margin: 0;
+}
+:root[data-chrome='hidden'] .schedule-head {
+  top: 0;
+  padding-top: calc(var(--sp-2) + env(safe-area-inset-top));
 }
 .schedule-head .calendar {
   margin-top: var(--sp-3);
@@ -1875,6 +1947,12 @@ details[open] > .more-summary {
   padding: var(--sp-3) var(--sp-2) var(--sp-2);
   border-radius: var(--r-md);
   background: var(--surface);
+}
+.calendar.compact {
+  padding-top: var(--sp-2);
+}
+.calendar.compact .cal-nav {
+  display: none;
 }
 .cal-nav {
   display: flex;

@@ -315,14 +315,27 @@ export function useHideOnScroll(threshold = 8) {
   useEffect(() => {
     let last = window.scrollY;
     let ticking = false;
+    let state = false;
+    // 切り替えた直後は、隠したことで高さが変わって起きるスクロールを向きとして扱わない（出る・隠れるの繰り返しを防ぐ）
+    let quietUntil = 0;
+    const set = (v: boolean) => {
+      if (v === state) return;
+      state = v;
+      quietUntil = performance.now() + 400;
+      setHidden(v);
+    };
     const update = () => {
       ticking = false;
       const y = window.scrollY;
+      if (performance.now() < quietUntil) {
+        last = y;
+        return;
+      }
       const dy = y - last;
       const atBottom = window.innerHeight + y >= document.documentElement.scrollHeight - 2;
-      if (y < 48) setHidden(false);
-      else if (dy > threshold && !atBottom) setHidden(true);
-      else if (dy < -threshold) setHidden(false);
+      if (y < 48) set(false);
+      else if (dy > threshold && !atBottom) set(true);
+      else if (dy < -threshold) set(false);
       else return;
       last = y;
     };
@@ -336,6 +349,77 @@ export function useHideOnScroll(threshold = 8) {
     return () => window.removeEventListener('scroll', onScroll);
   }, [threshold]);
   return hidden;
+}
+
+const PULL_TRIGGER = 64;
+const PULL_MAX = 96;
+
+/**
+ * 画面の一番上で下に引っ張ると、最新を取り直す。
+ * 引いた量に合わせて丸い印が下りてきて回り、一定以上引いて離すと更新する
+ */
+export function PullToRefresh({ onRefresh }: { onRefresh: () => Promise<unknown> }) {
+  const { toast } = useApp();
+  const [pull, setPull] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const refresh = useRef(onRefresh);
+  refresh.current = onRefresh;
+
+  useEffect(() => {
+    const st = { startY: 0, active: false, pull: 0, loading: false };
+    const start = (e: TouchEvent) => {
+      if (st.loading || window.scrollY > 0 || e.touches.length !== 1) return;
+      st.startY = e.touches[0].clientY;
+      st.active = true;
+      st.pull = 0;
+    };
+    const move = (e: TouchEvent) => {
+      if (!st.active) return;
+      const dy = e.touches[0].clientY - st.startY;
+      st.pull = dy <= 0 || window.scrollY > 0 ? 0 : Math.min(PULL_MAX, dy * 0.5);
+      setPull(st.pull);
+    };
+    const end = async () => {
+      if (!st.active) return;
+      st.active = false;
+      if (st.pull < PULL_TRIGGER) {
+        st.pull = 0;
+        setPull(0);
+        return;
+      }
+      st.loading = true;
+      setLoading(true);
+      setPull(PULL_TRIGGER);
+      try {
+        await refresh.current();
+      } catch {
+        toast('更新できませんでした。もう一度試してください', true);
+      } finally {
+        st.loading = false;
+        st.pull = 0;
+        setLoading(false);
+        setPull(0);
+      }
+    };
+    window.addEventListener('touchstart', start, { passive: true });
+    window.addEventListener('touchmove', move, { passive: true });
+    window.addEventListener('touchend', end);
+    window.addEventListener('touchcancel', end);
+    return () => {
+      window.removeEventListener('touchstart', start);
+      window.removeEventListener('touchmove', move);
+      window.removeEventListener('touchend', end);
+      window.removeEventListener('touchcancel', end);
+    };
+  }, []);
+
+  if (pull === 0 && !loading) return null;
+  const progress = Math.min(1, pull / PULL_TRIGGER);
+  return (
+    <div class="ptr" role="status" aria-label={loading ? '更新中' : '離すと更新'} style={{ '--pull': `${pull}px`, '--progress': progress }}>
+      <span class={`ptr-ring${loading ? ' spinning' : ''}`} />
+    </div>
+  );
 }
 
 /** 画面下のナビゲーション。どの画面からでも主要画面に移れる */
@@ -368,6 +452,12 @@ export function NavBar() {
   ];
   const active = resolveActiveNavKey(path);
   const hidden = useHideOnScroll();
+  // 上のバーや予定のタブも同じ合図で動かすため、画面全体に印を付ける
+  useEffect(() => {
+    if (hidden) document.documentElement.dataset.chrome = 'hidden';
+    else delete document.documentElement.dataset.chrome;
+  }, [hidden]);
+  useEffect(() => () => void delete document.documentElement.dataset.chrome, []);
   return (
     <nav class={`navbar${hidden ? ' is-hidden' : ''}`}>
       {items.map((it) => (

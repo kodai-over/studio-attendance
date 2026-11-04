@@ -44,9 +44,12 @@ export function CalendarEventChip({
 export function CalendarView({
   practices,
   onSelectDate,
+  compact = false,
 }: {
   practices: PracticeView[];
   onSelectDate?: (date: string) => void;
+  /** スクロール中は、選んだ日（なければ今日）の週だけに縮める */
+  compact?: boolean;
 }) {
   const app = useApp();
   const toneSettings = app?.me?.settings;
@@ -64,7 +67,14 @@ export function CalendarView({
     resolveInitialSelectedDate(currentYear, currentMonth, practicesByDate, todayIso),
   );
 
-  const days = buildMonthDays(currentYear, currentMonth, todayIso);
+  const monthDays = buildMonthDays(currentYear, currentMonth, todayIso);
+  const anchor = Math.max(
+    0,
+    [selectedDate, todayIso].map((d) => monthDays.findIndex((x) => x.date === d)).find((i) => i >= 0) ??
+      monthDays.findIndex((x) => x.isCurrentMonth),
+  );
+  const week = Math.floor(anchor / 7);
+  const days = compact ? monthDays.slice(week * 7, week * 7 + 7) : monthDays;
 
   const handlePrevMonth = () => {
     const prev = getPrevMonth(currentYear, currentMonth);
@@ -99,7 +109,7 @@ export function CalendarView({
   };
 
   return (
-    <div class="calendar">
+    <div class={`calendar${compact ? ' compact' : ''}`}>
       <div class="cal-nav">
         <span class="cal-year-month">{formatYearMonth(currentYear, currentMonth)}</span>
         <button
