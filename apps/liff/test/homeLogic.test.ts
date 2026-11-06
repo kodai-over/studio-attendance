@@ -149,10 +149,13 @@ describe('ホーム画面ロジック（homeLogic）', () => {
       const pTodayGoing = createMockPracticeView({ id: 'p-today-going', date: '2026-11-02', start: '19:00', end: '21:00', myAnswer: '行く' });
       const pTodayBooked = createMockPracticeView({ id: 'p-today-booked', booker: 'Ume', date: '2026-11-02', start: '10:00', end: '12:00', myAnswer: '行かない' });
       const pTodayCanceled = createMockPracticeView({ id: 'p-today-cancel', date: '2026-11-02', start: '14:00', myAnswer: '行く', status: '中止' });
+      const pTodayMaybeOther = createMockPracticeView({ id: 'p-today-maybe', booker: 'U_OTHER', date: '2026-11-02', start: '15:00', myAnswer: '保留' });
+      const pTodayNotGoingOther = createMockPracticeView({ id: 'p-today-notgoing', booker: 'U_OTHER', date: '2026-11-02', start: '16:00', myAnswer: '行かない' });
+      const pTodayUnansweredOther = createMockPracticeView({ id: 'p-today-unanswered', booker: 'U_OTHER', date: '2026-11-02', start: '17:00', myAnswer: null });
       const pTomorrow = createMockPracticeView({ id: 'p-tomorrow', date: '2026-11-03', myAnswer: '行く' });
 
       const todayList = getTodayPractices(
-        [pTodayGoing, pTodayBooked, pTodayCanceled, pTomorrow],
+        [pTodayGoing, pTodayBooked, pTodayCanceled, pTodayMaybeOther, pTodayNotGoingOther, pTodayUnansweredOther, pTomorrow],
         me,
         '2026-11-02',
       );
