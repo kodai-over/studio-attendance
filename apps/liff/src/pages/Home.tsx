@@ -153,7 +153,7 @@ export function HomePage() {
                 return (
                   <li key={n.id}>
                     <button
-                      class={`notice${isUnread ? ' is-unread' : ''}${isTodo ? ' is-todo' : ''}`}
+                      class={`notice${isUnread ? ' is-unread' : ''}`}
                       onClick={handleClick}
                     >
                       <span class={`notice-icon ${n.kind}`}>

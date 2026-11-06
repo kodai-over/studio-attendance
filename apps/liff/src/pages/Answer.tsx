@@ -31,6 +31,7 @@ import {
   processCommitItems,
   pruneStaleDrafts,
   recordSpecificChange,
+  resolveAnswerTargets,
   runDoneWorkflow,
   runTellWorkflow,
   saveDraftsToStorage,
@@ -129,13 +130,8 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   const [draft, setDraft] = useState<string | null>(null);
   const latest = useRef('');
 
-  // 対象となる予約情報全体
-  let allTargets: PracticeView[] = [];
-  if (isSpecific) {
-    allTargets = ids.map((id) => list?.find((v) => v.practice.id === id)).filter((v): v is PracticeView => v != null);
-  } else if (list) {
-    allTargets = list.filter((v) => isRsvpTarget(v, me.member.userId, me.member.groups, today, currentTime));
-  }
+  // 対象となる予約情報全体（ID指定がある場合は開始後も含め取得、通常一覧では開始前のアクティブなものを取得）
+  const allTargets = resolveAnswerTargets(list, ids, me.member.userId, me.member.groups, today, currentTime);
 
   // 所属グループ選択によるチケット絞り込み（groupsが空の予約情報や自分が予約者の予約情報は全グループで表示）
   const groupFiltered = isSpecific

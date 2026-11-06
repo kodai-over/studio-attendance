@@ -12,6 +12,7 @@ import {
   mergePracticesWithKeep,
   processCommitItems,
   recordSpecificChange,
+  resolveAnswerTargets,
   stageAnswer,
   type SpecificChangeMap,
 } from '../src/pages/answerLogic';
@@ -593,6 +594,8 @@ describe('開始後の予約情報に対する詳細画面からの回答変更�
   it('開始時刻を過ぎた予約情報でも、ID指定（?r= 指定）で回答画面を開いた場合は除外されず回答変更できる', () => {
     const today = '2026-11-02';
     const currentTime = '19:30';
+    const userId = 'U_USER';
+    const userGroups = ['G1'];
     const startedPractice = {
       practice: {
         id: 'p-started-detail',
@@ -609,21 +612,14 @@ describe('開始後の予約情報に対する詳細画面からの回答変更�
       myAnswer: '行く' as const,
     } as unknown as PracticeView;
 
-    // 1. 通常の一覧（全件表示）では isRsvpTarget により除外される
-    const isTargetInList = [startedPractice].filter((v) =>
-      v.practice.date >= today && v.practice.start > currentTime,
-    );
-    expect(isTargetInList).toHaveLength(0);
+    // 1. 通常の一覧（ID指定なし）では isRsvpTarget により開始後は除外される
+    const targetsInList = resolveAnswerTargets([startedPractice], [], userId, userGroups, today, currentTime);
+    expect(targetsInList).toHaveLength(0);
 
     // 2. 詳細画面の「回答を変更」から ID 指定（ids: ['p-started-detail']）で開いた場合は
-    // isSpecific 判定により確実に抽出され、回答変更の対象となる
-    const ids = ['p-started-detail'];
-    const isSpecific = ids.length > 0;
-    const allList = [startedPractice];
-    const targets = isSpecific
-      ? ids.map((id) => allList.find((v) => v.practice.id === id)).filter((v): v is PracticeView => v != null)
-      : [];
-    expect(targets).toHaveLength(1);
-    expect(targets[0].practice.id).toBe('p-started-detail');
+    // resolveAnswerTargets の isSpecific 経路により確実に抽出され、回答変更の対象となる
+    const targetsSpecific = resolveAnswerTargets([startedPractice], ['p-started-detail'], userId, userGroups, today, currentTime);
+    expect(targetsSpecific).toHaveLength(1);
+    expect(targetsSpecific[0].practice.id).toBe('p-started-detail');
   });
 });

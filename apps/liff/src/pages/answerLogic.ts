@@ -743,3 +743,25 @@ export async function executeStageAnswer(
     return 'staged';
   }
 }
+
+/**
+ * 回答画面の表示対象となる予約情報一覧を解決する。
+ * ID指定（募集カードや詳細画面からの遷移）がある場合は、開始後も含めて指定された予約情報を返す。
+ * ID指定がない場合は、開始前のアクティブな予約情報（isRsvpTarget）を返す。
+ */
+export function resolveAnswerTargets(
+  list: PracticeView[] | null | undefined,
+  ids: string[],
+  userId: string,
+  userGroups: string[],
+  today: string,
+  currentTime?: string,
+): PracticeView[] {
+  if (!list) return [];
+  if (ids.length > 0) {
+    return ids
+      .map((id) => list.find((v) => v.practice.id === id))
+      .filter((v): v is PracticeView => v != null);
+  }
+  return list.filter((v) => isRsvpTarget(v, userId, userGroups, today, currentTime));
+}
