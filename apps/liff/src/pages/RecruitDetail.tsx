@@ -2,16 +2,15 @@ import { useState } from 'preact/hooks';
 import type { AttendeeView, PracticeView } from '@studio-attendance/shared';
 import { api } from '../api';
 import { shareLink } from '../liff';
-import { Avatar, Icon, Spinner, Syncing, TopBar, go, shareData, useApp } from '../ui';
-import { EditForm, PracticePass, usePractice } from './Detail';
-import { confirmAndRemind } from './recruitLogic';
+import { Icon, Spinner, Syncing, TopBar, go, shareData, useApp } from '../ui';
+import { AnswerRow, Attendees, EditForm, PracticePass, usePractice } from './Detail';
+import { confirmAndRemind, resolveRecruitGroups } from './recruitLogic';
 
 /** 「募集」から開く練習の画面。募集先のグループ・ゲストの追加・参加リンク・（予約者と管理者は）編集と削除 */
 export function RecruitDetailPage({ id }: { id: string }) {
   const { me, deletePractice } = useApp();
   const { v, loading, busy, update } = usePractice(id);
   if (!v) return <><TopBar back />{loading ? <Spinner /> : <div class="empty">予約情報が見つかりません</div>}</>;
-  const guests = [...v.going, ...v.maybe, ...v.notGoing].filter((a) => a.kind === 'ゲスト');
   const remove = (a: AttendeeView) => update(() => api('removeAttendance', { id, participant: a.participant }), '削除しました');
 
   return (
@@ -21,6 +20,8 @@ export function RecruitDetailPage({ id }: { id: string }) {
       <div class="detail-layout">
         <div class="detail-primary">
           <PracticePass v={v} />
+
+          <AnswerRow v={v} />
 
           {(v.practice.status === '募集中' || v.practice.status === '満員') && (
             <RecruitForm
@@ -38,25 +39,10 @@ export function RecruitDetailPage({ id }: { id: string }) {
         </div>
 
         <div class="detail-side">
+          <Attendees v={v} onRemove={remove} />
+
           <section>
-            <div class="sec-head">
-              ゲスト {guests.length > 0 && <span class="n">{guests.length}</span>}
-            </div>
-            {guests.length > 0 && (
-              <div class="people section-gap-bottom">
-                {guests.map((a) => (
-                  <span class="person">
-                    <Avatar name={a.name} guest />
-                    <span>{a.name}</span>
-                    {a.canRemove && (
-                      <button class="x" aria-label={`${a.name}さんを削除`} onClick={() => confirm(`${a.name}さんを削除しますか？`) && remove(a)}>
-                        <Icon name="x" size={14} />
-                      </button>
-                    )}
-                  </span>
-                ))}
-              </div>
-            )}
+            <div class="sec-head">ゲストを追加</div>
             <GuestForm onAdd={(name) => update(() => api('addGuest', { id, name }), `${name}さんを追加しました`)} busy={busy} />
           </section>
 
@@ -114,9 +100,12 @@ function RecruitForm({
 }) {
   const { me } = useApp();
   const [picked, setPicked] = useState<string[]>([]);
-  const sent = (gid: string) => v.practice.groups.includes(gid);
-  const unrecruitedGroups = me.groups.filter((g) => !sent(g.id));
-  const sentGroups = me.groups.filter((g) => sent(g.id));
+  const { unrecruited: unrecruitedGroups, sent: sentGroups } = resolveRecruitGroups(
+    me.groups,
+    me.member.groups,
+    v.practice.groups,
+  );
+  const myGroupsCount = (me.member.groups ?? []).length;
   const canSend = v.canEdit && unrecruitedGroups.length > 0;
 
   const handleRemind = async (g: { id: string; name: string }) => {
@@ -126,7 +115,7 @@ function RecruitForm({
   return (
     <section>
       <div class="sec-head">グループに募集</div>
-      {me.groups.length === 0 ? (
+      {myGroupsCount === 0 || me.groups.length === 0 ? (
         <p class="note">Botをグループに招待すると送れます</p>
       ) : (
         <>

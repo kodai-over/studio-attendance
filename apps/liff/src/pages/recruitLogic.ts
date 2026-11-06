@@ -1,4 +1,4 @@
-import type { PracticeView } from '@studio-attendance/shared';
+import type { Group, PracticeView } from '@studio-attendance/shared';
 
 export type RecruitScope = 'mine' | 'all';
 export const RECRUIT_SCOPE_KEY = 'pb:recruitScope';
@@ -81,4 +81,37 @@ export async function confirmAndRemind(
   }
   await onRemind(group.id);
   return true;
+}
+
+/**
+ * 操作者が募集を送信可能なグループ（本人が所属しているグループ）を絞り込む。
+ * allGroups: システム内のグループ一覧（me.groups）
+ * myGroupIds: 操作者の所属グループID配列（me.member.groups）
+ */
+export function filterAvailableGroups(
+  allGroups: Group[] | undefined | null,
+  myGroupIds: string[] | undefined | null,
+): Group[] {
+  if (!allGroups || allGroups.length === 0) return [];
+  if (!myGroupIds || myGroupIds.length === 0) return [];
+  const set = new Set(myGroupIds);
+  return allGroups.filter((g) => set.has(g.id));
+}
+
+/**
+ * 操作者が募集・再募集できるグループを分類する。
+ * - unrecruited: 未募集のグループ（本人が所属しており、まだこの予約情報が送られていない）
+ * - sent: 募集済のグループ（本人が所属しており、すでにこの予約情報が送られている）
+ */
+export function resolveRecruitGroups(
+  allGroups: Group[] | undefined | null,
+  myGroupIds: string[] | undefined | null,
+  practiceGroupIds: string[] | undefined | null,
+): { unrecruited: Group[]; sent: Group[] } {
+  const available = filterAvailableGroups(allGroups, myGroupIds);
+  const sentSet = new Set(practiceGroupIds ?? []);
+  return {
+    unrecruited: available.filter((g) => !sentSet.has(g.id)),
+    sent: available.filter((g) => sentSet.has(g.id)),
+  };
 }

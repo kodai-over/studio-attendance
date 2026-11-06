@@ -1,8 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { PracticeView } from '@studio-attendance/shared';
+import type { Group, PracticeView } from '@studio-attendance/shared';
 import {
+  canRemindGroup,
+  confirmAndRemind,
+  filterAvailableGroups,
   filterRecruitPractices,
   readRecruitScope,
+  resolveRecruitGroups,
   saveRecruitScope,
   type RecruitScope,
 } from '../src/pages/recruitLogic';
@@ -105,6 +109,74 @@ describe('募集ロジック（recruitLogic）', () => {
       expect(res.shown).toEqual([]);
       expect(res.mine).toEqual([]);
       expect(res.all).toEqual([]);
+    });
+  });
+
+  describe('filterAvailableGroups / resolveRecruitGroups', () => {
+    const allGroups: Group[] = [
+      { id: 'g1', name: 'チームA' },
+      { id: 'g2', name: 'チームB' },
+      { id: 'g3', name: '他チームC' },
+    ];
+
+    it('自分が所属しているグループのみを抽出する', () => {
+      const myGroups = ['g1', 'g2'];
+      const res = filterAvailableGroups(allGroups, myGroups);
+      expect(res.map((g) => g.id)).toEqual(['g1', 'g2']);
+    });
+
+    it('所属グループが未登録または空の場合、空配列を返す', () => {
+      expect(filterAvailableGroups(allGroups, [])).toEqual([]);
+      expect(filterAvailableGroups(allGroups, null)).toEqual([]);
+      expect(filterAvailableGroups(null, ['g1'])).toEqual([]);
+    });
+
+    it('未募集グループと募集済グループを正しく分類する（本人の所属グループのみ対象）', () => {
+      const myGroups = ['g1', 'g2'];
+      // g1 はすでに募集済み、g3 も募集済みだが本人は所属していない
+      const practiceGroups = ['g1', 'g3'];
+      const { unrecruited, sent } = resolveRecruitGroups(allGroups, myGroups, practiceGroups);
+
+      // unrecruited には所属かつ未送信の g2 のみ
+      expect(unrecruited.map((g) => g.id)).toEqual(['g2']);
+      // sent には所属かつ送信済の g1 のみ（g3 は未所属なので含まれない）
+      expect(sent.map((g) => g.id)).toEqual(['g1']);
+    });
+  });
+
+  describe('canRemindGroup / confirmAndRemind', () => {
+    it('満員の場合は canSubmit が false になる', () => {
+      const pFull = createMockPractice('p1', 'U_ME', true);
+      pFull.practice.status = '満員';
+      expect(canRemindGroup(pFull)).toEqual({ canShow: true, canSubmit: false });
+    });
+
+    it('確認ダイアログでOKした場合は onRemind が呼ばれる', async () => {
+      let calledWith = '';
+      const ok = await confirmAndRemind(
+        { id: 'g1', name: 'チームA' },
+        async (gid) => {
+          calledWith = gid;
+        },
+        false,
+        () => true,
+      );
+      expect(ok).toBe(true);
+      expect(calledWith).toBe('g1');
+    });
+
+    it('確認ダイアログでキャンセルした場合は onRemind が呼ばれない', async () => {
+      let called = false;
+      const ok = await confirmAndRemind(
+        { id: 'g1', name: 'チームA' },
+        async () => {
+          called = true;
+        },
+        false,
+        () => false,
+      );
+      expect(ok).toBe(false);
+      expect(called).toBe(false);
     });
   });
 });
