@@ -248,3 +248,128 @@ export function resolveInitialSelectedDate(
 
   return monthDates[0] ?? `${prefix}01`;
 }
+
+// ---------------------------------------------------------------------------
+// 曜日フィルターと月週グループ化
+// ---------------------------------------------------------------------------
+
+export type DayKind = 'all' | 'weekday' | 'holiday';
+
+export const SCHEDULE_DAY_KIND_KEY = 'pb:scheduleDayKind';
+
+export function readDayKind(): DayKind {
+  try {
+    const val = localStorage.getItem(SCHEDULE_DAY_KIND_KEY);
+    if (val === 'weekday' || val === 'holiday') return val;
+    return 'all';
+  } catch {
+    return 'all';
+  }
+}
+
+export function saveDayKind(kind: DayKind): void {
+  try {
+    localStorage.setItem(SCHEDULE_DAY_KIND_KEY, kind);
+  } catch {
+    /* localStorage が使えない環境でも安全 */
+  }
+}
+
+function parseIsoDate(iso: string): { year: number; month: number; day: number } {
+  const [y, m, d] = iso.split('-').map(Number);
+  return { year: y, month: m, day: d };
+}
+
+function formatIso(year: number, month: number, day: number): string {
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/**
+ * 予約情報を曜日（すべて／平日／休日）で絞り込む。
+ * ※休日は土曜・日曜および日本の祝日（isHoliday）。
+ */
+export function filterByDayKind(list: PracticeView[], kind: DayKind): PracticeView[] {
+  if (kind === 'all') return list;
+
+  return list.filter((v) => {
+    const { year, month, day } = parseIsoDate(v.practice.date);
+    const dayOfWeek = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+    const isHol = isHoliday(v.practice.date) || dayOfWeek === 0 || dayOfWeek === 6;
+    return kind === 'holiday' ? isHol : !isHol;
+  });
+}
+
+export interface WeekGroup {
+  start: string; // 'YYYY-MM-DD' (その週の月曜日)
+  end: string;   // 'YYYY-MM-DD' (その週の日曜日)
+  label: string; // 'M/D〜M/D'
+  items: PracticeView[];
+}
+
+export interface MonthGroup {
+  month: string; // 'YYYY-MM'
+  label: string; // 'YYYY年M月'
+  weeks: WeekGroup[];
+  totalCount: number;
+}
+
+/**
+ * 日付からその週の月曜日と日曜日の日付を計算する（月曜始まり・日曜終わり）。
+ */
+function getWeekRangeForDate(dateIso: string): { start: string; end: string; label: string } {
+  const { year, month, day } = parseIsoDate(dateIso);
+  const d = new Date(Date.UTC(year, month - 1, day));
+  const dayOfWeek = d.getUTCDay(); // 0(日) - 6(土)
+  // 月曜日を週初めとするオフセット: 月(1)=0, 火(2)=1, ..., 土(6)=5, 日(0)=6
+  const mondayOffset = (dayOfWeek + 6) % 7;
+  const monUtc = Date.UTC(year, month - 1, day - mondayOffset);
+  const startD = new Date(monUtc);
+  const endD = new Date(monUtc + 6 * 24 * 60 * 60 * 1000);
+
+  const start = formatIso(startD.getUTCFullYear(), startD.getUTCMonth() + 1, startD.getUTCDate());
+  const end = formatIso(endD.getUTCFullYear(), endD.getUTCMonth() + 1, endD.getUTCDate());
+  const label = `${startD.getUTCMonth() + 1}/${startD.getUTCDate()}〜${endD.getUTCMonth() + 1}/${endD.getUTCDate()}`;
+  return { start, end, label };
+}
+
+/**
+ * 予約情報リストを「月 ＞ 週」の階層構造にグループ化する。
+ */
+export function groupByMonthWeek(list: PracticeView[]): MonthGroup[] {
+  const monthMap = new Map<string, { label: string; weekMap: Map<string, WeekGroup>; totalCount: number }>();
+
+  for (const v of list) {
+    const monthKey = v.practice.date.slice(0, 7); // 'YYYY-MM'
+    const { year, month } = parseIsoDate(v.practice.date);
+    const monthLabel = `${year}年${month}月`;
+
+    let mEntry = monthMap.get(monthKey);
+    if (!mEntry) {
+      mEntry = { label: monthLabel, weekMap: new Map(), totalCount: 0 };
+      monthMap.set(monthKey, mEntry);
+    }
+    mEntry.totalCount++;
+
+    const { start, end, label: weekLabel } = getWeekRangeForDate(v.practice.date);
+    let wEntry = mEntry.weekMap.get(start);
+    if (!wEntry) {
+      wEntry = { start, end, label: weekLabel, items: [] };
+      mEntry.weekMap.set(start, wEntry);
+    }
+    wEntry.items.push(v);
+  }
+
+  const result: MonthGroup[] = [];
+  for (const [monthKey, mVal] of monthMap.entries()) {
+    const weeks: WeekGroup[] = Array.from(mVal.weekMap.values());
+    result.push({
+      month: monthKey,
+      label: mVal.label,
+      weeks,
+      totalCount: mVal.totalCount,
+    });
+  }
+
+  return result;
+}
+

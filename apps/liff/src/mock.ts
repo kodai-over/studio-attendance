@@ -110,6 +110,106 @@ store.p = [
     groups: ['G1'],
     memo: '最低人数4人に未達のままキャンセル期限を過ぎている枠',
   }),
+  // 9. 11月末（11/30 月・週跨ぎ 11/30〜12/6）
+  {
+    id: makePracticeId({ studio: 'studio worcle 横浜', date: '2026-11-30', start: '19:00', room: '101' }),
+    date: '2026-11-30',
+    start: '19:00',
+    end: '21:00',
+    studio: 'studio worcle 横浜',
+    room: '101',
+    fee: 4400,
+    booker: 'Ume',
+    max: null,
+    min: null,
+    memo: '11月締めくくり合わせ練習（11/30〜12/6の週）',
+    status: '募集中',
+    groups: ['G1'],
+    joinKey: 'mockkey',
+    feeOverride: null,
+    warned: false,
+    createdAt: new Date().toISOString(),
+  },
+  // 10. 12月初日（12/1 火・週跨ぎ 11/30〜12/6）
+  {
+    id: makePracticeId({ studio: 'BUZZ渋谷', date: '2026-12-01', start: '19:00', room: '渋谷A' }),
+    date: '2026-12-01',
+    start: '19:00',
+    end: '21:00',
+    studio: 'BUZZ渋谷',
+    room: '渋谷A',
+    fee: 5600,
+    booker: 'U2',
+    max: null,
+    min: null,
+    memo: '12月新ルーティン開始練習（11/30〜12/6の週）',
+    status: '募集中',
+    groups: ['G1', 'G2'],
+    joinKey: 'mockkey',
+    feeOverride: null,
+    warned: false,
+    createdAt: new Date().toISOString(),
+  },
+  // 11. 12月第1週 週末（12/5 土・週跨ぎ 11/30〜12/6）
+  {
+    id: makePracticeId({ studio: 'studio worcle 原宿', date: '2026-12-05', start: '14:00', room: '201' }),
+    date: '2026-12-05',
+    start: '14:00',
+    end: '17:00',
+    studio: 'studio worcle 原宿',
+    room: '201',
+    fee: 8800,
+    booker: 'Ume',
+    max: null,
+    min: null,
+    memo: 'サークル全体練習会（11/30〜12/6の週）',
+    status: '募集中',
+    groups: ['G2'],
+    joinKey: 'mockkey',
+    feeOverride: null,
+    warned: false,
+    createdAt: new Date().toISOString(),
+  },
+  // 12. 12月第2週 平日（12/10 木・週 12/7〜12/13）
+  {
+    id: makePracticeId({ studio: 'BUZZ横浜東口', date: '2026-12-10', start: '19:30', room: 'Bst' }),
+    date: '2026-12-10',
+    start: '19:30',
+    end: '21:30',
+    studio: 'BUZZ横浜東口',
+    room: 'Bst',
+    fee: 4400,
+    booker: 'U3',
+    max: null,
+    min: null,
+    memo: 'ナンバー少人数強化練',
+    status: '募集中',
+    groups: ['G1'],
+    joinKey: 'mockkey',
+    feeOverride: null,
+    warned: false,
+    createdAt: new Date().toISOString(),
+  },
+  // 13. 12月第2週 週末（12/13 日・週 12/7〜12/13）
+  {
+    id: makePracticeId({ studio: 'studio worcle 横浜', date: '2026-12-13', start: '10:00', room: '106' }),
+    date: '2026-12-13',
+    start: '10:00',
+    end: '13:00',
+    studio: 'studio worcle 横浜',
+    room: '106',
+    fee: 6600,
+    booker: 'U2',
+    max: null,
+    min: null,
+    memo: '冬バトルエントリー対策会',
+    status: '募集中',
+    groups: ['G1', 'G2', 'G3'],
+    joinKey: 'mockkey',
+    feeOverride: null,
+    warned: false,
+    createdAt: new Date().toISOString(),
+  },
 ];
 
 let attOffsetMins = 180;
@@ -184,6 +284,29 @@ att(store.p[7].id, 'U4', 'みお', '保留');
 att(store.p[8].id, 'Ume', 'おおゆち', '行く');
 att(store.p[8].id, 'U3', 'けんた', '行く');
 att(store.p[8].id, 'U5', 'れん', '保留');
+
+// 9. 11/30 (月) worcle 横浜 (store.p[9])
+att(store.p[9].id, 'Ume', 'おおゆち', '行く');
+att(store.p[9].id, 'U3', 'けんた', '行く');
+
+// 10. 12/1 (火) BUZZ渋谷 (store.p[10])
+att(store.p[10].id, 'U2', 'さくら', '行く');
+att(store.p[10].id, 'Ume', 'おおゆち', '行く');
+att(store.p[10].id, 'U4', 'みお', '保留');
+
+// 11. 12/5 (土) worcle 原宿 (store.p[11])
+att(store.p[11].id, 'Ume', 'おおゆち', '行く');
+att(store.p[11].id, 'U3', 'けんた', '行く');
+att(store.p[11].id, 'U5', 'れん', '行く');
+
+// 12. 12/10 (木) BUZZ横浜東口 (store.p[12])
+att(store.p[12].id, 'U3', 'けんた', '行く');
+att(store.p[12].id, 'Ume', 'おおゆち', '保留');
+
+// 13. 12/13 (日) worcle 横浜 (store.p[13])
+att(store.p[13].id, 'U2', 'さくら', '行く');
+att(store.p[13].id, 'Ume', 'おおゆち', '行く');
+att(store.p[13].id, 'U6', 'あおい', '行く');
 
 store.f = [
   { id: 'f1', userId: 'U3', name: 'けんた', text: '練習の前日にリマインドがほしい', status: '改善済み', reply: '前日にアプリの「自分が行く」で確認できるようにしました', createdAt: new Date(Date.now() - 86400000).toISOString() },

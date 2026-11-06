@@ -628,6 +628,28 @@ describe('出欠', () => {
     expect(t.line.pushes.slice(pushes).map((p) => p.to)).toEqual([G1, 'C2']);
     expect(t.store.getPractice(id)?.groups).toEqual([G1, 'C2']);
   });
+
+  it('すでに募集済みのグループにもう一度募集（リマインド）を送れる。10分あける制限と権限チェックがある', () => {
+    const item = { ...reservation, date: '2026-10-30', max: null, min: null, memo: '' };
+    const { created } = handleApi(t.ctx, { userId: 'U9', name: 'きゅう' }, 'createPractices', { items: [item], groups: [G1] }) as any;
+    const id = created[0];
+
+    // 予約者でも管理者でもないメンバーは送れない
+    expect(() => handleApi(t.ctx, { userId: 'U1', name: 'いち' }, 'remindPractice', { id, group: G1 })).toThrow('予約者か管理者');
+
+    // 予約者本人がリマインド送信
+    const pushesBefore = t.line.pushes.length;
+    const v = handleApi(t.ctx, { userId: 'U9' }, 'remindPractice', { id, group: G1 }) as any;
+    expect(v.practice.id).toBe(id);
+    expect(t.line.pushes.length).toBe(pushesBefore + 1);
+    expect(t.line.pushes[pushesBefore].to).toBe(G1);
+
+    // 10分以内の連続送信は拒否される
+    expect(() => handleApi(t.ctx, { userId: 'U9' }, 'remindPractice', { id, group: G1 })).toThrow('10分');
+
+    // 管理者でも10分制限内は拒否される
+    expect(() => handleApi(t.ctx, { userId: ADMIN }, 'remindPractice', { id, group: G1 })).toThrow('10分');
+  });
 });
 
 describe('改善要望', () => {

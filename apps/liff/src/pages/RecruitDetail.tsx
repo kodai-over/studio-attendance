@@ -29,6 +29,10 @@ export function RecruitDetailPage({ id }: { id: string }) {
                 if (me.actAs === 'test' && !confirm('確認用アカウント「admin」として、グループに募集を送ります。よろしいですか？')) return;
                 await update(() => api('recruitPractice', { id, groups }), 'グループに募集を送りました');
               }}
+              onRemind={async (group) => {
+                if (me.actAs === 'test' && !confirm('確認用アカウント「admin」として、グループに募集を送ります。よろしいですか？')) return;
+                await update(() => api('remindPractice', { id, group }), '募集を送りました');
+              }}
             />
           )}
         </div>
@@ -97,11 +101,29 @@ function GuestForm({ onAdd, busy }: { onAdd: (name: string) => Promise<unknown>;
 }
 
 /** グループへの募集。いつも出し、グループがない・送れない人にはその旨を一行だけ出す */
-function RecruitForm({ v, onSend, busy }: { v: PracticeView; onSend: (groups: string[]) => Promise<unknown>; busy: boolean }) {
+function RecruitForm({
+  v,
+  onSend,
+  onRemind,
+  busy,
+}: {
+  v: PracticeView;
+  onSend: (groups: string[]) => Promise<unknown>;
+  onRemind: (group: string) => Promise<unknown>;
+  busy: boolean;
+}) {
   const { me } = useApp();
   const [picked, setPicked] = useState<string[]>([]);
   const sent = (gid: string) => v.practice.groups.includes(gid);
-  const canSend = v.canEdit && me.groups.some((g) => !sent(g.id));
+  const unrecruitedGroups = me.groups.filter((g) => !sent(g.id));
+  const sentGroups = me.groups.filter((g) => sent(g.id));
+  const canSend = v.canEdit && unrecruitedGroups.length > 0;
+
+  const handleRemind = async (g: { id: string; name: string }) => {
+    if (!confirm(`${g.name} にもう一度募集カードを送りますか？`)) return;
+    await onRemind(g.id);
+  };
+
   return (
     <section>
       <div class="sec-head">グループに募集</div>
@@ -109,24 +131,21 @@ function RecruitForm({ v, onSend, busy }: { v: PracticeView; onSend: (groups: st
         <p class="note">Botをグループに招待すると送れます</p>
       ) : (
         <>
-          <div class="chips">
-            {me.groups.map((g) =>
-              sent(g.id) || !v.canEdit ? (
-                <button class="chip" disabled aria-label={`${g.name}（${sent(g.id) ? '募集済' : '未募集'}）`}>
-                  {sent(g.id) && <Icon name="check" size={16} />}
-                  {g.name}
-                </button>
-              ) : (
+          {unrecruitedGroups.length > 0 && (
+            <div class="chips">
+              {unrecruitedGroups.map((g) => (
                 <button
+                  key={g.id}
                   class="chip"
+                  disabled={!v.canEdit}
                   aria-pressed={picked.includes(g.id)}
                   onClick={() => setPicked(picked.includes(g.id) ? picked.filter((x) => x !== g.id) : [...picked, g.id])}
                 >
                   {g.name}
                 </button>
-              ),
-            )}
-          </div>
+              ))}
+            </div>
+          )}
           {!v.canEdit && <p class="note">送れるのは予約者と管理者です</p>}
           {canSend && (
             <button
@@ -139,6 +158,28 @@ function RecruitForm({ v, onSend, busy }: { v: PracticeView; onSend: (groups: st
               <Icon name="send" size={18} />
               {picked.length > 0 ? `${picked.length}グループに募集を送る` : '募集を送る'}
             </button>
+          )}
+
+          {sentGroups.length > 0 && v.canEdit && (
+            <div class="sent-groups section-gap">
+              <div class="note">募集済みのグループ（もう一度募集を送る）</div>
+              <div class="remind-list">
+                {sentGroups.map((g) => (
+                  <div key={g.id} class="remind-item">
+                    <span>{g.name}</span>
+                    <button
+                      type="button"
+                      class="btn small plain"
+                      disabled={busy || v.practice.status === '満員'}
+                      onClick={() => handleRemind(g)}
+                    >
+                      <Icon name="send" size={14} />
+                      もう一度募集
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </>
       )}

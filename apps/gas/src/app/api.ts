@@ -35,7 +35,7 @@ import {
   type StudioDef,
 } from '@studio-attendance/shared';
 import { UserError, type Ctx, type RawReservation } from './ports';
-import { buildDraft, classifyFor, createPractices, ensureMember, inGroupKey, loadDraft, noteGroupMember, readReservations, recordAnswer, refreshStatus, removeDraft, sendPracticeCancellation, sendRecruit, withDefaultFee } from './practices';
+import { buildDraft, classifyFor, createPractices, ensureMember, inGroupKey, loadDraft, noteGroupMember, readReservations, recordAnswer, refreshStatus, remindRecruit, removeDraft, sendPracticeCancellation, sendRecruit, withDefaultFee } from './practices';
 
 /** 誰として操作しているか（管理者の見え方の切り替え） */
 interface Acting {
@@ -392,6 +392,11 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
       const cur = getPracticeOrThrow(ctx, id);
       ctx.store.savePractice({ ...cur, groups: [...new Set([...cur.groups, ...sent])] });
     });
+    return view(ctx, id, me);
+  },
+
+  remindPractice(ctx, me, { id, group }) {
+    remindRecruit(ctx, me.userId, id, group);
     return view(ctx, id, me);
   },
 

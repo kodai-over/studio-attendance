@@ -3,16 +3,20 @@ import type { Answer, AttendeeView, PracticeStatus, PracticeView } from '@studio
 import {
   buildMonthDays,
   computeScrollOffset,
+  filterByDayKind,
   formatCalendarCount,
   formatYearMonth,
   getCalendarToneLabel,
   getNextMonth,
   getPracticeCalendarTone,
   getPrevMonth,
+  groupByMonthWeek,
   groupPracticesByDate,
   hasPracticeOnDate,
+  readDayKind,
   readScheduleViewMode,
   resolveInitialSelectedDate,
+  saveDayKind,
   saveScheduleViewMode,
   type CalendarToneSettings,
 } from '../src/pages/calendarLogic';
@@ -434,4 +438,95 @@ describe('カレンダーロジック（calendarLogic）', () => {
       expect(computeScrollOffset(200, 100, 8)).toBe(92);
     });
   });
+
+  describe('曜日フィルターと月週グループ化（calendarLogic 新機能）', () => {
+    describe('filterByDayKind（曜日フィルター：すべて・平日・休日）', () => {
+      // 2026-11-02 (月・平日)
+      const pWeekday = createMockPracticeView({ id: 'p-mon', date: '2026-11-02' });
+      // 2026-11-03 (火・文化の日・祝日)
+      const pHolidayTuesday = createMockPracticeView({ id: 'p-tue-holiday', date: '2026-11-03' });
+      // 2026-11-07 (土・週末)
+      const pSaturday = createMockPracticeView({ id: 'p-sat', date: '2026-11-07' });
+      // 2026-11-08 (日・週末)
+      const pSunday = createMockPracticeView({ id: 'p-sun', date: '2026-11-08' });
+
+      const list = [pWeekday, pHolidayTuesday, pSaturday, pSunday];
+
+      it('all の場合はすべての予約情報を返す', () => {
+        const res = filterByDayKind(list, 'all');
+        expect(res).toHaveLength(4);
+      });
+
+      it('weekday の場合は祝日と土日を除外し、平日のみを返す', () => {
+        const res = filterByDayKind(list, 'weekday');
+        expect(res.map((v) => v.practice.id)).toEqual(['p-mon']);
+      });
+
+      it('holiday の場合は土日および祝日（文化の日）を返す', () => {
+        const res = filterByDayKind(list, 'holiday');
+        expect(res.map((v) => v.practice.id)).toEqual(['p-tue-holiday', 'p-sat', 'p-sun']);
+      });
+    });
+
+    describe('groupByMonthWeek（月別・週別グループ化）', () => {
+      it('予約情報を月ごと、さらに週（月曜〜日曜）ごとに階層化する', () => {
+        const p0 = createMockPracticeView({ id: 'p0', date: '2026-11-01' }); // 日曜日（前週 10/26〜11/1）
+        const p1 = createMockPracticeView({ id: 'p1', date: '2026-11-02' }); // 月曜日（第1週 11/2〜11/8）
+        const p2 = createMockPracticeView({ id: 'p2', date: '2026-11-05' }); // 木曜日（第1週 11/2〜11/8）
+        const p3 = createMockPracticeView({ id: 'p3', date: '2026-11-10' }); // 火曜日（第2週 11/9〜11/15）
+        const p4 = createMockPracticeView({ id: 'p4', date: '2026-12-05' }); // 12月第1週（11/30〜12/6）
+        const list = [p0, p1, p2, p3, p4];
+
+        const grouped = groupByMonthWeek(list);
+        expect(grouped).toHaveLength(2); // 11月と12月
+
+        // 11月
+        const nov = grouped[0];
+        expect(nov.month).toBe('2026-11');
+        expect(nov.label).toBe('2026年11月');
+        expect(nov.totalCount).toBe(4);
+        expect(nov.weeks).toHaveLength(3);
+
+        // 11月 1週目（11/1 日曜日）
+        expect(nov.weeks[0].start).toBe('2026-10-26');
+        expect(nov.weeks[0].end).toBe('2026-11-01');
+        expect(nov.weeks[0].label).toBe('10/26〜11/1');
+        expect(nov.weeks[0].items.map((v) => v.practice.id)).toEqual(['p0']);
+
+        // 11月 2週目（11/2〜11/8）
+        expect(nov.weeks[1].start).toBe('2026-11-02');
+        expect(nov.weeks[1].end).toBe('2026-11-08');
+        expect(nov.weeks[1].label).toBe('11/2〜11/8');
+        expect(nov.weeks[1].items.map((v) => v.practice.id)).toEqual(['p1', 'p2']);
+
+        // 11月 3週目（11/9〜11/15）
+        expect(nov.weeks[2].start).toBe('2026-11-09');
+        expect(nov.weeks[2].end).toBe('2026-11-15');
+        expect(nov.weeks[2].label).toBe('11/9〜11/15');
+        expect(nov.weeks[2].items.map((v) => v.practice.id)).toEqual(['p3']);
+
+        // 12月
+        const dec = grouped[1];
+        expect(dec.month).toBe('2026-12');
+        expect(dec.totalCount).toBe(1);
+        expect(dec.weeks[0].start).toBe('2026-11-30');
+        expect(dec.weeks[0].end).toBe('2026-12-06');
+        expect(dec.weeks[0].label).toBe('11/30〜12/6');
+      });
+    });
+
+    describe('フィルター状態の保存・読み込み（localStorage）', () => {
+      it('曜日フィルターの保存と読み込みが正しく動作し、無効な値は all にフォールバックする', () => {
+        expect(readDayKind()).toBe('all');
+        saveDayKind('weekday');
+        expect(readDayKind()).toBe('weekday');
+        saveDayKind('holiday');
+        expect(readDayKind()).toBe('holiday');
+
+        localStorage.setItem('pb:scheduleDayKind', 'invalid');
+        expect(readDayKind()).toBe('all');
+      });
+    });
+  });
 });
+

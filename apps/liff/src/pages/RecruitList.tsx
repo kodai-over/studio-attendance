@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { isAdmin, labelDate, type PracticeView } from '@studio-attendance/shared';
 import { api } from '../api';
 import { TicketSub } from './List';
-import { DeleteConfirmDialog, Icon, Spinner, StatusBadge, Stub, TopBar, go, place, useApp, useRunner } from '../ui';
+import { DeleteConfirmDialog, Icon, Spinner, StatusBadge, Stub, Tabs, TopBar, go, place, useApp, useRunner } from '../ui';
+import { filterRecruitPractices, readRecruitScope, saveRecruitScope, type RecruitScope } from './recruitLogic';
 
 /**
  * 「募集」。自分が登録した練習（管理者はすべての練習）を並べ、押すと募集・編集の画面へ。
@@ -27,8 +28,16 @@ export function RecruitListPage() {
   }, []);
 
   const admin = isAdmin(me.member);
-  // 直せる練習（自分が登録した練習。管理者はすべて）。サーバーの判定（canEdit）にそろえる
-  const list = practices == null && !fresh ? null : (practices ?? []).filter((v) => v.canEdit);
+  const [scope, setScope] = useState<RecruitScope>(() => readRecruitScope());
+
+  const selectScope = (s: string) => {
+    const next = s === 'all' ? 'all' : 'mine';
+    setScope(next);
+    saveRecruitScope(next);
+  };
+
+  const rawPractices = practices == null && !fresh ? null : practices;
+  const { mine, all, shown: list } = filterRecruitPractices(rawPractices, admin, me.member.userId, scope);
 
   const remove = (v: PracticeView) => {
     setOpened(null);
@@ -42,6 +51,18 @@ export function RecruitListPage() {
           <Icon name="plus" />
         </button>
       </TopBar>
+      {admin && (
+        <div class="tabs-head section">
+          <Tabs
+            value={scope}
+            onChange={selectScope}
+            items={[
+              { key: 'mine', label: '自分', count: mine.length },
+              { key: 'all', label: 'すべて', count: all.length },
+            ]}
+          />
+        </div>
+      )}
       {list == null ? (
         <Spinner />
       ) : list.length === 0 ? (

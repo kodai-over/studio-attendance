@@ -1955,12 +1955,216 @@ html {
   top: var(--bar-h);
   transition: top 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), padding-top 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
   z-index: 4;
-  margin: 0 calc(var(--pad-x) * -1) var(--sp-5);
-  padding: 0 var(--pad-x) var(--sp-3);
+  margin: 0 calc(var(--pad-x) * -1) var(--sp-1);
+  padding: 0 var(--pad-x) var(--sp-1);
   background: var(--bg);
+}
+.schedule-head:has(.calendar) {
+  margin-bottom: var(--sp-3);
+  padding-bottom: var(--sp-2);
 }
 .schedule-head .tabs-head {
   margin: 0;
+}
+
+/* ---------- 予定: 曜日フィルター（格納型） ---------- */
+.filter-fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s ease;
+  opacity: 0;
+}
+.filter-fold[data-open='true'] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  margin-top: var(--sp-2);
+}
+.filter-fold-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+.filter-chips {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+.filter-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--separator);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.filter-chip[aria-pressed='true'],
+.filter-chip.active {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+  font-weight: 600;
+}
+.filter-chip:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* フィルター適用中（格納時）の表示タグ */
+.active-filter-tags {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+.filter-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 8px;
+  background: var(--surface);
+  border: 1px solid var(--separator);
+  border-radius: var(--r-full);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+}
+.filter-tag .tag-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  padding: 0;
+  border-radius: 50%;
+}
+.filter-tag .tag-x:hover {
+  color: var(--text);
+}
+
+.icon-btn.is-filtered {
+  position: relative;
+}
+.icon-btn.is-filtered::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text);
+}
+
+/* ---------- 予定: カレンダー日付選択バー ---------- */
+.selected-date-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-2) var(--sp-3);
+  margin-bottom: var(--sp-3);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px solid var(--separator);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+.selected-date-banner .clear-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  border-radius: 50%;
+}
+.selected-date-banner .clear-btn:hover {
+  color: var(--text);
+  background: var(--separator);
+}
+
+/* ---------- 予定: 月・週見出しと折りたたみ ---------- */
+.schedule-group {
+  margin-bottom: var(--sp-4);
+}
+.schedule-group-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  width: 100%;
+  padding: var(--sp-2) 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  user-select: none;
+}
+.schedule-group-head.month {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  margin-top: var(--sp-2);
+  border-bottom: 1px solid var(--separator);
+  padding-bottom: var(--sp-2);
+}
+.schedule-group:first-child .schedule-group-head.month,
+.schedule-group:first-of-type .schedule-group-head.month {
+  margin-top: 0;
+}
+.schedule-group-head.week {
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--text-2);
+  margin-top: var(--sp-1);
+}
+.schedule-group-head .chevron-icon {
+  display: inline-flex;
+  transition: transform 0.2s ease;
+}
+.schedule-group-head[data-open='false'] .chevron-icon {
+  transform: rotate(-90deg);
+}
+.schedule-group-head .group-count {
+  margin-left: auto;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  font-weight: normal;
+}
+.schedule-group-body[data-open='false'] {
+  display: none;
+}
+
+/* ---------- 募集: もう一度募集（リマインド） ---------- */
+.remind-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+.remind-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface);
+  border-radius: var(--r-md);
+  border: 1px solid var(--separator);
+  font-size: var(--fs-sm);
+}
+.remind-item .btn {
+  margin-left: var(--sp-2);
 }
 :root[data-chrome='hidden'] .schedule-head {
   top: 0;
