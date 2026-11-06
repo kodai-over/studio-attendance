@@ -670,7 +670,7 @@ describe('RecruitDetail の「もう一度募集」', () => {
     const onRemind = vi.fn().mockResolvedValue(true);
     const confirmFn = vi.fn().mockReturnValue(false);
 
-    const sent = await confirmAndRemind({ id: 'G1', name: 'チームA' }, onRemind, confirmFn);
+    const sent = await confirmAndRemind({ id: 'G1', name: 'チームA' }, onRemind, false, confirmFn);
     expect(sent).toBe(false);
     expect(confirmFn).toHaveBeenCalledWith('チームA にもう一度募集カードを送りますか？');
     expect(onRemind).not.toHaveBeenCalled();
@@ -680,9 +680,20 @@ describe('RecruitDetail の「もう一度募集」', () => {
     const onRemind = vi.fn().mockResolvedValue(true);
     const confirmFn = vi.fn().mockReturnValue(true);
 
-    const sent = await confirmAndRemind({ id: 'G1', name: 'チームA' }, onRemind, confirmFn);
+    const sent = await confirmAndRemind({ id: 'G1', name: 'チームA' }, onRemind, false, confirmFn);
     expect(sent).toBe(true);
     expect(confirmFn).toHaveBeenCalledWith('チームA にもう一度募集カードを送りますか？');
+    expect(onRemind).toHaveBeenCalledWith('G1');
+  });
+
+  it('確認用アカウント（actAs="test"）の場合はダイアログにその旨を含めて1回だけ確認する', async () => {
+    const onRemind = vi.fn().mockResolvedValue(true);
+    const confirmFn = vi.fn().mockReturnValue(true);
+
+    const sent = await confirmAndRemind({ id: 'G1', name: 'チームA' }, onRemind, true, confirmFn);
+    expect(sent).toBe(true);
+    expect(confirmFn).toHaveBeenCalledTimes(1);
+    expect(confirmFn).toHaveBeenCalledWith('確認用アカウント「admin」として、チームA にもう一度募集カードを送りますか？');
     expect(onRemind).toHaveBeenCalledWith('G1');
   });
 });

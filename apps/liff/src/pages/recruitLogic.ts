@@ -65,13 +65,18 @@ export function canRemindGroup(v: PracticeView): { canShow: boolean; canSubmit: 
 /**
  * 確認ダイアログを経て「もう一度募集」を実行する。
  * キャンセルされた場合は false を返し onRemind は実行しない。
+ * 確認用アカウント（actAs === 'test'）の場合は確認文にその旨を明記する。
  */
 export async function confirmAndRemind(
   group: { id: string; name: string },
   onRemind: (groupId: string) => Promise<unknown>,
-  confirmFn: (msg: string) => boolean = (msg) => confirm(msg),
+  isTestUser = false,
+  confirmFn: (msg: string) => boolean = (msg) => (typeof confirm !== 'undefined' ? confirm(msg) : true),
 ): Promise<boolean> {
-  if (!confirmFn(`${group.name} にもう一度募集カードを送りますか？`)) {
+  const msg = isTestUser
+    ? `確認用アカウント「admin」として、${group.name} にもう一度募集カードを送りますか？`
+    : `${group.name} にもう一度募集カードを送りますか？`;
+  if (!confirmFn(msg)) {
     return false;
   }
   await onRemind(group.id);

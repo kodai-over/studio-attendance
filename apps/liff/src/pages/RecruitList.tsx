@@ -67,7 +67,10 @@ export function RecruitListPage() {
         <Spinner />
       ) : list.length === 0 ? (
         <div class="empty">
-          <div>予約情報はまだありません</div>
+          <div>{admin && scope === 'mine' && all.length > 0 ? '自分が登録した予約情報はありません' : '予約情報はまだありません'}</div>
+          {admin && scope === 'mine' && all.length > 0 && (
+            <p class="note">他の人が登録した予約情報は「すべて」で見られます</p>
+          )}
           <button class="btn primary" onClick={() => go('/register')}>
             <Icon name="plus" size={18} />
             スタジオ予約を登録
