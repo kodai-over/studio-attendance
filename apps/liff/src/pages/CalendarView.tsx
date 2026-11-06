@@ -10,7 +10,7 @@ import {
   getPracticeCalendarTone,
   getPrevMonth,
   groupPracticesByDate,
-  resolveInitialSelectedDate,
+  resolveNextSelectedDate,
   type CalendarDay,
   type CalendarEventTone,
 } from './calendarLogic';
@@ -43,11 +43,13 @@ export function CalendarEventChip({
 
 export function CalendarView({
   practices,
+  selectedDate: propSelectedDate,
   onSelectDate,
   compact = false,
 }: {
   practices: PracticeView[];
-  onSelectDate?: (date: string) => void;
+  selectedDate?: string | null;
+  onSelectDate?: (date: string | null) => void;
   /** スクロール中は、選んだ日（なければ今日）の週だけに縮める */
   compact?: boolean;
 }) {
@@ -62,10 +64,9 @@ export function CalendarView({
 
   const practicesByDate = groupPracticesByDate(practices);
 
-  // 初期選択日（今日、または直近の予定日）
-  const [selectedDate, setSelectedDate] = useState<string | null>(() =>
-    resolveInitialSelectedDate(currentYear, currentMonth, practicesByDate, todayIso),
-  );
+  // 親から渡された selectedDate を優先し、なければ内部 state を利用
+  const [innerSelectedDate, setInnerSelectedDate] = useState<string | null>(null);
+  const selectedDate = propSelectedDate !== undefined ? propSelectedDate : innerSelectedDate;
 
   const monthDays = buildMonthDays(currentYear, currentMonth, todayIso);
   const anchor = Math.max(
@@ -80,32 +81,33 @@ export function CalendarView({
     const prev = getPrevMonth(currentYear, currentMonth);
     setCurrentYear(prev.year);
     setCurrentMonth(prev.month);
-    setSelectedDate(null);
-    onSelectDate?.('');
+    setInnerSelectedDate(null);
+    onSelectDate?.(null);
   };
 
   const handleNextMonth = () => {
     const next = getNextMonth(currentYear, currentMonth);
     setCurrentYear(next.year);
     setCurrentMonth(next.month);
-    setSelectedDate(null);
-    onSelectDate?.('');
+    setInnerSelectedDate(null);
+    onSelectDate?.(null);
   };
 
   const handleToday = () => {
     setCurrentYear(tY);
     setCurrentMonth(tM);
-    setSelectedDate(todayIso);
+    setInnerSelectedDate(todayIso);
     onSelectDate?.(todayIso);
   };
 
   const handleSelectDay = (day: CalendarDay) => {
-    setSelectedDate(day.date);
+    const next = resolveNextSelectedDate(selectedDate, day.date);
+    setInnerSelectedDate(next);
     if (!day.isCurrentMonth) {
       setCurrentYear(day.year);
       setCurrentMonth(day.month);
     }
-    onSelectDate?.(day.date);
+    onSelectDate?.(next);
   };
 
   return (

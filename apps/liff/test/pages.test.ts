@@ -17,6 +17,8 @@ import {
   type SpecificChangeMap,
 } from '../src/pages/answerLogic';
 import { MyAnswerBadge, readTab } from '../src/pages/List';
+import { filterByDayKind, groupByMonthWeek, resolveNextSelectedDate, toggleCollapseKey } from '../src/pages/calendarLogic';
+import { canRemindGroup, confirmAndRemind } from '../src/pages/recruitLogic';
 import { resolveInitialHash } from '../src/route';
 import { RsvpButtons, cancelDeadlineDisplay, go, handleHashChangeGuard, hasLargeTitle, parseHash, setNavigationGuard } from '../src/ui';
 
@@ -621,5 +623,191 @@ describe('開始後の予約情報に対する詳細画面からの回答変更�
     const targetsSpecific = resolveAnswerTargets([startedPractice], ['p-started-detail'], userId, userGroups, today, currentTime);
     expect(targetsSpecific).toHaveLength(1);
     expect(targetsSpecific[0].practice.id).toBe('p-started-detail');
+  });
+});
+
+describe('RecruitDetail の「もう一度募集」', () => {
+  const basePracticeView = {
+    practice: {
+      id: 'p-remind-1',
+      date: '2026-11-20',
+      start: '19:00',
+      end: '21:00',
+      studio: 'worcle',
+      room: '101',
+      fee: 4000,
+      status: '募集中' as const,
+      booker: 'U_BOOKER',
+      groups: ['G1'],
+    },
+    canEdit: true,
+  } as unknown as PracticeView;
+
+  it('予約者・管理者以外（canEdit=false）には表示されない', () => {
+    const generalView = { ...basePracticeView, canEdit: false } as PracticeView;
+    const res = canRemindGroup(generalView);
+    expect(res.canShow).toBe(false);
+    expect(res.canSubmit).toBe(false);
+  });
+
+  it('予約者または管理者（canEdit=true）には表示され、募集中なら送信可能', () => {
+    const res = canRemindGroup(basePracticeView);
+    expect(res.canShow).toBe(true);
+    expect(res.canSubmit).toBe(true);
+  });
+
+  it('満員の予約情報ではボタンが押せない（canSubmit=false）', () => {
+    const fullView = {
+      ...basePracticeView,
+      practice: { ...basePracticeView.practice, status: '満員' as const },
+    } as PracticeView;
+    const res = canRemindGroup(fullView);
+    expect(res.canShow).toBe(true);
+    expect(res.canSubmit).toBe(false);
+  });
+
+  it('確認ダイアログでキャンセルした場合は送信関数を呼ばない', async () => {
+    const onRemind = vi.fn().mockResolvedValue(true);
+    const confirmFn = vi.fn().mockReturnValue(false);
+
+    const sent = await confirmAndRemind({ id: 'G1', name: 'チームA' }, onRemind, false, confirmFn);
+    expect(sent).toBe(false);
+    expect(confirmFn).toHaveBeenCalledWith('チームA にもう一度募集カードを送りますか？');
+    expect(onRemind).not.toHaveBeenCalled();
+  });
+
+  it('確認ダイアログでOKした場合は対象グループIDで送信関数を呼ぶ', async () => {
+    const onRemind = vi.fn().mockResolvedValue(true);
+    const confirmFn = vi.fn().mockReturnValue(true);
+
+    const sent = await confirmAndRemind({ id: 'G1', name: 'チームA' }, onRemind, false, confirmFn);
+    expect(sent).toBe(true);
+    expect(confirmFn).toHaveBeenCalledWith('チームA にもう一度募集カードを送りますか？');
+    expect(onRemind).toHaveBeenCalledWith('G1');
+  });
+
+  it('確認用アカウント（actAs="test"）の場合はダイアログにその旨を含めて1回だけ確認する', async () => {
+    const onRemind = vi.fn().mockResolvedValue(true);
+    const confirmFn = vi.fn().mockReturnValue(true);
+
+    const sent = await confirmAndRemind({ id: 'G1', name: 'チームA' }, onRemind, true, confirmFn);
+    expect(sent).toBe(true);
+    expect(confirmFn).toHaveBeenCalledTimes(1);
+    expect(confirmFn).toHaveBeenCalledWith('確認用アカウント「admin」として、チームA にもう一度募集カードを送りますか？');
+    expect(onRemind).toHaveBeenCalledWith('G1');
+  });
+});
+
+describe('CalendarView の日付タップと解除', () => {
+  it('未選択状態（null）で日付をタップするとその日付が選択される', () => {
+    expect(resolveNextSelectedDate(null, '2026-11-10')).toBe('2026-11-10');
+  });
+
+  it('選択中の日付をもう一度タップすると解除（null）される', () => {
+    expect(resolveNextSelectedDate('2026-11-10', '2026-11-10')).toBe(null);
+  });
+
+  it('別の日付をタップするとその日付に切り替わる', () => {
+    expect(resolveNextSelectedDate('2026-11-10', '2026-11-15')).toBe('2026-11-15');
+  });
+});
+
+describe('groupByMonthWeek の月跨ぎ週（11/30〜12/6）の仕様固定', () => {
+  it('月をまたぐ週の予約情報は、それぞれの月の見出し配下に分割して所属する', () => {
+    const pNov30 = {
+      practice: { id: 'p-nov-30', date: '2026-11-30', start: '19:00', end: '21:00', studio: 'w', room: '1', fee: 0, status: '募集中' },
+    } as unknown as PracticeView;
+    const pDec01 = {
+      practice: { id: 'p-dec-01', date: '2026-12-01', start: '19:00', end: '21:00', studio: 'w', room: '1', fee: 0, status: '募集中' },
+    } as unknown as PracticeView;
+
+    const groups = groupByMonthWeek([pNov30, pDec01]);
+    expect(groups).toHaveLength(2);
+
+    // 11月の見出し配下
+    const novGroup = groups.find((g) => g.month === '2026-11');
+    expect(novGroup).toBeDefined();
+    expect(novGroup!.weeks).toHaveLength(1);
+    expect(novGroup!.weeks[0].label).toBe('11/30〜12/6');
+    expect(novGroup!.weeks[0].items.map((v) => v.practice.id)).toEqual(['p-nov-30']);
+
+    // 12月の見出し配下
+    const decGroup = groups.find((g) => g.month === '2026-12');
+    expect(decGroup).toBeDefined();
+    expect(decGroup!.weeks).toHaveLength(1);
+    expect(decGroup!.weeks[0].label).toBe('11/30〜12/6');
+    expect(decGroup!.weeks[0].items.map((v) => v.practice.id)).toEqual(['p-dec-01']);
+  });
+
+  it('月をまたぐ同一週の片方を畳んでも、もう一方の月の週は開いたまま独立して開閉できる', () => {
+    let collapsed = new Set<string>();
+
+    const novWeekKey = 'week:2026-11:2026-11-30';
+    const decWeekKey = 'week:2026-12:2026-11-30';
+
+    // 11月の週を折りたたむ
+    collapsed = toggleCollapseKey(collapsed, novWeekKey);
+    expect(collapsed.has(novWeekKey)).toBe(true);
+    expect(collapsed.has(decWeekKey)).toBe(false);
+
+    // 11月の週をもう一度押して展開
+    collapsed = toggleCollapseKey(collapsed, novWeekKey);
+    expect(collapsed.has(novWeekKey)).toBe(false);
+    expect(collapsed.has(decWeekKey)).toBe(false);
+  });
+});
+
+describe('List 画面の表示切り替え（日付選択・フィルター連動・0件表示）', () => {
+  const pWeekday = {
+    practice: { id: 'p-fri', date: '2026-11-06', start: '19:00', end: '21:00', studio: 'w', room: '1', fee: 0, status: '募集中' },
+  } as unknown as PracticeView;
+  const pSaturday = {
+    practice: { id: 'p-sat', date: '2026-11-07', start: '19:00', end: '21:00', studio: 'w', room: '1', fee: 0, status: '募集中' },
+  } as unknown as PracticeView;
+  const list = [pWeekday, pSaturday];
+
+  it('日付非選択時は曜日フィルターに応じた月・週アコーディオン（monthGroups）が生成される', () => {
+    const filtered = filterByDayKind(list, 'weekday');
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].practice.id).toBe('p-fri');
+
+    const monthGroups = groupByMonthWeek(filtered);
+    expect(monthGroups).toHaveLength(1);
+    expect(monthGroups[0].weeks[0].items).toHaveLength(1);
+  });
+
+  it('日付選択中はその日だけのチケットが抽出され、月・週グループ（アコーディオン）は生成されない', () => {
+    const selectedDate = '2026-11-06';
+    const filteredList = filterByDayKind(list, 'all');
+
+    // List.tsx のロジック: selectedDate があるときは filteredList から該当日のものだけを抽出
+    const displayList = selectedDate
+      ? filteredList.filter((v) => v.practice.date === selectedDate)
+      : filteredList;
+    const monthGroups = !selectedDate ? groupByMonthWeek(displayList) : [];
+
+    expect(displayList).toHaveLength(1);
+    expect(displayList[0].practice.id).toBe('p-fri');
+    expect(monthGroups).toHaveLength(0); // 見出しは非表示
+  });
+
+  it('曜日フィルター適用中に合致しない日付を選択した場合は0件（空表示）となる', () => {
+    // 平日のみ適用中に、土曜の日付（2026-11-07）を選択
+    const filteredList = filterByDayKind(list, 'weekday');
+    const selectedDate = '2026-11-07';
+
+    const displayList = selectedDate
+      ? filteredList.filter((v) => v.practice.date === selectedDate)
+      : filteredList;
+
+    expect(displayList).toHaveLength(0);
+  });
+
+  it('予約情報が1件もない場合は displayList が空となり空表示状態になる', () => {
+    const emptyList: PracticeView[] = [];
+    const filtered = filterByDayKind(emptyList, 'holiday');
+    expect(filtered).toHaveLength(0);
+    const monthGroups = groupByMonthWeek(filtered);
+    expect(monthGroups).toHaveLength(0);
   });
 });

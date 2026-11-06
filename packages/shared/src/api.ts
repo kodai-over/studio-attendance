@@ -134,6 +134,8 @@ export interface ApiActions {
   deletePractice: { params: { id: string; notifyGroups?: boolean }; result: PracticeView[] };
   /** 登録済みの練習の募集を、まだ送っていないグループに流す */
   recruitPractice: { params: { id: string; groups: string[] }; result: PracticeView };
+  /** すでに募集したグループに、もう一度募集（リマインド）を送る */
+  remindPractice: { params: { id: string; group: string }; result: PracticeView };
   setDisplayName: { params: { name: string }; result: Member };
   listMembers: { params: Record<string, never>; result: Member[] };
   updateMember: { params: { userId: string; patch: Partial<Pick<Member, 'name' | 'role' | 'defaultGroups' | 'groups'>> }; result: Member };
