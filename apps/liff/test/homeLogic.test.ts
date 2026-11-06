@@ -215,6 +215,39 @@ describe('ホーム画面ロジック（homeLogic）', () => {
       expect(todos[1].kind).toBe('todo');
       expect(todos[1].title).toBe('未定のままです');
     });
+
+    it('開始済み・中止・自分に関係ない予約情報はリマインドに出さない', () => {
+      const me = createMockMe();
+      const today = '2026-11-02';
+      const currentTime = '15:00';
+
+      // 当日ですでに開始している未回答
+      const pStarted = createMockPracticeView({
+        id: 'p-started',
+        date: today,
+        start: '13:00',
+        end: '15:00',
+        myAnswer: null,
+      });
+      // 中止の未回答
+      const pCanceled = createMockPracticeView({
+        id: 'p-canceled',
+        date: '2026-11-10',
+        status: '中止',
+        myAnswer: null,
+      });
+      // 自分が関係ないグループの未回答
+      const pUnrelated = createMockPracticeView({
+        id: 'p-unrelated',
+        booker: 'U_OTHER',
+        groups: ['G_UNKNOWN'],
+        date: '2026-11-10',
+        myAnswer: null,
+      });
+
+      const todos = buildTodoNotices([pStarted, pCanceled, pUnrelated], me, today, currentTime);
+      expect(todos).toEqual([]);
+    });
   });
 
   describe('buildHomeNotices & syncPracticeNotices（お知らせの抽出・変更検知）', () => {
@@ -537,6 +570,16 @@ describe('ホーム画面ロジック（homeLogic）', () => {
       const statusAllRead = getHomeUnreadStatus([p1Updated], me, '2026-11-02');
       expect(statusAllRead.hasUnreadReleaseNote).toBe(false);
       expect(statusAllRead.totalBadgeCount).toBe(0);
+
+      // 6. 自分宛ての未回答予約情報（todo）があっても、ホームの未読バッジ（赤丸）には影響しない
+      const pTodo = createMockPracticeView({
+        id: 'p-todo-unread-test',
+        date: '2026-11-10',
+        myAnswer: null,
+      });
+      const statusWithTodo = getHomeUnreadStatus([p1Updated, pTodo], me, '2026-11-02');
+      expect(statusWithTodo.unreadNoticesCount).toBe(0);
+      expect(statusWithTodo.totalBadgeCount).toBe(0);
     });
 
     it('CHANGELOG.md から自動生成されたリリースノートに最新バージョン v1.7.0〜v1.0.0 が含まれ、** などの記号や空項目が残らず、見出し付き入れ子箇条書きがすべて親見出しを引き継ぐ', () => {

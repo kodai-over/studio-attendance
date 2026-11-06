@@ -1,6 +1,6 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { isAdmin, isStartedPractice, labelDate, toJstDate, toJstTime, type PracticeView } from '@studio-attendance/shared';
+import { isAdmin, labelDate, type PracticeView } from '@studio-attendance/shared';
 import { api } from '../api';
 import { TicketSub } from './List';
 import { DeleteConfirmDialog, Icon, Spinner, StatusBadge, Stub, TopBar, go, place, useApp, useRunner } from '../ui';
@@ -27,16 +27,8 @@ export function RecruitListPage() {
   }, []);
 
   const admin = isAdmin(me.member);
-  const now = new Date();
-  const today = toJstDate(now);
-  const currentTime = toJstTime(now);
-  // 直せる練習（自分が登録した練習。管理者はすべて）。開始時刻を過ぎた練習は除外
-  const list =
-    practices == null && !fresh
-      ? null
-      : (practices ?? [])
-          .filter((v) => v.canEdit)
-          .filter((v) => !isStartedPractice(v.practice, today, currentTime));
+  // 直せる練習（自分が登録した練習。管理者はすべて）。サーバーの判定（canEdit）にそろえる
+  const list = practices == null && !fresh ? null : (practices ?? []).filter((v) => v.canEdit);
 
   const remove = (v: PracticeView) => {
     setOpened(null);

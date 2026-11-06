@@ -100,7 +100,7 @@ export function HomePage() {
             ))}
           </div>
         ) : (
-          <div class="empty small">今日の予定はありません</div>
+          <div class="empty small">今日の予定はありません。</div>
         )}
       </section>
 
@@ -111,7 +111,7 @@ export function HomePage() {
         {nextGoing ? (
           <PracticeCard v={nextGoing} />
         ) : (
-          <div class="empty small">次の参加予定はありません</div>
+          <div class="empty small">次の参加予定はありません。</div>
         )}
       </section>
 

@@ -17,6 +17,7 @@ import {
   isHolidayOrWeekend,
   isMinePractice,
   isRsvpTarget,
+  isStartedPractice,
   jpHolidays,
   parseFeeValue,
   findCancelRule,
@@ -623,6 +624,34 @@ describe('Flex Message', () => {
         '15:00',
       ),
     ).toBe(true);
+  });
+
+  it('isStartedPractice（予約情報が開始時刻を過ぎているかの判定）', () => {
+    const today = '2026-11-02';
+
+    // 過去日は常に開始済み
+    expect(isStartedPractice({ date: '2026-11-01', start: '19:00' }, today)).toBe(true);
+    expect(isStartedPractice({ date: '2026-11-01' }, today)).toBe(true);
+
+    // 未来日は常に未開始
+    expect(isStartedPractice({ date: '2026-11-03', start: '10:00' }, today)).toBe(false);
+    expect(isStartedPractice({ date: '2026-11-03' }, today)).toBe(false);
+
+    // 当日: 開始時刻ちょうど（<= で開始済み）
+    expect(isStartedPractice({ date: today, start: '14:00' }, today, '14:00')).toBe(true);
+
+    // 当日: 開始時刻超過
+    expect(isStartedPractice({ date: today, start: '14:00' }, today, '14:01')).toBe(true);
+
+    // 当日: 開始前
+    expect(isStartedPractice({ date: today, start: '14:00' }, today, '13:59')).toBe(false);
+
+    // 当日: start がなく end だけの場合は end で判定
+    expect(isStartedPractice({ date: today, end: '16:00' }, today, '16:00')).toBe(true);
+    expect(isStartedPractice({ date: today, end: '16:00' }, today, '15:30')).toBe(false);
+
+    // 当日: currentTime が未指定の場合は false（当日の練習は開始済み扱いしない）
+    expect(isStartedPractice({ date: today, start: '14:00' }, today)).toBe(false);
   });
 
   it('開始を変えたら、終了を開始の1時間後より前にしない', () => {
