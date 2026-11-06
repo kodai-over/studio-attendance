@@ -120,15 +120,7 @@ export function DetailPage({ id, focus }: { id: string; focus: 'calendar' | null
         <div class="detail-primary">
           <PracticePass v={v} />
 
-          <div class="answer-row">
-            <span class="grow">あなたの回答</span>
-            <MyAnswerBadge answer={v.myAnswer} />
-            {p.status !== '中止' && (
-              <button class="btn small primary" onClick={() => go(`/answer?r=${encodeURIComponent(p.id)}`)}>
-                {v.myAnswer == null ? '回答する' : '回答を変更'}
-              </button>
-            )}
-          </div>
+          <AnswerRow v={v} />
 
           {going && (
             <div ref={calRef}>
@@ -184,8 +176,24 @@ function CalendarButtons({ v, highlight }: { v: PracticeView; highlight: boolean
   );
 }
 
+/** あなたの回答行。現在の回答バッジと回答／変更ボタンを表示 */
+export function AnswerRow({ v }: { v: PracticeView }) {
+  const p = v.practice;
+  return (
+    <div class="answer-row">
+      <span class="grow">あなたの回答</span>
+      <MyAnswerBadge answer={v.myAnswer} />
+      {p.status !== '中止' && (
+        <button class="btn small primary" onClick={() => go(`/answer?r=${encodeURIComponent(p.id)}`)}>
+          {v.myAnswer == null ? '回答する' : '回答を変更'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 /** 参加メンバーの一覧。行く・保留・行かないの順に名前を出す。自分が足したゲスト（予約者と管理者はすべてのゲスト）は取り消せる */
-function Attendees({ v, onRemove }: { v: PracticeView; onRemove: (a: AttendeeView) => void }) {
+export function Attendees({ v, onRemove }: { v: PracticeView; onRemove: (a: AttendeeView) => void }) {
   const groups = [
     { key: 'going' as const, mark: '○', label: '行く', people: v.going },
     { key: 'maybe' as const, mark: '△', label: '未定', people: v.maybe },

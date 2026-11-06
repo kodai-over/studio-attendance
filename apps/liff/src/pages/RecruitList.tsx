@@ -2,8 +2,8 @@ import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { isAdmin, labelDate, type PracticeView } from '@studio-attendance/shared';
 import { api } from '../api';
-import { TicketSub } from './List';
-import { DeleteConfirmDialog, Icon, Spinner, StatusBadge, Stub, Tabs, TopBar, go, place, useApp, useRunner } from '../ui';
+import { MyAnswerBadge, TicketSub } from './List';
+import { DeleteConfirmDialog, Fee, Icon, Spinner, StatusBadge, Stub, Tabs, TopBar, go, place, useApp, useRunner } from '../ui';
 import { filterRecruitPractices, readRecruitScope, saveRecruitScope, type RecruitScope } from './recruitLogic';
 
 /**
@@ -116,7 +116,12 @@ function RecruitTicket({ v }: { v: PracticeView }) {
   const hasGroups = targetGroups.length > 0;
 
   return (
-    <article class="ticket" data-status={p.status}>
+    <article
+      class="ticket"
+      data-answer={v.myAnswer ?? 'none'}
+      data-status={p.status}
+      data-ticket-date={p.date}
+    >
       <Stub date={p.date} onClick={open} />
       <button class="ticket-main" onClick={open}>
         <span class="sr">{labelDate(p.date)}</span>
@@ -125,9 +130,18 @@ function RecruitTicket({ v }: { v: PracticeView }) {
             {p.start}–{p.end}
           </span>
           <StatusBadge v={v} />
+          <MyAnswerBadge answer={v.myAnswer} />
         </div>
         <div class="place">{place(p)}</div>
         <div class="ticket-meta">
+          <span class="meta-item" aria-label={`行く ${v.goingCount}人`}>
+            <Icon name="people" size={16} />
+            {v.goingCount}
+            {p.max ? `/${p.max}` : ''}
+          </span>
+          <Fee v={v} />
+        </div>
+        <div class="ticket-groups-row">
           <div class="ticket-groups">
             {hasGroups ? (
               targetGroups.map((name) => (
@@ -136,7 +150,7 @@ function RecruitTicket({ v }: { v: PracticeView }) {
                 </span>
               ))
             ) : (
-              <span>未募集</span>
+              <span class="unrecruited-label">未募集</span>
             )}
           </div>
         </div>
