@@ -1,5 +1,6 @@
 import {
   isPastPractice,
+  isRsvpTarget,
   labelDate,
   yen,
   type Answer,
@@ -9,7 +10,7 @@ import {
   type PracticeView,
 } from '@studio-attendance/shared';
 import changelogRaw from '../../../../CHANGELOG.md?raw';
-import { getDraftOwnerKey } from './answerLogic';
+import { getDraftOwnerKey, needsAnswer } from './answerLogic';
 
 export interface ReleaseNoteSection {
   heading: string;
@@ -107,7 +108,7 @@ export function parseChangelog(md: string): ReleaseNote[] {
 export const RELEASE_NOTES: ReleaseNote[] = parseChangelog(changelogRaw);
 export const LATEST_RELEASE_VERSION: string = RELEASE_NOTES[0]?.version ?? '';
 
-export type NoticeKind = 'answer' | 'practice_changed' | 'practice_canceled';
+export type NoticeKind = 'answer' | 'practice_changed' | 'practice_canceled' | 'todo';
 
 export interface HomeNoticeItem {
   id: string;
@@ -161,20 +162,40 @@ function placeText(p: { studio: string; room: string }): string {
 }
 
 /**
- * 次の参加予定（「行く」と回答しており、まだ終了しておらず中止でもない直近の予約情報）を返す。
+ * 当日の参加予定・主催予定（日付が変わるまで、練習終了後も表示する）
+ * 自分が「行く」と回答している予約情報、または自分が予約者の予約情報
+ */
+export function getTodayPractices(
+  practices: PracticeView[] | null,
+  me: Pick<MeView, 'member'>,
+  today: string,
+): PracticeView[] {
+  if (!practices) return [];
+  const userId = me.member.userId;
+  return practices
+    .filter(
+      (v) =>
+        v.practice.date === today &&
+        v.practice.status !== '中止' &&
+        (v.myAnswer === '行く' || v.practice.booker === userId),
+    )
+    .sort((a, b) => a.practice.start.localeCompare(b.practice.start));
+}
+
+/**
+ * 次の参加予定（明日以降の、自分が「行く」と回答している直近の予約情報1件）
  */
 export function getNextGoingPractice(
   practices: PracticeView[] | null,
   today: string,
-  currentTime?: string,
 ): PracticeView | null {
   if (!practices) return null;
   const candidates = practices
     .filter(
       (v) =>
+        v.practice.date > today &&
         v.myAnswer === '行く' &&
-        v.practice.status !== '中止' &&
-        !isPastPractice(v.practice, today, currentTime),
+        v.practice.status !== '中止',
     )
     .sort((a, b) =>
       (a.practice.date + a.practice.start).localeCompare(b.practice.date + b.practice.start),
@@ -462,6 +483,41 @@ export function syncPracticeNotices(
     // お知らせは付加機能のため、localStorage破損や例外時でも本体の起動・一覧取得を巻き込まない
     return [];
   }
+}
+
+/**
+ * 自分宛ての未回答・未定の予約情報に対するリマインドお知らせを生成する。
+ * お知らせタブの先頭に常時表示され、回答が完了すると一覧から消える。
+ * 未読バッジ（赤丸）には数えない。
+ */
+export function buildTodoNotices(
+  practices: PracticeView[] | null,
+  me: MeView,
+  today: string,
+  currentTime?: string,
+): HomeNoticeItem[] {
+  if (!practices) return [];
+  const rsvpTargets = practices.filter((v) =>
+    isRsvpTarget(v, me.member.userId, me.member.groups, today, currentTime),
+  );
+  return rsvpTargets
+    .filter(needsAnswer)
+    .sort((a, b) =>
+      (a.practice.date + a.practice.start).localeCompare(b.practice.date + b.practice.start),
+    )
+    .map((v) => {
+      const p = v.practice;
+      const pLabel = `${labelDate(p.date)} ${p.start}–${p.end}`;
+      return {
+        id: `todo:${p.id}`,
+        kind: 'todo',
+        practiceId: p.id,
+        updatedAt: p.createdAt,
+        title: v.myAnswer === '保留' ? '未定のままです' : '回答してください',
+        detail: `${pLabel} ${placeText(p)}`,
+        answer: v.myAnswer ?? undefined,
+      };
+    });
 }
 
 /**

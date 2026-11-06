@@ -12,6 +12,7 @@ import {
   mergePracticesWithKeep,
   processCommitItems,
   recordSpecificChange,
+  resolveAnswerTargets,
   stageAnswer,
   type SpecificChangeMap,
 } from '../src/pages/answerLogic';
@@ -550,6 +551,7 @@ describe('hasLargeTitle（画面上部の大きい見出し）', () => {
   it('メニューから開く画面（見出しあり・戻るなし）だけ大きい見出しを出す', () => {
     expect(hasLargeTitle('ホーム', false)).toBe(true);
     expect(hasLargeTitle('ホーム')).toBe(true);
+    expect(hasLargeTitle('回答', false)).toBe(true);
   });
 
   it('戻るがある画面や、見出しのない画面では出さない', () => {
@@ -585,5 +587,39 @@ describe('RsvpButtons の取り消し（同じ記号をもう一度押す）', (
     const onAnswer = vi.fn();
     expect(() => buttons({ onAnswer })[0].props.onClick()).not.toThrow();
     expect(onAnswer).not.toHaveBeenCalled();
+  });
+});
+
+describe('開始後の予約情報に対する詳細画面からの回答変更経路', () => {
+  it('開始時刻を過ぎた予約情報でも、ID指定（?r= 指定）で回答画面を開いた場合は除外されず回答変更できる', () => {
+    const today = '2026-11-02';
+    const currentTime = '19:30';
+    const userId = 'U_USER';
+    const userGroups = ['G1'];
+    const startedPractice = {
+      practice: {
+        id: 'p-started-detail',
+        date: today,
+        start: '18:00',
+        end: '20:00',
+        studio: 'worcle',
+        room: '101',
+        fee: 4000,
+        status: '募集中' as const,
+        booker: 'U_OTHER',
+        groups: ['G1'],
+      },
+      myAnswer: '行く' as const,
+    } as unknown as PracticeView;
+
+    // 1. 通常の一覧（ID指定なし）では isRsvpTarget により開始後は除外される
+    const targetsInList = resolveAnswerTargets([startedPractice], [], userId, userGroups, today, currentTime);
+    expect(targetsInList).toHaveLength(0);
+
+    // 2. 詳細画面の「回答を変更」から ID 指定（ids: ['p-started-detail']）で開いた場合は
+    // resolveAnswerTargets の isSpecific 経路により確実に抽出され、回答変更の対象となる
+    const targetsSpecific = resolveAnswerTargets([startedPractice], ['p-started-detail'], userId, userGroups, today, currentTime);
+    expect(targetsSpecific).toHaveLength(1);
+    expect(targetsSpecific[0].practice.id).toBe('p-started-detail');
   });
 });

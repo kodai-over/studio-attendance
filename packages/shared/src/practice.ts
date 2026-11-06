@@ -157,6 +157,20 @@ export function isPastPractice(
   return false;
 }
 
+/** 予約情報が始まっているか（過去日、または当日で開始時刻を過ぎているか。start がなければ end で判定） */
+export function isStartedPractice(
+  p: Pick<Practice, 'date'> & Partial<Pick<Practice, 'start' | 'end'>>,
+  today: string,
+  currentTime?: string,
+): boolean {
+  if (p.date < today) return true;
+  const time = p.start ?? p.end;
+  if (p.date === today && time && currentTime) {
+    return minutes(time) <= minutes(currentTime);
+  }
+  return false;
+}
+
 /** 予約情報削除時に、募集済グループへ削除の連絡を送れる状態かどうか（未来の募集中予約情報のみ。今日すでに終了した時間帯は除外） */
 export function canNotifyPracticeCancellation(
   p: Pick<Practice, 'date' | 'status'> & Partial<Pick<Practice, 'end'>>,
@@ -284,9 +298,9 @@ export function isMinePractice(
   return p.booker === userId || p.groups.some((g) => userGroups.includes(g)) || v.myAnswer != null || Boolean(v.involved);
 }
 
-/** RSVP（回答・変更）の対象となる未来のアクティブな予約情報か */
+/** 回答（回答・変更）の対象となる未来のアクティブな予約情報か */
 export function isRsvpTarget(
-  v: { practice: Pick<Practice, 'booker' | 'groups' | 'status' | 'date'> & Partial<Pick<Practice, 'end'>>; myAnswer?: unknown; involved?: boolean },
+  v: { practice: Pick<Practice, 'booker' | 'groups' | 'status' | 'date'> & Partial<Pick<Practice, 'start' | 'end'>>; myAnswer?: unknown; involved?: boolean },
   userId: string,
   userGroups: string[],
   today: string,
@@ -294,6 +308,6 @@ export function isRsvpTarget(
 ): boolean {
   const p = v.practice;
   if (p.status === '中止') return false;
-  if (isPastPractice(p, today, currentTime)) return false;
+  if (isStartedPractice(p, today, currentTime)) return false;
   return isMinePractice(v, userId, userGroups);
 }
