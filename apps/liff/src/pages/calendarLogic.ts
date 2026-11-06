@@ -223,6 +223,14 @@ export function formatCalendarCount(v: PracticeView): string {
 }
 
 /**
+ * カレンダーの日付タップ時の選択状態の遷移。
+ * 同じ日付をタップした場合は選択解除（null）、異なる日付ならその日付を返す。
+ */
+export function resolveNextSelectedDate(currentSelected: string | null, targetDate: string): string | null {
+  return currentSelected === targetDate ? null : targetDate;
+}
+
+/**
  * 初期選択日を決める。
  * 当月で今日以降の最も近い予約情報の日、なければ今日。今日が当月にない場合は当月の予約日の最初、それもなければ1日。
  */

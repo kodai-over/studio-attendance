@@ -11,6 +11,7 @@ import {
   getPrevMonth,
   groupPracticesByDate,
   resolveInitialSelectedDate,
+  resolveNextSelectedDate,
   type CalendarDay,
   type CalendarEventTone,
 } from './calendarLogic';
@@ -101,7 +102,7 @@ export function CalendarView({
   };
 
   const handleSelectDay = (day: CalendarDay) => {
-    const next = selectedDate === day.date ? null : day.date;
+    const next = resolveNextSelectedDate(selectedDate, day.date);
     setInnerSelectedDate(next);
     if (!day.isCurrentMonth) {
       setCurrentYear(day.year);

@@ -103,7 +103,7 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
 
   // 日付選択時はその日のみ表示、非選択時は filteredList
   const displayList = selectedDate
-    ? baseList.filter((v) => v.practice.date === selectedDate)
+    ? filteredList.filter((v) => v.practice.date === selectedDate)
     : filteredList;
 
   // 月・週グループ
@@ -146,7 +146,7 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
         </div>
 
         {/* 格納型曜日フィルター */}
-        <div class="filter-fold" aria-hidden={!showFilter} data-open={showFilter}>
+        <div class="filter-fold" aria-hidden={!showFilter} data-open={showFilter} inert={!showFilter ? true : undefined}>
           <div class="filter-fold-inner">
             <div class="filter-chips" role="radiogroup" aria-label="曜日フィルター">
               <button

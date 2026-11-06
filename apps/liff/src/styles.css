@@ -1955,13 +1955,18 @@ html {
   top: var(--bar-h);
   transition: top 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), padding-top 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
   z-index: 4;
-  margin: 0 calc(var(--pad-x) * -1) var(--sp-1);
-  padding: 0 var(--pad-x) var(--sp-1);
+  margin: 0 calc(var(--pad-x) * -1) var(--sp-5);
+  padding: 0 var(--pad-x) var(--sp-3);
   background: var(--bg);
 }
 .schedule-head:has(.calendar) {
   margin-bottom: var(--sp-3);
   padding-bottom: var(--sp-2);
+}
+.schedule-head:has(.filter-fold[data-open='true']),
+.schedule-head:has(.active-filter-tags) {
+  margin-bottom: var(--sp-2);
+  padding-bottom: var(--sp-1);
 }
 .schedule-head .tabs-head {
   margin: 0;
@@ -1986,7 +1991,7 @@ html {
 .filter-chips {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-2);
   padding: 2px 0;
 }
 .filter-chip {
@@ -1994,8 +1999,8 @@ html {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 30px;
-  padding: 0 10px;
+  height: var(--sp-6);
+  padding: 0 var(--sp-2);
   border-radius: var(--r-full);
   border: 1px solid var(--separator);
   background: var(--surface);
@@ -2027,9 +2032,9 @@ html {
 .filter-tag {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  height: 26px;
-  padding: 0 8px;
+  gap: var(--sp-1);
+  height: var(--sp-6);
+  padding: 0 var(--sp-2);
   background: var(--surface);
   border: 1px solid var(--separator);
   border-radius: var(--r-full);
@@ -2057,10 +2062,10 @@ html {
 .icon-btn.is-filtered::after {
   content: '';
   position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 6px;
-  height: 6px;
+  top: var(--sp-1);
+  right: var(--sp-1);
+  width: var(--sp-2);
+  height: var(--sp-2);
   border-radius: 50%;
   background: var(--text);
 }
@@ -2082,8 +2087,8 @@ html {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: var(--sp-6);
+  height: var(--sp-6);
   border: none;
   background: transparent;
   color: var(--text-2);
@@ -2146,7 +2151,7 @@ html {
   display: none;
 }
 
-/* ---------- 募集: もう一度募集（リマインド） ---------- */
+/* ---------- 募集: もう一度募集 ---------- */
 .remind-list {
   display: flex;
   flex-direction: column;

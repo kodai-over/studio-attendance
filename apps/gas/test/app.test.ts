@@ -629,7 +629,7 @@ describe('出欠', () => {
     expect(t.store.getPractice(id)?.groups).toEqual([G1, 'C2']);
   });
 
-  it('すでに募集済みのグループにもう一度募集（リマインド）を送れる。10分あける制限と権限チェックがある', () => {
+  it('すでに募集済のグループにもう一度募集を送れる。10分あける制限と権限チェックがある', () => {
     const item = { ...reservation, date: '2026-10-30', max: null, min: null, memo: '' };
     const { created } = handleApi(t.ctx, { userId: 'U9', name: 'きゅう' }, 'createPractices', { items: [item], groups: [G1] }) as any;
     const id = created[0];
@@ -637,7 +637,7 @@ describe('出欠', () => {
     // 予約者でも管理者でもないメンバーは送れない
     expect(() => handleApi(t.ctx, { userId: 'U1', name: 'いち' }, 'remindPractice', { id, group: G1 })).toThrow('予約者か管理者');
 
-    // 予約者本人がリマインド送信
+    // 予約者本人がもう一度募集を送信
     const pushesBefore = t.line.pushes.length;
     const v = handleApi(t.ctx, { userId: 'U9' }, 'remindPractice', { id, group: G1 }) as any;
     expect(v.practice.id).toBe(id);

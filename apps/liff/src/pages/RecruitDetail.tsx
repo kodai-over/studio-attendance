@@ -4,6 +4,7 @@ import { api } from '../api';
 import { shareLink } from '../liff';
 import { Avatar, Icon, Spinner, Syncing, TopBar, go, shareData, useApp } from '../ui';
 import { EditForm, PracticePass, usePractice } from './Detail';
+import { confirmAndRemind } from './recruitLogic';
 
 /** 「募集」から開く練習の画面。募集先のグループ・ゲストの追加・参加リンク・（予約者と管理者は）編集と削除 */
 export function RecruitDetailPage({ id }: { id: string }) {
@@ -120,8 +121,7 @@ function RecruitForm({
   const canSend = v.canEdit && unrecruitedGroups.length > 0;
 
   const handleRemind = async (g: { id: string; name: string }) => {
-    if (!confirm(`${g.name} にもう一度募集カードを送りますか？`)) return;
-    await onRemind(g.id);
+    await confirmAndRemind(g, onRemind);
   };
 
   return (
@@ -162,7 +162,7 @@ function RecruitForm({
 
           {sentGroups.length > 0 && v.canEdit && (
             <div class="sent-groups section-gap">
-              <div class="note">募集済みのグループ（もう一度募集を送る）</div>
+              <div class="note">募集済のグループ（もう一度募集を送る）</div>
               <div class="remind-list">
                 {sentGroups.map((g) => (
                   <div key={g.id} class="remind-item">

@@ -49,3 +49,31 @@ export function filterRecruitPractices(
     shown: scope === 'all' ? canEditList : mineList,
   };
 }
+
+/**
+ * 募集済のグループへ「もう一度募集」を送信できるか判定する。
+ * - 予約情報の編集権限（canEdit: 予約者または管理者）が必要
+ * - 満員の場合は送信不可（disabled）
+ */
+export function canRemindGroup(v: PracticeView): { canShow: boolean; canSubmit: boolean } {
+  return {
+    canShow: v.canEdit,
+    canSubmit: v.canEdit && v.practice.status !== '満員',
+  };
+}
+
+/**
+ * 確認ダイアログを経て「もう一度募集」を実行する。
+ * キャンセルされた場合は false を返し onRemind は実行しない。
+ */
+export async function confirmAndRemind(
+  group: { id: string; name: string },
+  onRemind: (groupId: string) => Promise<unknown>,
+  confirmFn: (msg: string) => boolean = (msg) => confirm(msg),
+): Promise<boolean> {
+  if (!confirmFn(`${group.name} にもう一度募集カードを送りますか？`)) {
+    return false;
+  }
+  await onRemind(group.id);
+  return true;
+}
