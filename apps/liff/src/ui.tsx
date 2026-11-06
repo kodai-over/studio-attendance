@@ -248,6 +248,13 @@ export function TopBar({
   }, []);
 
   if (!title && !back && children === undefined && !showTheme) return null;
+  const actions = (
+    <div class="topbar-actions">
+      {children}
+      {showTheme && <ThemeToggle />}
+    </div>
+  );
+
   return (
     <>
       <header ref={barRef} class={`topbar${large ? ' has-large' : ''}${scrolled ? ' scrolled' : ''}`}>
@@ -272,15 +279,15 @@ export function TopBar({
           ) : (
             <h1 class="topbar-title">{title}</h1>
           ))}
-        <div class="topbar-actions">
-          {children}
-          {showTheme && <ThemeToggle />}
-        </div>
+        {(!large || scrolled) && actions}
       </header>
       {large && (
-        <h1 ref={titleRef} class="large-title">
-          {title}
-        </h1>
+        <div class="large-head">
+          <h1 ref={titleRef} class="large-title">
+            {title}
+          </h1>
+          {!scrolled && actions}
+        </div>
       )}
     </>
   );
@@ -455,7 +462,7 @@ export function NavBar() {
     { to: '/home', key: 'home', icon: 'home', label: 'ホーム', badge: homeBadgeCount },
     { to: '/', key: '', icon: 'ticket', label: '予定' },
     ...(canRegister(me.member) ? ([{ to: '/recruit', key: 'recruit', icon: 'send', label: '募集' }] as const) : []),
-    { to: '/answer', key: 'answer', icon: 'check', label: 'RSVP', badge: todoCount },
+    { to: '/answer', key: 'answer', icon: 'check', label: '回答', badge: todoCount },
     { to: '/settings', key: 'settings', icon: 'user', label: 'アカウント' },
   ];
   const active = resolveActiveNavKey(path);

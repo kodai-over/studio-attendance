@@ -593,7 +593,17 @@ describe('Flex Message', () => {
         today,
       ),
     ).toBe(false);
-    // 当日終了済みは対象外
+    // 当日開始後は対象外
+    expect(
+      isRsvpTarget(
+        { practice: { booker: 'U_OTHER', groups: ['G1'], status: '募集中', date: today, start: '13:00', end: '15:00' } },
+        uid,
+        ugroups,
+        today,
+        '14:00',
+      ),
+    ).toBe(false);
+    // 当日終了済み（startなしでもendで判定）は対象外
     expect(
       isRsvpTarget(
         { practice: { booker: 'U_OTHER', groups: ['G1'], status: '募集中', date: today, end: '12:00' } },
@@ -603,10 +613,10 @@ describe('Flex Message', () => {
         '15:00',
       ),
     ).toBe(false);
-    // 当日終了前なら対象
+    // 当日開始前なら対象
     expect(
       isRsvpTarget(
-        { practice: { booker: 'U_OTHER', groups: ['G1'], status: '募集中', date: today, end: '18:00' } },
+        { practice: { booker: 'U_OTHER', groups: ['G1'], status: '募集中', date: today, start: '16:00', end: '18:00' } },
         uid,
         ugroups,
         today,

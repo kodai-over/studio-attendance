@@ -65,7 +65,7 @@ function JoinPage() {
 
   return (
     <>
-      <h1 class="large-title join-title">RSVP</h1>
+      <h1 class="large-title join-title">回答</h1>
       <Pass
         date={v.date}
         status={v.status}

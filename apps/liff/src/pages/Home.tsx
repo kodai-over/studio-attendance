@@ -2,15 +2,17 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { toJstDate, toJstTime } from '@studio-attendance/shared';
 import { api } from '../api';
 import { FRESH_MS, Icon, Spinner, Syncing, Tabs, TopBar, go, useApp, useRunner } from '../ui';
-import { getDraftOwnerKey, getUnansweredSummary } from './answerLogic';
+import { getDraftOwnerKey } from './answerLogic';
 import {
   LATEST_RELEASE_VERSION,
   RELEASE_NOTES,
   buildHomeNotices,
+  buildTodoNotices,
   formatNoticeTime,
   getHomeUnreadStatus,
   getNextGoingPractice,
   getNoticeReadAt,
+  getTodayPractices,
   markNoticesRead,
   markReleaseNotesRead,
   syncPracticeNotices,
@@ -48,22 +50,24 @@ export function HomePage() {
   const today = toJstDate(now);
   const currentTime = toJstTime(now);
 
-  const { totalCount: todoCount } = getUnansweredSummary(list, me, today, currentTime);
-  const nextGoing = getNextGoingPractice(list, today, currentTime);
-  const notices = buildHomeNotices(list, me, today, currentTime);
+  const todayPractices = getTodayPractices(list, me, today);
+  const nextGoing = getNextGoingPractice(list, today);
+  const todoNotices = buildTodoNotices(list, me, today, currentTime);
+  const historyNotices = buildHomeNotices(list, me, today, currentTime);
+  const notices = [...todoNotices, ...historyNotices];
   const unreadStatus = getHomeUnreadStatus(list, me, today, currentTime);
 
   // 「お知らせ」タブ表示中かつ最新一覧の取得完了時（practicesAt > 0）に既読更新する
   useEffect(() => {
     if (!list || practicesAt === 0 || subTab !== 'notices') return;
-    const latestAt = notices[0]?.updatedAt;
+    const latestAt = historyNotices[0]?.updatedAt;
     markNoticesRead(me, latestAt);
-  }, [list, practicesAt, subTab, ownerKey, notices[0]?.updatedAt]);
+  }, [list, practicesAt, subTab, ownerKey, historyNotices[0]?.updatedAt]);
 
   const handleSelectSubTab = (t: HomeSubTab) => {
     setSubTab(t);
     if (t === 'notices') {
-      markNoticesRead(me, notices[0]?.updatedAt);
+      markNoticesRead(me, historyNotices[0]?.updatedAt);
     } else if (t === 'releases') {
       markReleaseNotesRead(me);
     }
@@ -85,22 +89,24 @@ export function HomePage() {
         {(practicesAt === 0 || busy) && <Syncing />}
       </TopBar>
 
-      {todoCount > 0 && (
-        <button class="banner" onClick={() => go('/answer')}>
-          <span class="count-badge">{todoCount}</span>
-          <span class="grow">
-            <strong>未回答・未定の予約情報が{todoCount}件あります</strong>
-          </span>
-          <Icon name="chevron" size={18} />
-        </button>
-      )}
-
       <section>
         <div class="sec-head big">
-          <span class="grow">次の参加予定</span>
-          <button class="btn plain small link" onClick={() => go('/?tab=mine')}>
-            すべて見る
-          </button>
+          <span>今日の予定</span>
+        </div>
+        {todayPractices.length > 0 ? (
+          <div class="ticket-grid">
+            {todayPractices.map((v) => (
+              <PracticeCard key={v.practice.id} v={v} />
+            ))}
+          </div>
+        ) : (
+          <div class="empty small">今日の予定はありません</div>
+        )}
+      </section>
+
+      <section class="section">
+        <div class="sec-head big">
+          <span>次の参加予定</span>
         </div>
         {nextGoing ? (
           <PracticeCard v={nextGoing} />
@@ -135,12 +141,34 @@ export function HomePage() {
           ) : (
             <ul class="notice-list">
               {notices.map((n) => {
-                const isUnread = readAtBefore != null && n.updatedAt > readAtBefore;
+                const isTodo = n.kind === 'todo';
+                const isUnread = !isTodo && readAtBefore != null && n.updatedAt > readAtBefore;
+                const handleClick = () => {
+                  if (isTodo) {
+                    go(`/answer?r=${encodeURIComponent(n.practiceId)}`);
+                  } else {
+                    go(`/p/${encodeURIComponent(n.practiceId)}`);
+                  }
+                };
                 return (
                   <li key={n.id}>
-                    <button class={`notice${isUnread ? ' is-unread' : ''}`} onClick={() => go(`/p/${encodeURIComponent(n.practiceId)}`)}>
+                    <button
+                      class={`notice${isUnread ? ' is-unread' : ''}${isTodo ? ' is-todo' : ''}`}
+                      onClick={handleClick}
+                    >
                       <span class={`notice-icon ${n.kind}`}>
-                        <Icon name={n.kind === 'practice_canceled' ? 'x' : n.kind === 'practice_changed' ? 'edit' : 'user'} size={16} />
+                        <Icon
+                          name={
+                            n.kind === 'todo'
+                              ? 'check'
+                              : n.kind === 'practice_canceled'
+                              ? 'x'
+                              : n.kind === 'practice_changed'
+                              ? 'edit'
+                              : 'user'
+                          }
+                          size={16}
+                        />
                       </span>
                       <span class="notice-body">
                         <span class="notice-title">
@@ -149,7 +177,7 @@ export function HomePage() {
                         </span>
                         <span class="notice-sub">
                           <span class="notice-detail">{n.detail}</span>
-                          <time>{formatNoticeTime(n.updatedAt)}</time>
+                          {!isTodo && <time>{formatNoticeTime(n.updatedAt)}</time>}
                         </span>
                       </span>
                     </button>

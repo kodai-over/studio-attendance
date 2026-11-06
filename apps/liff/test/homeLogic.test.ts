@@ -4,9 +4,11 @@ import {
   LATEST_RELEASE_VERSION,
   RELEASE_NOTES,
   buildHomeNotices,
+  buildTodoNotices,
   formatNoticeTime,
   getHomeUnreadStatus,
   getNextGoingPractice,
+  getTodayPractices,
   isRelatedForNotice,
   markNoticesRead,
   markReleaseNotesRead,
@@ -141,8 +143,26 @@ describe('ホーム画面ロジック（homeLogic）', () => {
     globalThis.localStorage = originalLocalStorage;
   });
 
+  describe('getTodayPractices（今日の予定）', () => {
+    it('当日の予約情報のうち、自分が行くものまたは自分が予約者のものを返し、終了後も日付が変わるまで残す', () => {
+      const me = createMockMe();
+      const pTodayGoing = createMockPracticeView({ id: 'p-today-going', date: '2026-11-02', start: '19:00', end: '21:00', myAnswer: '行く' });
+      const pTodayBooked = createMockPracticeView({ id: 'p-today-booked', booker: 'Ume', date: '2026-11-02', start: '10:00', end: '12:00', myAnswer: '行かない' });
+      const pTodayCanceled = createMockPracticeView({ id: 'p-today-cancel', date: '2026-11-02', start: '14:00', myAnswer: '行く', status: '中止' });
+      const pTomorrow = createMockPracticeView({ id: 'p-tomorrow', date: '2026-11-03', myAnswer: '行く' });
+
+      const todayList = getTodayPractices(
+        [pTodayGoing, pTodayBooked, pTodayCanceled, pTomorrow],
+        me,
+        '2026-11-02',
+      );
+      expect(todayList.map((x) => x.practice.id)).toEqual(['p-today-booked', 'p-today-going']);
+    });
+  });
+
   describe('getNextGoingPractice（次の参加予定）', () => {
-    it('自分が「行く」と回答しており、未終了かつ中止でない直近の予約情報を返す', () => {
+    it('明日以降の、自分が「行く」と回答している直近の予約情報を返す（当日分は除外）', () => {
+      const pToday = createMockPracticeView({ id: 'p-today', date: '2026-11-02', start: '19:00', myAnswer: '行く' });
       const pPast = createMockPracticeView({ id: 'p-past', date: '2026-11-01', myAnswer: '行く' });
       const pCanceled = createMockPracticeView({ id: 'p-cancel', date: '2026-11-05', myAnswer: '行く', status: '中止' });
       const pMaybe = createMockPracticeView({ id: 'p-maybe', date: '2026-11-06', myAnswer: '保留' });
@@ -150,9 +170,8 @@ describe('ホーム画面ロジック（homeLogic）', () => {
       const pGoingNext = createMockPracticeView({ id: 'p-next', date: '2026-11-08', start: '18:00', myAnswer: '行く' });
 
       const next = getNextGoingPractice(
-        [pPast, pCanceled, pMaybe, pGoingLater, pGoingNext],
+        [pToday, pPast, pCanceled, pMaybe, pGoingLater, pGoingNext],
         '2026-11-02',
-        '12:00',
       );
       expect(next?.practice.id).toBe('p-next');
     });
@@ -161,6 +180,40 @@ describe('ホーム画面ロジック（homeLogic）', () => {
       const pMaybe = createMockPracticeView({ id: 'p-maybe', date: '2026-11-06', myAnswer: '保留' });
       expect(getNextGoingPractice([pMaybe], '2026-11-02')).toBeNull();
       expect(getNextGoingPractice(null, '2026-11-02')).toBeNull();
+    });
+  });
+
+  describe('buildTodoNotices（未回答・未定リマインド）', () => {
+    it('自分宛ての未回答・未定の予約情報を todo アイテムとして生成する', () => {
+      const me = createMockMe();
+      const pUnanswered = createMockPracticeView({
+        id: 'p-todo-1',
+        date: '2026-11-08',
+        start: '18:00',
+        end: '20:00',
+        myAnswer: null,
+      });
+      const pMaybe = createMockPracticeView({
+        id: 'p-todo-2',
+        date: '2026-11-09',
+        start: '19:00',
+        end: '21:00',
+        myAnswer: '保留',
+      });
+      const pAnswered = createMockPracticeView({
+        id: 'p-done',
+        date: '2026-11-10',
+        myAnswer: '行く',
+      });
+
+      const todos = buildTodoNotices([pUnanswered, pMaybe, pAnswered], me, '2026-11-02', '12:00');
+      expect(todos.length).toBe(2);
+      expect(todos[0].id).toBe('todo:p-todo-1');
+      expect(todos[0].kind).toBe('todo');
+      expect(todos[0].title).toBe('回答してください');
+      expect(todos[1].id).toBe('todo:p-todo-2');
+      expect(todos[1].kind).toBe('todo');
+      expect(todos[1].title).toBe('未定のままです');
     });
   });
 

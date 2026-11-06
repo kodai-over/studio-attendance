@@ -43,7 +43,7 @@ import {
 
 type RsvpSubTab = 'unanswered' | 'answered';
 
-/** 募集カードの「回答」またはメニューの「RSVP」から開く画面。まとめて変更して、完了またはメッセージ送信でまとめて反映 */
+/** 募集カードの「回答」またはメニューの「回答」から開く画面。まとめて変更して、完了またはメッセージ送信でまとめて反映 */
 export function AnswerPage({ ids: raw }: { ids: string[] }) {
   const { me, practices: list, practicesAt, startupFailed, loadHome, updatePractice, touchPractice, untouchPractice, toast } = useApp();
   const ids = [...new Set(raw)];
@@ -446,7 +446,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
   if (list == null || (isSpecific && displayed.length < ids.length && (load === 'loading' || load === 'wait'))) {
     return (
       <>
-        <TopBar title="RSVP" back={isSpecific} onBack={handleBack} />
+        <TopBar title="回答" back={isSpecific} onBack={handleBack} />
         <Spinner />
       </>
     );
@@ -454,7 +454,7 @@ export function AnswerPage({ ids: raw }: { ids: string[] }) {
 
   return (
     <>
-      <TopBar title="RSVP" back={isSpecific} onBack={handleBack}>
+      <TopBar title="回答" back={isSpecific} onBack={handleBack}>
         {(busy || saving || load === 'loading' || load === 'wait') && <Syncing />}
       </TopBar>
 

@@ -127,7 +127,7 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
               <PracticeCard key={v.practice.id} v={v} highlighted={highlightedDate === v.practice.date} />
             ))}
           </div>
-          <p class="note center section">回答は下のメニューの「RSVP」からできます</p>
+          <p class="note center section">回答は下のメニューの「回答」からできます</p>
         </>
       )}
     </>

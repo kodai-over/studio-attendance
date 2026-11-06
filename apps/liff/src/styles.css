@@ -222,6 +222,21 @@ a {
   gap: var(--sp-1);
   margin-left: auto;
 }
+.large-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: var(--sp-1) 0 var(--sp-5);
+}
+.large-head .large-title {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+.large-head .topbar-actions {
+  margin-left: auto;
+  margin-right: calc(var(--sp-2) * -1);
+}
 .large-title {
   margin: var(--sp-1) 0 var(--sp-5);
   font-size: var(--fs-2xl);
@@ -1630,6 +1645,10 @@ details[open] > .more-summary {
 .notice-icon.practice_changed {
   color: var(--warning);
 }
+.notice-icon.todo {
+  background: var(--surface-2);
+  color: var(--warning);
+}
 .notice-body {
   flex: 1;
   min-width: 0;
@@ -2047,8 +2066,8 @@ html {
   color: var(--sat);
 }
 .cal-day-cell.is-today .cal-day-num {
-  color: var(--danger);
   font-weight: 600;
+  box-shadow: inset 0 0 0 1.5px var(--text);
 }
 .cal-day-cell.is-selected .cal-day-num {
   background: var(--accent);

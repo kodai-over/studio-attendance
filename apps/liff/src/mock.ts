@@ -59,6 +59,11 @@ const mk = (days: number, start: string, end: string, studio: string, room: stri
   };
 };
 store.p = [
+  // 0. 今日・募集中・自分「行く」・予約者おおゆち（今日の予定確認用）
+  mk(0, '19:00', '21:00', 'studio worcle 横浜', '101', 4400, 'Ume', {
+    groups: ['G1'],
+    memo: '本日の合わせ練習。終了後にお金の確認',
+  }),
   // 1. 平日・募集中・自分「行く」・通常
   mk(1, '19:00', '21:00', 'studio worcle 横浜', '202', 4400, 'Ume', {
     groups: ['G1'],
@@ -122,58 +127,63 @@ const att = (practiceId: string, participant: string, name: string, answer: '行
   });
 };
 
-// 1. 平日 worcle 横浜 (store.p[0])
+// 0. 今日 worcle 横浜 (store.p[0])
 att(store.p[0].id, 'Ume', 'おおゆち', '行く');
 att(store.p[0].id, 'U3', 'けんた', '行く');
 att(store.p[0].id, 'U5', 'れん', '行く');
-att(store.p[0].id, 'guest:1', 'りな', '行く', 'ゲスト', 'U3');
-att(store.p[0].id, 'U2', 'さくら', '保留');
-att(store.p[0].id, 'U4', 'みお', '行かない');
 
-// 2. 祝日 BUZZ横浜東口 (store.p[1] - 満員4名)
-att(store.p[1].id, 'U2', 'さくら', '行く');
+// 1. 平日 worcle 横浜 (store.p[1])
+att(store.p[1].id, 'Ume', 'おおゆち', '行く');
 att(store.p[1].id, 'U3', 'けんた', '行く');
-att(store.p[1].id, 'U6', 'あおい', '行く');
-att(store.p[1].id, 'guest:2', 'しょう', '行く', 'ゲスト', 'U2');
-att(store.p[1].id, 'Ume', 'おおゆち', '保留');
-att(store.p[1].id, 'U7', 'たくみ', '行かない');
+att(store.p[1].id, 'U5', 'れん', '行く');
+att(store.p[1].id, 'guest:1', 'りな', '行く', 'ゲスト', 'U3');
+att(store.p[1].id, 'U2', 'さくら', '保留');
+att(store.p[1].id, 'U4', 'みお', '行かない');
 
-// 3. 土曜 worcle 原宿 (store.p[2])
+// 2. 祝日 BUZZ横浜東口 (store.p[2] - 満員4名)
 att(store.p[2].id, 'U2', 'さくら', '行く');
 att(store.p[2].id, 'U3', 'けんた', '行く');
-att(store.p[2].id, 'U7', 'たくみ', '行く');
-att(store.p[2].id, 'U5', 'れん', '保留');
-att(store.p[2].id, 'Ume', 'おおゆち', '行かない');
+att(store.p[2].id, 'U6', 'あおい', '行く');
+att(store.p[2].id, 'guest:2', 'しょう', '行く', 'ゲスト', 'U2');
+att(store.p[2].id, 'Ume', 'おおゆち', '保留');
+att(store.p[2].id, 'U7', 'たくみ', '行かない');
 
-// 4. 日曜 BUZZ渋谷 (store.p[3] - 大人数 7名行く、自分未回答)
+// 3. 土曜 worcle 原宿 (store.p[3])
 att(store.p[3].id, 'U2', 'さくら', '行く');
 att(store.p[3].id, 'U3', 'けんた', '行く');
-att(store.p[3].id, 'U4', 'みお', '行く');
-att(store.p[3].id, 'U5', 'れん', '行く');
-att(store.p[3].id, 'U6', 'あおい', '行く');
 att(store.p[3].id, 'U7', 'たくみ', '行く');
-att(store.p[3].id, 'U8', 'ひなた', '行く');
-att(store.p[3].id, 'guest:3', 'ユウキ', '保留', 'ゲスト', 'U2');
+att(store.p[3].id, 'U5', 'れん', '保留');
+att(store.p[3].id, 'Ume', 'おおゆち', '行かない');
 
-// 5. スタジオよこはま (store.p[4] - 0人)
+// 4. 日曜 BUZZ渋谷 (store.p[4] - 大人数 7名行く、自分未回答)
+att(store.p[4].id, 'U2', 'さくら', '行く');
+att(store.p[4].id, 'U3', 'けんた', '行く');
+att(store.p[4].id, 'U4', 'みお', '行く');
+att(store.p[4].id, 'U5', 'れん', '行く');
+att(store.p[4].id, 'U6', 'あおい', '行く');
+att(store.p[4].id, 'U7', 'たくみ', '行く');
+att(store.p[4].id, 'U8', 'ひなた', '行く');
+att(store.p[4].id, 'guest:3', 'ユウキ', '保留', 'ゲスト', 'U2');
+
+// 5. スタジオよこはま (store.p[5] - 0人)
 // 回答なし
 
-// 6. BUZZ横浜駅前 (store.p[5] - 定員6名、現在3名行く)
-att(store.p[5].id, 'U3', 'けんた', '行く');
-att(store.p[5].id, 'U5', 'れん', '行く');
-att(store.p[5].id, 'U7', 'たくみ', '行く');
-att(store.p[5].id, 'U2', 'さくら', '保留');
+// 6. BUZZ横浜駅前 (store.p[6] - 定員6名、現在3名行く)
+att(store.p[6].id, 'U3', 'けんた', '行く');
+att(store.p[6].id, 'U5', 'れん', '行く');
+att(store.p[6].id, 'U7', 'たくみ', '行く');
+att(store.p[6].id, 'U2', 'さくら', '保留');
 
-// 7. 祝日 worcle 横浜 (store.p[6] - 最低5人設定で2人行く)
-att(store.p[6].id, 'U2', 'さくら', '行く');
-att(store.p[6].id, 'Ume', 'おおゆち', '行く');
-att(store.p[6].id, 'U3', 'けんた', '保留');
-att(store.p[6].id, 'U4', 'みお', '保留');
-
-// 8. worcle 横浜 301 (store.p[7] - 最低4人設定・上限8人で2人行く・キャンセル期限超過)
+// 7. 祝日 worcle 横浜 (store.p[7] - 最低5人設定で2人行く)
+att(store.p[7].id, 'U2', 'さくら', '行く');
 att(store.p[7].id, 'Ume', 'おおゆち', '行く');
-att(store.p[7].id, 'U3', 'けんた', '行く');
-att(store.p[7].id, 'U5', 'れん', '保留');
+att(store.p[7].id, 'U3', 'けんた', '保留');
+att(store.p[7].id, 'U4', 'みお', '保留');
+
+// 8. worcle 横浜 301 (store.p[8] - 最低4人設定・上限8人で2人行く・キャンセル期限超過)
+att(store.p[8].id, 'Ume', 'おおゆち', '行く');
+att(store.p[8].id, 'U3', 'けんた', '行く');
+att(store.p[8].id, 'U5', 'れん', '保留');
 
 store.f = [
   { id: 'f1', userId: 'U3', name: 'けんた', text: '練習の前日にリマインドがほしい', status: '改善済み', reply: '前日にアプリの「自分が行く」で確認できるようにしました', createdAt: new Date(Date.now() - 86400000).toISOString() },

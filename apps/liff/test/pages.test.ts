@@ -550,6 +550,7 @@ describe('hasLargeTitle（画面上部の大きい見出し）', () => {
   it('メニューから開く画面（見出しあり・戻るなし）だけ大きい見出しを出す', () => {
     expect(hasLargeTitle('ホーム', false)).toBe(true);
     expect(hasLargeTitle('ホーム')).toBe(true);
+    expect(hasLargeTitle('回答', false)).toBe(true);
   });
 
   it('戻るがある画面や、見出しのない画面では出さない', () => {
