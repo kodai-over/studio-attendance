@@ -39,6 +39,16 @@ export function saveScheduleViewMode(mode: ScheduleViewMode): void {
 }
 
 /**
+ * 折りたたみキーの開閉状態を切り替える。
+ */
+export function toggleCollapseKey(prevKeys: Set<string>, key: string): Set<string> {
+  const next = new Set(prevKeys);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  return next;
+}
+
+/**
  * 年月（year, month）のカレンダーグリッド用の日付配列（日曜日開始、常に7の倍数）を生成する。
  * 前月末、当月、翌月初の日付を含む。
  */
@@ -228,33 +238,6 @@ export function formatCalendarCount(v: PracticeView): string {
  */
 export function resolveNextSelectedDate(currentSelected: string | null, targetDate: string): string | null {
   return currentSelected === targetDate ? null : targetDate;
-}
-
-/**
- * 初期選択日を決める。
- * 当月で今日以降の最も近い予約情報の日、なければ今日。今日が当月にない場合は当月の予約日の最初、それもなければ1日。
- */
-export function resolveInitialSelectedDate(
-  year: number,
-  month: number,
-  practicesByDate: Map<string, PracticeView[]>,
-  todayIso = toJstDate(new Date()),
-): string {
-  const [tY, tM] = todayIso.split('-').map(Number);
-  const isThisMonth = tY === year && tM === month;
-
-  // 当月の予約情報がある日付をソート
-  const prefix = `${year}-${String(month).padStart(2, '0')}-`;
-  const monthDates = Array.from(practicesByDate.keys())
-    .filter((d) => d.startsWith(prefix))
-    .sort();
-
-  if (isThisMonth) {
-    const upcoming = monthDates.find((d) => d >= todayIso);
-    return upcoming ?? todayIso;
-  }
-
-  return monthDates[0] ?? `${prefix}01`;
 }
 
 // ---------------------------------------------------------------------------

@@ -10,7 +10,6 @@ import {
   getPracticeCalendarTone,
   getPrevMonth,
   groupPracticesByDate,
-  resolveInitialSelectedDate,
   resolveNextSelectedDate,
   type CalendarDay,
   type CalendarEventTone,

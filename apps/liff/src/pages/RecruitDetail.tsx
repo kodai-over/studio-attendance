@@ -32,7 +32,7 @@ export function RecruitDetailPage({ id }: { id: string }) {
               }}
               onRemind={async (group) => {
                 if (me.actAs === 'test' && !confirm('確認用アカウント「admin」として、グループに募集を送ります。よろしいですか？')) return;
-                await update(() => api('remindPractice', { id, group }), '募集を送りました');
+                await update(() => api('remindPractice', { id, group }), 'もう一度募集を送りました');
               }}
             />
           )}

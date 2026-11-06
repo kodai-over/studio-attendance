@@ -17,7 +17,7 @@ import {
   type SpecificChangeMap,
 } from '../src/pages/answerLogic';
 import { MyAnswerBadge, readTab } from '../src/pages/List';
-import { groupByMonthWeek, resolveNextSelectedDate } from '../src/pages/calendarLogic';
+import { filterByDayKind, groupByMonthWeek, resolveNextSelectedDate, toggleCollapseKey } from '../src/pages/calendarLogic';
 import { canRemindGroup, confirmAndRemind } from '../src/pages/recruitLogic';
 import { resolveInitialHash } from '../src/route';
 import { RsvpButtons, cancelDeadlineDisplay, go, handleHashChangeGuard, hasLargeTitle, parseHash, setNavigationGuard } from '../src/ui';
@@ -726,5 +726,77 @@ describe('groupByMonthWeek の月跨ぎ週（11/30〜12/6）の仕様固定', ()
     expect(decGroup!.weeks).toHaveLength(1);
     expect(decGroup!.weeks[0].label).toBe('11/30〜12/6');
     expect(decGroup!.weeks[0].items.map((v) => v.practice.id)).toEqual(['p-dec-01']);
+  });
+
+  it('月をまたぐ同一週の片方を畳んでも、もう一方の月の週は開いたまま独立して開閉できる', () => {
+    let collapsed = new Set<string>();
+
+    const novWeekKey = 'week:2026-11:2026-11-30';
+    const decWeekKey = 'week:2026-12:2026-11-30';
+
+    // 11月の週を折りたたむ
+    collapsed = toggleCollapseKey(collapsed, novWeekKey);
+    expect(collapsed.has(novWeekKey)).toBe(true);
+    expect(collapsed.has(decWeekKey)).toBe(false);
+
+    // 11月の週をもう一度押して展開
+    collapsed = toggleCollapseKey(collapsed, novWeekKey);
+    expect(collapsed.has(novWeekKey)).toBe(false);
+    expect(collapsed.has(decWeekKey)).toBe(false);
+  });
+});
+
+describe('List 画面の表示切り替え（日付選択・フィルター連動・0件表示）', () => {
+  const pWeekday = {
+    practice: { id: 'p-fri', date: '2026-11-06', start: '19:00', end: '21:00', studio: 'w', room: '1', fee: 0, status: '募集中' },
+  } as unknown as PracticeView;
+  const pSaturday = {
+    practice: { id: 'p-sat', date: '2026-11-07', start: '19:00', end: '21:00', studio: 'w', room: '1', fee: 0, status: '募集中' },
+  } as unknown as PracticeView;
+  const list = [pWeekday, pSaturday];
+
+  it('日付非選択時は曜日フィルターに応じた月・週アコーディオン（monthGroups）が生成される', () => {
+    const filtered = filterByDayKind(list, 'weekday');
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].practice.id).toBe('p-fri');
+
+    const monthGroups = groupByMonthWeek(filtered);
+    expect(monthGroups).toHaveLength(1);
+    expect(monthGroups[0].weeks[0].items).toHaveLength(1);
+  });
+
+  it('日付選択中はその日だけのチケットが抽出され、月・週グループ（アコーディオン）は生成されない', () => {
+    const selectedDate = '2026-11-06';
+    const filteredList = filterByDayKind(list, 'all');
+
+    // List.tsx のロジック: selectedDate があるときは filteredList から該当日のものだけを抽出
+    const displayList = selectedDate
+      ? filteredList.filter((v) => v.practice.date === selectedDate)
+      : filteredList;
+    const monthGroups = !selectedDate ? groupByMonthWeek(displayList) : [];
+
+    expect(displayList).toHaveLength(1);
+    expect(displayList[0].practice.id).toBe('p-fri');
+    expect(monthGroups).toHaveLength(0); // 見出しは非表示
+  });
+
+  it('曜日フィルター適用中に合致しない日付を選択した場合は0件（空表示）となる', () => {
+    // 平日のみ適用中に、土曜の日付（2026-11-07）を選択
+    const filteredList = filterByDayKind(list, 'weekday');
+    const selectedDate = '2026-11-07';
+
+    const displayList = selectedDate
+      ? filteredList.filter((v) => v.practice.date === selectedDate)
+      : filteredList;
+
+    expect(displayList).toHaveLength(0);
+  });
+
+  it('予約情報が1件もない場合は displayList が空となり空表示状態になる', () => {
+    const emptyList: PracticeView[] = [];
+    const filtered = filterByDayKind(emptyList, 'holiday');
+    expect(filtered).toHaveLength(0);
+    const monthGroups = groupByMonthWeek(filtered);
+    expect(monthGroups).toHaveLength(0);
   });
 });

@@ -15,7 +15,6 @@ import {
   hasPracticeOnDate,
   readDayKind,
   readScheduleViewMode,
-  resolveInitialSelectedDate,
   saveDayKind,
   saveScheduleViewMode,
   type CalendarToneSettings,
@@ -198,44 +197,6 @@ describe('カレンダーロジック（calendarLogic）', () => {
 
       const nov15 = map.get('2026-11-15')!;
       expect(nov15).toHaveLength(1);
-    });
-  });
-
-  describe('resolveInitialSelectedDate（初期選択日決定）', () => {
-    it('当月の場合、今日以降の直近の予約日を優先して選択する', () => {
-      const map = new Map<string, PracticeView[]>();
-      map.set('2026-11-01', [createMockPracticeView({ id: 'p0', date: '2026-11-01' })]);
-      map.set('2026-11-10', [createMockPracticeView({ id: 'p1', date: '2026-11-10' })]);
-
-      // 今日が 2026-11-03 の場合、今日以降の最も近い 2026-11-10 が選ばれる
-      const selected = resolveInitialSelectedDate(2026, 11, map, '2026-11-03');
-      expect(selected).toBe('2026-11-10');
-    });
-
-    it('当月で今日より前の過去の予約情報しかない場合、今日の日付を選択する（今日の状態を明瞭にするため）', () => {
-      const map = new Map<string, PracticeView[]>();
-      map.set('2026-11-01', [createMockPracticeView({ id: 'p0', date: '2026-11-01' })]);
-
-      // 今日が 2026-11-15 の場合、過去の予定があっても今日が選択される
-      const selected = resolveInitialSelectedDate(2026, 11, map, '2026-11-15');
-      expect(selected).toBe('2026-11-15');
-    });
-
-    it('当月に予約情報が1件もない場合も今日の日付を選択する', () => {
-      const map = new Map<string, PracticeView[]>();
-      const selected = resolveInitialSelectedDate(2026, 11, map, '2026-11-03');
-      expect(selected).toBe('2026-11-03');
-    });
-
-    it('別月を表示している場合は、その月の最初の予約日（なければ1日）を選ぶ', () => {
-      const map = new Map<string, PracticeView[]>();
-      map.set('2026-12-15', [createMockPracticeView({ id: 'p1', date: '2026-12-15' })]);
-
-      const selectedDec = resolveInitialSelectedDate(2026, 12, map, '2026-11-03');
-      expect(selectedDec).toBe('2026-12-15');
-
-      const selectedJan = resolveInitialSelectedDate(2027, 1, map, '2026-11-03');
-      expect(selectedJan).toBe('2027-01-01');
     });
   });
 

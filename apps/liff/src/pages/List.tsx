@@ -10,6 +10,7 @@ import {
   readScheduleViewMode,
   saveDayKind,
   saveScheduleViewMode,
+  toggleCollapseKey,
   type DayKind,
   type MonthGroup,
   type ScheduleViewMode,
@@ -69,12 +70,7 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
   };
 
   const toggleCollapse = (key: string) => {
-    setCollapsedKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+    setCollapsedKeys((prev) => toggleCollapseKey(prev, key));
   };
 
   const showCalendar = viewMode === 'calendar';
@@ -118,7 +114,7 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
           class={`icon-btn${dayKind !== 'all' ? ' is-filtered' : ''}`}
           onClick={() => setShowFilter(!showFilter)}
           aria-pressed={showFilter}
-          aria-label={showFilter ? 'フィルターを閉じる' : '曜日で絞り込み'}
+          aria-label={showFilter ? '絞り込みを閉じる' : '曜日で絞り込み'}
         >
           <Icon name="filter" />
         </button>
@@ -148,7 +144,7 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
         {/* 格納型曜日フィルター */}
         <div class="filter-fold" aria-hidden={!showFilter} data-open={showFilter} inert={!showFilter ? true : undefined}>
           <div class="filter-fold-inner">
-            <div class="filter-chips" role="radiogroup" aria-label="曜日フィルター">
+            <div class="filter-chips" role="radiogroup" aria-label="曜日で絞り込み">
               <button
                 type="button"
                 class={`filter-chip${dayKind === 'weekday' ? ' active' : ''}`}
@@ -259,10 +255,10 @@ export function ListPage({ initialTab }: { initialTab?: string | null }) {
                 </button>
                 <div class="schedule-group-body" data-open={isMOpen}>
                   {m.weeks.map((w) => {
-                    const wKey = `week:${w.start}`;
+                    const wKey = `week:${m.month}:${w.start}`;
                     const isWOpen = !collapsedKeys.has(wKey);
                     return (
-                      <div key={w.start} class="schedule-subgroup">
+                      <div key={wKey} class="schedule-subgroup">
                         <button
                           type="button"
                           class="schedule-group-head week"
