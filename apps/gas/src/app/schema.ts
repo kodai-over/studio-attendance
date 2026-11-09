@@ -18,7 +18,7 @@ export const SHEETS = {
     name: '練習',
     headers: [
       '練習ID', '日付', '開始', '終了', 'スタジオ', '部屋', '料金', '予約者', '予約者名', '上限人数', '最低人数',
-      'メモ', '状態', '送り先グループ', '参加キー', '1人料金(調整)', '警告送信済', '登録日時',
+      'メモ', '状態', '送り先グループ', '参加キー', '1人料金(調整)', '警告送信済', '前日通知済', '登録日時',
     ],
   },
   attendance: {
@@ -60,6 +60,7 @@ export function rowToPractice(r: Row): Practice {
     joinKey: r['参加キー'] ?? '',
     feeOverride: numOrNull(r['1人料金(調整)'] ?? ''),
     warned: (r['警告送信済'] ?? '') !== '',
+    reminded: (r['前日通知済'] ?? '') !== '',
     createdAt: r['登録日時'] ?? '',
   };
 }
@@ -82,6 +83,7 @@ export function practiceToRow(p: Practice, bookerName?: string): Row {
     参加キー: p.joinKey,
     '1人料金(調整)': p.feeOverride == null ? '' : String(p.feeOverride),
     警告送信済: p.warned ? '済' : '',
+    前日通知済: p.reminded ? '済' : '',
     登録日時: p.createdAt,
   };
   if (bookerName !== undefined) row['予約者名'] = bookerName;

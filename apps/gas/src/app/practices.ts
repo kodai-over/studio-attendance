@@ -404,6 +404,7 @@ function draftPractice(ctx: Ctx, booker: Member, r: Reservation & { fee: number 
     joinKey: ctx.uuid(),
     feeOverride: null,
     warned: false,
+    reminded: false,
     createdAt: ctx.now().toISOString(),
   };
 }

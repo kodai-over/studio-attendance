@@ -1,11 +1,15 @@
-import { cancelWarningAt, findCancelRule, goingList, isActive, toJstDate, warningCard, TEST_MEMBER_ID, type LineMessage } from '@studio-attendance/shared';
+import { cancelWarningAt, dayBeforeCard, findCancelRule, goingList, isActive, jstDateTime, perPersonFee, toJstDate, warningCard, TEST_MEMBER_ID, type LineMessage, type Practice } from '@studio-attendance/shared';
 import type { Ctx } from './ports';
-import { remindGroups } from './practices';
+import { groupLink, remindGroups } from './practices';
+
+/** 前日のお知らせを送る、開始の何時間前か */
+const DAY_BEFORE_MS = 24 * 60 * 60 * 1000;
 
 /**
  * 毎時実行。
  * - 日付を過ぎた練習を「終了」にする（参加リンクも無効になる）
  * - キャンセル期限前警告：警告時刻を過ぎ、参加人数が最低人数に届いていない練習を予約者に知らせる（グループにもう一度募集できる）
+ * - リマインドカード：開始の24時間前になった練習を、募集済のグループに知らせる
  * - グループ名をLINE側の名前にそろえる
  */
 export function hourlyJob(ctx: Ctx): void {
@@ -14,6 +18,7 @@ export function hourlyJob(ctx: Ctx): void {
   const settings = ctx.store.settings();
   const att = ctx.store.attendance();
   const warnings: { to: string; message: LineMessage }[] = [];
+  const dayBefore: Practice[] = [];
 
   ctx.withLock(() => {
     for (const p of ctx.store.practices()) {
@@ -37,6 +42,19 @@ export function hourlyJob(ctx: Ctx): void {
         warnings.push({ to: p.booker, message: warningCard({ practice: p, going, min, groups: remindGroups(ctx, p, settings.groups), appUrl: ctx.config.appUrl }) });
       }
     }
+
+    // 前日のお知らせ：送る時刻を過ぎたら一度だけ送る。始まったあとや、時刻を過ぎてから登録・募集したものには送らない
+    for (const p of ctx.store.practices()) {
+      if (!isActive(p) || p.reminded) continue;
+      const start = jstDateTime(p.date, p.start);
+      const remindAt = new Date(start.getTime() - DAY_BEFORE_MS);
+      if (now < remindAt) continue;
+      ctx.store.savePractice({ ...p, reminded: true });
+      if (now >= start || new Date(p.createdAt) >= remindAt) continue;
+      // 確認用アカウントはLINEのユーザーではないので送らない
+      if (p.booker === TEST_MEMBER_ID || p.groups.length === 0) continue;
+      dayBefore.push(p);
+    }
   });
 
   for (const w of warnings) {
@@ -47,11 +65,41 @@ export function hourlyJob(ctx: Ctx): void {
     }
   }
 
+  for (const p of dayBefore) sendDayBefore(ctx, p);
+
   // 名前の同期が失敗しても、終了処理と警告は済ませておく
   try {
     syncGroupNames(ctx);
   } catch (e) {
     ctx.log('group name sync failed', e);
+  }
+}
+
+/**
+ * 前日のお知らせを、募集済のグループに送る。どのグループにも送れなかったときは、次の回で送り直せるよう印を戻す。
+ * 参加人数は送る時点のもの
+ */
+function sendDayBefore(ctx: Ctx, p: Practice): void {
+  const att = ctx.store.attendance(p.id).filter((a) => a.practiceId === p.id);
+  const going = goingList(att, p.id);
+  const maybe = att.filter((a) => a.answer === '保留');
+  const perPerson = perPersonFee(p.fee, going.length, ctx.store.settings().roundUnit, p.feeOverride);
+  let sent = 0;
+  for (const g of p.groups) {
+    try {
+      const link = groupLink(ctx, g);
+      // Bot が入っていないグループ（設定から外れたもの）には送らない
+      if (!link) continue;
+      const card = dayBeforeCard({ practice: p, going: going.map((a) => a.name), maybe: maybe.map((a) => a.name), perPerson, appUrl: ctx.config.appUrl, group: link });
+      ctx.line.push(g, [card]);
+      sent++;
+    } catch (e) {
+      ctx.log('day-before push failed', g, e);
+    }
+  }
+  if (sent === 0) {
+    const cur = ctx.store.getPractice(p.id);
+    if (cur) ctx.store.savePractice({ ...cur, reminded: false });
   }
 }
 

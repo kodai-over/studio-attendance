@@ -54,6 +54,7 @@ const mk = (days: number, start: string, end: string, studio: string, room: stri
     joinKey: 'mockkey',
     feeOverride: null,
     warned: false,
+    reminded: false,
     createdAt: new Date().toISOString(),
     ...over,
   };
@@ -128,6 +129,7 @@ store.p = [
     joinKey: 'mockkey',
     feeOverride: null,
     warned: false,
+    reminded: false,
     createdAt: new Date().toISOString(),
   },
   // 10. 12月初日（12/1 火・週跨ぎ 11/30〜12/6）
@@ -148,6 +150,7 @@ store.p = [
     joinKey: 'mockkey',
     feeOverride: null,
     warned: false,
+    reminded: false,
     createdAt: new Date().toISOString(),
   },
   // 11. 12月第1週 週末（12/5 土・週跨ぎ 11/30〜12/6）
@@ -168,6 +171,7 @@ store.p = [
     joinKey: 'mockkey',
     feeOverride: null,
     warned: false,
+    reminded: false,
     createdAt: new Date().toISOString(),
   },
   // 12. 12月第2週 平日（12/10 木・週 12/7〜12/13）
@@ -188,6 +192,7 @@ store.p = [
     joinKey: 'mockkey',
     feeOverride: null,
     warned: false,
+    reminded: false,
     createdAt: new Date().toISOString(),
   },
   // 13. 12月第2週 週末（12/13 日・週 12/7〜12/13）
@@ -208,6 +213,7 @@ store.p = [
     joinKey: 'mockkey',
     feeOverride: null,
     warned: false,
+    reminded: false,
     createdAt: new Date().toISOString(),
   },
 ];
