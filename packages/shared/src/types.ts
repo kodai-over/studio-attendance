@@ -24,6 +24,8 @@ export interface Practice {
   joinKey: string;
   feeOverride: number | null;
   warned: boolean;
+  /** 開始の24時間前のお知らせ（前日リマインド）を送った */
+  reminded: boolean;
   createdAt: string;
 }
 

@@ -249,7 +249,7 @@ export function classifyReservations(
     }
     items.push({ reservation: { ...r }, kind: 'new' });
     running.push({
-      p: { ...r, id, fee: r.fee ?? 0, booker: '', max: null, min: null, memo: '', status: '募集中', groups: [], joinKey: '', feeOverride: null, warned: false, createdAt: '' },
+      p: { ...r, id, fee: r.fee ?? 0, booker: '', max: null, min: null, memo: '', status: '募集中', groups: [], joinKey: '', feeOverride: null, warned: false, reminded: false, createdAt: '' },
       itemIndex: items.length - 1,
     });
   }

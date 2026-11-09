@@ -104,6 +104,7 @@ function createMockPracticeView(partial: {
       groups: partial.groups ?? ['G1'],
       feeOverride: null,
       warned: false,
+      reminded: false,
       createdAt: partial.createdAt ?? '2026-11-01T00:00:00.000Z',
     },
     bookerName: partial.booker === 'U2' ? 'さくら' : 'おおゆち',

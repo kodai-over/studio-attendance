@@ -381,6 +381,86 @@ export function warningCard({ practice: p, going, min, groups, appUrl }: Warning
   };
 }
 
+export interface DayBeforeCardInput {
+  practice: Practice;
+  /** 「行く」の人の名前（ゲスト含む） */
+  going: string[];
+  /** 「未定」の人の名前 */
+  maybe: string[];
+  /** 1人あたり（人数が決まらないなどで出せないときは null） */
+  perPerson: number | null;
+  appUrl: string;
+  /** 送り先のグループ（回答のリンクに付けて、開いた人をそのグループのメンバーとして覚える） */
+  group?: LinkGroup;
+}
+
+/** 参加者の名前を並べる。多いときは途中までにして人数を添える */
+const MAX_NAMES = 30;
+function names(list: string[]): string {
+  if (list.length === 0) return 'まだいません';
+  const shown = list.slice(0, MAX_NAMES).join('、');
+  return list.length > MAX_NAMES ? `${shown} ほか${list.length - MAX_NAMES}人` : shown;
+}
+
+/**
+ * リマインドカード（前日のお知らせ）。開始の24時間前に、募集済のグループへ送る。
+ * 場所・日時・スタジオ代・現在の参加者を載せ、回答し忘れている人が「回答」からそのまま答えられるようにする
+ */
+export function dayBeforeCard({ practice: p, going, maybe, perPerson, appUrl, group }: DayBeforeCardInput): LineMessage {
+  // 料金は合計を大きく、1人あたりは小さく添える（人数が決まらないなど出せないときは合計だけ）
+  const fee: Node = {
+    type: 'box',
+    layout: 'baseline',
+    spacing: 'sm',
+    contents: [
+      text('料金', { size: 'sm', color: GRAY, flex: 2 }),
+      {
+        type: 'box',
+        layout: 'vertical',
+        flex: 5,
+        contents: [
+          text(`合計 ${yen(p.fee)}`, { size: 'sm' }),
+          ...(perPerson != null ? [text(`1人 ${yen(perPerson)}`, { size: 'xs', color: GRAY })] : []),
+        ],
+      },
+    ],
+  };
+  return {
+    type: 'flex',
+    altText: `リマインド: ${practiceSummary(p)}`,
+    contents: {
+      type: 'bubble',
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          text('リマインド', { weight: 'bold', size: 'xl', color: GREEN }),
+          text(`${labelDate(p.date)}　${timeRange(p)}`, { weight: 'bold', size: 'md' }),
+          row('場所', place(p)),
+          fee,
+          { type: 'separator' },
+          row(`行く ${going.length}人`, names(going)),
+          ...(maybe.length > 0 ? [row(`未定 ${maybe.length}人`, names(maybe))] : []),
+          text('まだ回答していない人は、下の「回答」から答えられます。', { size: 'xs', color: GRAY }),
+        ],
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          {
+            type: 'button',
+            style: 'primary',
+            color: GREEN,
+            action: { type: 'uri', label: '回答', uri: cardLink([{ practice: p, bookerName: '' }], appUrl, group) },
+          },
+        ],
+      },
+    },
+  };
+}
+
 /**
  * 回答画面の「グループに伝える」で、本人の発言としてグループに送る文。
  * 行く・保留・行かないを日付でまとめ、未回答は載せない。載せるものが無ければ null

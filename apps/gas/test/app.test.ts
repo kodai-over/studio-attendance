@@ -52,7 +52,7 @@ const reservation = { date: '2026-10-21', start: '19:00', end: '21:00', studio: 
 const PID = 'worcle横浜-20261021-1900-A';
 const baseP = {
   id: 'old-1', date: '2026-09-01', start: '19:00', end: '21:00', studio: 'x', room: 'A', fee: 0, booker: BOOKER, max: null, min: null,
-  memo: '', status: '終了', groups: [], joinKey: 'k', feeOverride: null, warned: true, createdAt: '',
+  memo: '', status: '終了', groups: [], joinKey: 'k', feeOverride: null, warned: true, reminded: true, createdAt: '',
 };
 
 describe('スクショから募集まで', () => {
@@ -715,6 +715,77 @@ describe('キャンセル期限前警告と終了', () => {
   });
 });
 
+describe('リマインドカード', () => {
+  const create = (t: ReturnType<typeof setup>, at: string) => {
+    t.clock.now = new Date(at);
+    handleApi(t.ctx, { userId: BOOKER }, 'createPractices', {
+      items: [{ ...reservation, max: null, min: null, memo: '' }],
+      groups: [G1],
+    });
+    t.line.pushes = [];
+  };
+
+  it('開始の24時間前になったら、募集済のグループに一度だけ送る', () => {
+    const t = setup();
+    create(t, '2026-10-18T00:00:00Z');
+
+    t.clock.now = new Date('2026-10-20T09:59:00Z'); // 開始（10/21 19:00 JST）の24時間前より1分前
+    hourlyJob(t.ctx);
+    expect(t.line.pushes).toHaveLength(0);
+
+    t.clock.now = new Date('2026-10-20T10:00:00Z');
+    hourlyJob(t.ctx);
+    expect(t.line.pushes).toHaveLength(1);
+    expect(t.line.pushes[0].to).toBe(G1);
+    const card = JSON.stringify(t.line.pushes[0]);
+    expect(card).toContain('リマインド');
+    expect(card).toContain('worcle横浜');
+    expect(card).toContain('合計 ¥6,000');
+    expect(card).toContain('1人 ¥6,000'); // 登録者1人 → 1人でスタジオ代を割る
+    expect(card).toContain('行く 1人');
+    expect(card).toContain(`r=${encodeURIComponent(PID)}`); // 「回答」から回答画面を開く
+    expect(t.store.p[0].reminded).toBe(true);
+
+    t.clock.now = new Date('2026-10-20T11:00:00Z');
+    hourlyJob(t.ctx);
+    expect(t.line.pushes).toHaveLength(1);
+  });
+
+  it('始まったあとと、中止した練習には送らない', () => {
+    const t = setup();
+    create(t, '2026-10-18T00:00:00Z');
+    t.clock.now = new Date('2026-10-21T10:00:00Z'); // 開始時刻
+    hourlyJob(t.ctx);
+    expect(t.line.pushes).toHaveLength(0);
+
+    const t2 = setup();
+    create(t2, '2026-10-18T00:00:00Z');
+    t2.store.p[0].status = '中止';
+    t2.clock.now = new Date('2026-10-20T10:00:00Z');
+    hourlyJob(t2.ctx);
+    expect(t2.line.pushes).toHaveLength(0);
+  });
+
+  it('送る時刻を過ぎてから登録した練習には送らない', () => {
+    const t = setup();
+    create(t, '2026-10-20T12:00:00Z');
+    t.clock.now = new Date('2026-10-20T13:00:00Z');
+    hourlyJob(t.ctx);
+    expect(t.line.pushes).toHaveLength(0);
+    expect(t.store.p[0].reminded).toBe(true);
+  });
+
+  it('募集していない練習には送らない', () => {
+    const t = setup();
+    t.clock.now = new Date('2026-10-18T00:00:00Z');
+    handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [{ ...reservation, max: null, min: null, memo: '' }], groups: [] });
+    t.line.pushes = [];
+    t.clock.now = new Date('2026-10-20T10:00:00Z');
+    hourlyJob(t.ctx);
+    expect(t.line.pushes).toHaveLength(0);
+  });
+});
+
 describe('もう一度募集', () => {
   const G2 = 'Cgroup2';
   const remind = (t: ReturnType<typeof setup>, userId: string, id: string, g = G1) =>
@@ -953,7 +1024,7 @@ describe('ルーター', () => {
 
   it('グループ名の同期に失敗しても、終了処理と警告は済ませる', () => {
     const t = setup();
-    t.store.p.push({ ...baseP, id: 'past', status: '募集中', warned: false } as any);
+    t.store.p.push({ ...baseP, id: 'past', status: '募集中', warned: false, reminded: false } as any);
     t.line.groupNames = { [G1]: '新しい名前' };
     t.store.saveSettings = () => {
       throw new Error('sheet error');
