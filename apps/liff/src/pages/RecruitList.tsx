@@ -1,23 +1,29 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { isAdmin, labelDate, type PracticeView } from '@studio-attendance/shared';
+import { isAdmin, labelDate, toJstDate, type PracticeView } from '@studio-attendance/shared';
 import { api } from '../api';
 import { MyAnswerBadge, TicketSub } from './List';
 import { DeleteConfirmDialog, Fee, Icon, Spinner, StatusBadge, Stub, Tabs, TopBar, go, place, useApp, useRunner } from '../ui';
-import { filterRecruitPractices, readRecruitScope, saveRecruitScope, type RecruitScope } from './recruitLogic';
+import { canPickForRemind, defaultRemindTargets, filterAvailableGroups, filterRecruitPractices, readRecruitScope, saveRecruitScope, sendResultToast, unsentGroupNames, type RecruitScope } from './recruitLogic';
 
 /**
  * 「募集」。自分が登録した練習（管理者はすべての練習）を並べ、押すと募集・編集の画面へ。
  * 左にスワイプすると削除が出る。右上の＋から登録する
  */
 export function RecruitListPage() {
-  const { me, practices, setPractices, deletePractice } = useApp();
-  const [run] = useRunner();
+  const { me, practices, setPractices, deletePractice, toast } = useApp();
+  const [run, busy] = useRunner();
   const [fresh, setFresh] = useState(false);
   // 削除ボタンを出しているチケット（一度に1枚だけ）
   const [opened, setOpened] = useState<string | null>(null);
   // 削除確認ダイアログを出している予約情報
   const [deletingTarget, setDeletingTarget] = useState<PracticeView | null>(null);
+  // 「選ぶ」でまとめて募集を送る予約情報
+  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
+  // 募集を送るグループを選ぶダイアログ
+  const [choosing, setChoosing] = useState(false);
+  const [targets, setTargets] = useState<string[]>([]);
 
   // 手元の一覧ですぐ表示し、最新の一覧は裏で取り直す
   useEffect(() => {
@@ -39,6 +45,31 @@ export function RecruitListPage() {
   const rawPractices = practices == null && !fresh ? null : practices;
   const { mine, all, shown: list } = filterRecruitPractices(rawPractices, admin, me.member.userId, scope);
 
+  const today = toJstDate(new Date());
+  const pickable = (list ?? []).filter((v) => canPickForRemind(v, today));
+  const stopSelecting = () => {
+    setSelecting(false);
+    setPicked([]);
+  };
+  const togglePick = (id: string) => setPicked((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+  // 送り先に選べるのは、自分とBotが入っているグループすべて
+  const myGroups = filterAvailableGroups(me.groups, me.member.groups);
+  const pickedViews = pickable.filter((v) => picked.includes(v.practice.id));
+  const chooseTargets = () => {
+    setTargets(defaultRemindTargets(pickedViews, myGroups));
+    setChoosing(true);
+  };
+  const remindPicked = async () => {
+    if (pickedViews.length === 0 || targets.length === 0) return;
+    const sent = await run(() => api('remindPractices', { ids: pickedViews.map((v) => v.practice.id), groups: targets }));
+    setChoosing(false);
+    if (!sent) return;
+    // 一部のグループにしか送れなかったときは、送れなかったグループを知らせる
+    const r = sendResultToast(unsentGroupNames(myGroups.filter((g) => targets.includes(g.id)), sent));
+    toast(r.msg, r.error);
+    stopSelecting();
+  };
+
   const remove = (v: PracticeView) => {
     setOpened(null);
     setDeletingTarget(v);
@@ -47,6 +78,21 @@ export function RecruitListPage() {
   return (
     <>
       <TopBar title="募集">
+        {/* 登録の＋と、募集を送る予約情報を選ぶ操作を、同じアイコンボタンで並べる */}
+        {(pickable.length > 0 || selecting) && (
+          <button
+            class="icon-btn"
+            aria-label={selecting ? '選ぶのをやめる' : '募集を送る予約情報を選ぶ'}
+            aria-pressed={selecting}
+            onClick={() => {
+              setOpened(null);
+              if (selecting) stopSelecting();
+              else setSelecting(true);
+            }}
+          >
+            <Icon name={selecting ? 'x' : 'send'} />
+          </button>
+        )}
         <button class="icon-btn" aria-label="スタジオ予約を登録" onClick={() => (opened ? setOpened(null) : go('/register'))}>
           <Icon name="plus" />
         </button>
@@ -77,18 +123,64 @@ export function RecruitListPage() {
           </button>
         </div>
       ) : (
-        <div class="ticket-grid">
-          {list.map((v) => (
-            <SwipeRow
-              key={v.practice.id}
-              open={opened === v.practice.id}
-              anyOpen={opened != null}
-              onOpen={(o) => setOpened(o ? v.practice.id : null)}
-              onDelete={() => remove(v)}
-            >
-              <RecruitTicket v={v} />
-            </SwipeRow>
-          ))}
+        <div class={`ticket-grid${selecting ? ' picking' : ''}`}>
+          {list.map((v) =>
+            selecting ? (
+              <PickRow key={v.practice.id} v={v} enabled={canPickForRemind(v, today)} on={picked.includes(v.practice.id)} onToggle={() => togglePick(v.practice.id)} />
+            ) : (
+              <SwipeRow
+                key={v.practice.id}
+                open={opened === v.practice.id}
+                anyOpen={opened != null}
+                onOpen={(o) => setOpened(o ? v.practice.id : null)}
+                onDelete={() => remove(v)}
+              >
+                <RecruitTicket v={v} />
+              </SwipeRow>
+            ),
+          )}
+        </div>
+      )}
+
+      {selecting && (
+        <div class="pick-bar">
+          <button class="btn primary block" disabled={busy || picked.length === 0} onClick={chooseTargets}>
+            <Icon name="send" size={18} />
+            {picked.length > 0 ? `${picked.length}件の募集を送る` : '募集を送る予約情報を選ぶ'}
+          </button>
+        </div>
+      )}
+
+      {choosing && (
+        <div class="overlay" role="dialog" aria-modal="true" aria-label="募集を送るグループ">
+          <div class="dialog">
+            <h3>募集を送る</h3>
+            <p class="muted">{pickedViews.length}件の予約情報を、選んだグループに送ります</p>
+            {myGroups.length === 0 ? (
+              <p class="note">Botをグループに招待すると送れます</p>
+            ) : (
+              <div class="chips">
+                {myGroups.map((g) => (
+                  <button
+                    key={g.id}
+                    class="chip"
+                    aria-pressed={targets.includes(g.id)}
+                    onClick={() => setTargets((cur) => (cur.includes(g.id) ? cur.filter((x) => x !== g.id) : [...cur, g.id]))}
+                  >
+                    {g.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div class="btn-row">
+              <button class="btn" disabled={busy} onClick={() => setChoosing(false)}>
+                キャンセル
+              </button>
+              <button class="btn primary" disabled={busy || targets.length === 0} onClick={remindPicked}>
+                {targets.length > 0 ? `${targets.length}グループに送る` : '送る'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -102,6 +194,18 @@ export function RecruitListPage() {
         }}
       />
     </>
+  );
+}
+
+/** 「選ぶ」の間のチケット。押すと選ぶ／外す。募集を送れないもの（満員・未募集など）は薄くして選べない */
+function PickRow({ v, enabled, on, onToggle }: { v: PracticeView; enabled: boolean; on: boolean; onToggle: () => void }) {
+  return (
+    <button class={`pick-row${on ? ' on' : ''}`} role="checkbox" aria-checked={on} aria-disabled={!enabled} disabled={!enabled} onClick={onToggle}>
+      <RecruitTicket v={v} />
+      <span class="pick-mark" aria-hidden="true">
+        {on && <Icon name="check" size={16} />}
+      </span>
+    </button>
   );
 }
 

@@ -18,7 +18,7 @@ import {
 } from '../src/pages/answerLogic';
 import { MyAnswerBadge, readTab } from '../src/pages/List';
 import { filterByDayKind, groupByMonthWeek, resolveNextSelectedDate, toggleCollapseKey } from '../src/pages/calendarLogic';
-import { canRemindGroup, confirmAndRemind } from '../src/pages/recruitLogic';
+import { canRemindGroup, sendConfirmMessage } from '../src/pages/recruitLogic';
 import { resolveInitialHash } from '../src/route';
 import { RsvpButtons, cancelDeadlineDisplay, go, handleHashChangeGuard, hasLargeTitle, parseHash, setNavigationGuard } from '../src/ui';
 
@@ -626,7 +626,7 @@ describe('開始後の予約情報に対する詳細画面からの回答変更�
   });
 });
 
-describe('RecruitDetail の「もう一度募集」', () => {
+describe('RecruitDetail の「再募集」', () => {
   const basePracticeView = {
     practice: {
       id: 'p-remind-1',
@@ -666,35 +666,9 @@ describe('RecruitDetail の「もう一度募集」', () => {
     expect(res.canSubmit).toBe(false);
   });
 
-  it('確認ダイアログでキャンセルした場合は送信関数を呼ばない', async () => {
-    const onRemind = vi.fn().mockResolvedValue(true);
-    const confirmFn = vi.fn().mockReturnValue(false);
-
-    const sent = await confirmAndRemind({ id: 'G1', name: 'チームA' }, onRemind, false, confirmFn);
-    expect(sent).toBe(false);
-    expect(confirmFn).toHaveBeenCalledWith('チームA にもう一度募集カードを送りますか？');
-    expect(onRemind).not.toHaveBeenCalled();
-  });
-
-  it('確認ダイアログでOKした場合は対象グループIDで送信関数を呼ぶ', async () => {
-    const onRemind = vi.fn().mockResolvedValue(true);
-    const confirmFn = vi.fn().mockReturnValue(true);
-
-    const sent = await confirmAndRemind({ id: 'G1', name: 'チームA' }, onRemind, false, confirmFn);
-    expect(sent).toBe(true);
-    expect(confirmFn).toHaveBeenCalledWith('チームA にもう一度募集カードを送りますか？');
-    expect(onRemind).toHaveBeenCalledWith('G1');
-  });
-
-  it('確認用アカウント（actAs="test"）の場合はダイアログにその旨を含めて1回だけ確認する', async () => {
-    const onRemind = vi.fn().mockResolvedValue(true);
-    const confirmFn = vi.fn().mockReturnValue(true);
-
-    const sent = await confirmAndRemind({ id: 'G1', name: 'チームA' }, onRemind, true, confirmFn);
-    expect(sent).toBe(true);
-    expect(confirmFn).toHaveBeenCalledTimes(1);
-    expect(confirmFn).toHaveBeenCalledWith('確認用アカウント「admin」として、チームA にもう一度募集カードを送りますか？');
-    expect(onRemind).toHaveBeenCalledWith('G1');
+  it('確認文は送り先のグループ名を含み、確認用アカウントのときはその旨を添える', () => {
+    expect(sendConfirmMessage({ name: 'チームA' })).toBe('チームA に募集カードを送りますか？');
+    expect(sendConfirmMessage({ name: 'チームA' }, true)).toBe('確認用アカウント「admin」として、チームA に募集カードを送りますか？');
   });
 });
 

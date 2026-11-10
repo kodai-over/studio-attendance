@@ -35,7 +35,7 @@ import {
   type StudioDef,
 } from '@studio-attendance/shared';
 import { UserError, type Ctx, type RawReservation } from './ports';
-import { buildDraft, classifyFor, createPractices, ensureMember, inGroupKey, loadDraft, noteGroupMember, readReservations, recordAnswer, refreshStatus, remindRecruit, removeDraft, sendPracticeCancellation, sendRecruit, withDefaultFee } from './practices';
+import { buildDraft, classifyFor, createPractices, ensureMember, inGroupKey, loadDraft, noteGroupMember, readReservations, recordAnswer, refreshStatus, remindRecruitMany, removeDraft, sendPracticeCancellation, sendRecruit, withDefaultFee } from './practices';
 
 /** 誰として操作しているか（管理者の見え方の切り替え） */
 interface Acting {
@@ -395,9 +395,16 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
     return view(ctx, id, me);
   },
 
-  remindPractice(ctx, me, { id, group }) {
-    remindRecruit(ctx, me.userId, id, group);
+  remindPractice(ctx, me, { id, groups }) {
+    // デプロイ前に開いた古い画面は、groups ではなく group を送ってくる
+    if (!Array.isArray(groups)) throw new UserError('アプリを開き直してください。');
+    remindRecruitMany(ctx, me.userId, [id], groups);
     return view(ctx, id, me);
+  },
+
+  remindPractices(ctx, me, { ids, groups }) {
+    if (!Array.isArray(ids) || !Array.isArray(groups)) throw new UserError('アプリを開き直してください。');
+    return remindRecruitMany(ctx, me.userId, ids, groups);
   },
 
   setDisplayName(ctx, me, { name }) {

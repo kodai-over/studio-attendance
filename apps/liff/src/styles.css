@@ -1009,7 +1009,7 @@ a {
 
 /* ---------- 参加者 ---------- */
 .attendee-group + .attendee-group {
-  margin-top: var(--sp-5);
+  margin-top: var(--sp-4);
 }
 .attendee-head {
   display: flex;
@@ -2161,26 +2161,6 @@ html {
   display: none;
 }
 
-/* ---------- 募集: もう一度募集 ---------- */
-.remind-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-  margin-top: var(--sp-2);
-}
-.remind-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--sp-2) var(--sp-3);
-  background: var(--surface);
-  border-radius: var(--r-md);
-  border: 1px solid var(--separator);
-  font-size: var(--fs-sm);
-}
-.remind-item .btn {
-  margin-left: var(--sp-2);
-}
 :root[data-chrome='hidden'] .schedule-head {
   top: 0;
   padding-top: calc(var(--sp-2) + env(safe-area-inset-top));
@@ -2368,10 +2348,18 @@ html {
 /* 詳細：縦に並ぶときは、まとまりの間をあける */
 .detail-side,
 .detail-extra {
-  margin-top: var(--sp-8);
+  margin-top: var(--sp-5);
+}
+/* 詳細の右側（参加者・ゲスト・参加リンク・募集を送る・編集）は、どのまとまりの間も同じだけあける */
+.detail-side > * + * {
+  margin-top: var(--sp-5);
 }
 .detail-primary > :last-child {
   margin-bottom: 0;
+}
+/* ゲストの追加はめったに使わないので、参加者のすぐ下に小さく置く */
+.detail-side > .guest-add {
+  margin-top: var(--sp-2);
 }
 .detail-extra:empty {
   display: none;
@@ -2446,4 +2434,59 @@ html {
   .card-grid {
     gap: var(--sp-4);
   }
+}
+
+/* ---------- 募集: 選んでまとめて再募集 ---------- */
+.pick-row {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.pick-row .ticket {
+  pointer-events: none;
+}
+.pick-row:disabled {
+  opacity: 0.4;
+}
+.pick-row.on {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.pick-mark {
+  position: absolute;
+  right: var(--sp-3);
+  bottom: var(--sp-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1.5px solid var(--text-2);
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  color: var(--on-accent);
+}
+.pick-row.on .pick-mark {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.pick-bar {
+  position: fixed;
+  left: calc(50% + var(--nav-w) / 2);
+  bottom: calc(72px + env(safe-area-inset-bottom));
+  z-index: 9;
+  width: min(calc(100% - var(--nav-w) - 32px), 480px);
+  transform: translateX(-50%);
+  box-shadow: var(--shadow);
+  border-radius: var(--r-md);
+}
+
+.ticket-grid.picking {
+  padding-bottom: calc(var(--sp-12) + var(--sp-8));
 }
