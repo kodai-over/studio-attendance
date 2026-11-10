@@ -7,6 +7,8 @@ import {
   defaultFee,
   goingList,
   isActive,
+  isAdmin,
+  labelDate,
   nextStatus,
   normalizeReservation,
   practiceCancellationMessage,
@@ -400,12 +402,19 @@ export function remindRecruitMany(ctx: Ctx, userId: string, practiceIds: string[
   const byGroup = new Map<string, Practice[]>(targets.map((g) => [g, practices]));
   // 続けて押しても二重に流さない（1件ずつの「再募集」と同じ印を使う）
   const keys = [...byGroup].flatMap(([g, ps]) => ps.map((p) => remindKey(p.id, g)));
+  let recent = '';
   const fresh = ctx.withLock(() => {
-    if (keys.some((k) => ctx.kv.get(k))) return false;
+    for (const [g, ps] of byGroup) {
+      const hit = ps.find((p) => ctx.kv.get(remindKey(p.id, g)));
+      if (hit) {
+        recent = `${labelDate(hit.date)}の予約情報を${known.find((k) => k.id === g)?.name ?? g}に`;
+        return false;
+      }
+    }
     for (const k of keys) ctx.kv.put(k, '1', REMIND_GAP);
     return true;
   });
-  if (!fresh) throw new UserError('少し前に募集を送った予約情報が含まれています。続けて送るときは10分ほどあけてください。');
+  if (!fresh) throw new UserError(`${recent}少し前に募集を送りました。続けて送るときは10分ほどあけてください。`);
   // 1件だけのときは、今の人数も添える
   const only = practices.length === 1 ? practices[0] : null;
   const lead = only
@@ -530,9 +539,11 @@ export function refreshStatus(ctx: Ctx, p: Practice): void {
 
 /**
  * 募集の送り先に選べるか（まとめて・個別の「募集を送る」、お知らせの「再募集」）。
- * 本人が入っているグループ（Bot も入っているもの）。すでに募集済のグループと、本人のふだんの送り先は、入っているグループとして記録されていなくても選べる
+ * 本人が入っているグループ（Bot も入っているもの）。管理者はどのグループにも送れる。すでに募集済のグループと、本人のふだんの送り先は、入っているグループとして記録されていなくても選べる
  */
 export function canRemindTo(ctx: Ctx, me: Member | null, p: Pick<Practice, 'groups'>, groupId: string): boolean {
+  // 管理者は、これまでどおりBotが入っているグループならどこにでも送れる
+  if (isAdmin(me)) return true;
   if ((me?.groups ?? []).includes(groupId) || p.groups.includes(groupId)) return true;
   return me != null && defaultGroupsFor(me, ctx.store.settings().groups.map((g) => g.id)).includes(groupId);
 }

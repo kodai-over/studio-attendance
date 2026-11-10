@@ -905,6 +905,22 @@ describe('募集の送り先の決まり', () => {
     expect(JSON.stringify(toG2.messages[0])).toContain('参加者募集');
   });
 
+  it('管理者は、自分が入っていないグループにも送れる。一般の予約者は入っているグループだけ', () => {
+    const t = setup();
+    t.store.s.groups.push({ id: G2, name: 'チームB' });
+    const p = mk(t, [G1]);
+    expect(() => handleApi(t.ctx, { userId: BOOKER }, 'remindPractices', { ids: [p.id], groups: [G2] })).toThrow('入っているグループにだけ');
+    handleApi(t.ctx, { userId: ADMIN }, 'remindPractices', { ids: [p.id], groups: [G2] });
+    expect(t.line.pushes.map((x) => x.to)).toEqual([G2]);
+  });
+
+  it('10分以内に送ったものが混じるときは、どの予約情報をどのグループにかを知らせる', () => {
+    const t = setup();
+    const p = mk(t, [G1]);
+    handleApi(t.ctx, { userId: BOOKER }, 'remindPractices', { ids: [p.id], groups: [G1] });
+    expect(() => handleApi(t.ctx, { userId: BOOKER }, 'remindPractices', { ids: [p.id], groups: [G1] })).toThrow('10/21(水)の予約情報をチームAに少し前に募集を送りました');
+  });
+
   it('古い画面（groups ではなく group を送る）には、開き直しを案内する', () => {
     const t = setup();
     const p = mk(t, [G1]);
