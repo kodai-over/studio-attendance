@@ -68,6 +68,30 @@ export function canPickForRemind(v: PracticeView, today: string): boolean {
   return v.canEdit && p.groups.length > 0 && p.status === '募集中' && p.date >= today;
 }
 
+/** 個別予約詳細画面で「募集を送る」を押せるか。送れる人（予約者・管理者）で、満員でなく、グループを1つ以上選んでいる */
+export function canSendRecruit(v: PracticeView, chosenCount: number): boolean {
+  return v.canEdit && v.practice.status !== '満員' && chosenCount > 0;
+}
+
+/** 選んだグループのうち、送れなかったグループの名前（送れたグループ名の一覧と見比べる。同じ名前は1つずつ消す） */
+export function unsentGroupNames(chosen: Group[], sentNames: string[]): string[] {
+  const left = [...sentNames];
+  const failed: string[] = [];
+  for (const g of chosen) {
+    const i = left.indexOf(g.name);
+    if (i >= 0) left.splice(i, 1);
+    else failed.push(g.name);
+  }
+  return failed;
+}
+
+/** 募集を送ったあとに知らせる文。一部のグループに送れなかったときは、そのグループ名を伝える */
+export function sendResultToast(failedNames: string[]): { msg: string; error: boolean } {
+  return failedNames.length === 0
+    ? { msg: '募集を送りました', error: false }
+    : { msg: `${failedNames.join('・')}には送れませんでした`, error: true };
+}
+
 /** 一覧でまとめて募集を送る送り先の初期値。選んだ予約情報の募集済のグループのうち、本人が選べるものすべて */
 export function defaultRemindTargets(picked: PracticeView[], available: Group[]): string[] {
   const sent = new Set(picked.flatMap((v) => v.practice.groups));

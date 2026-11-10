@@ -905,6 +905,13 @@ describe('募集の送り先の決まり', () => {
     expect(JSON.stringify(toG2.messages[0])).toContain('参加者募集');
   });
 
+  it('古い画面（groups ではなく group を送る）には、開き直しを案内する', () => {
+    const t = setup();
+    const p = mk(t, [G1]);
+    expect(() => handleApi(t.ctx, { userId: BOOKER }, 'remindPractice', { id: p.id, group: G1 } as any)).toThrow('アプリを開き直して');
+    expect(t.line.pushes).toHaveLength(0);
+  });
+
   it('一部のグループにだけ送れたときは、送れたグループだけ募集済にし、送れなかったグループはすぐ押し直せる', () => {
     const t = setup();
     t.store.s.groups.push({ id: G2, name: 'チームB' });

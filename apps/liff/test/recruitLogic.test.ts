@@ -7,9 +7,12 @@ import {
   filterRecruitPractices,
   readRecruitScope,
   sendConfirmMessage,
+  canSendRecruit,
   defaultRemindTargets,
   resolveRecruitGroups,
   saveRecruitScope,
+  sendResultToast,
+  unsentGroupNames,
   type RecruitScope,
 } from '../src/pages/recruitLogic';
 
@@ -180,5 +183,20 @@ describe('まとめて募集を送る', () => {
     const picked = [mk({ groups: ['A', 'B'] }), mk({ groups: ['B', 'X'] })];
     expect(defaultRemindTargets(picked, [g('A'), g('B'), g('C')])).toEqual(['A', 'B']);
     expect(defaultRemindTargets(picked, [])).toEqual([]);
+  });
+
+  it('募集を送れるのは、送れる人が、満員でなく、グループを選んでいるときだけ', () => {
+    expect(canSendRecruit(mk(), 1)).toBe(true);
+    expect(canSendRecruit(mk(), 0)).toBe(false);
+    expect(canSendRecruit(mk({ status: '満員' }), 1)).toBe(false);
+    expect(canSendRecruit(mk({}, false), 1)).toBe(false);
+  });
+
+  it('一部のグループに送れなかったときは、送れなかったグループ名を知らせる', () => {
+    const g = (name: string): Group => ({ id: name, name });
+    expect(unsentGroupNames([g('A'), g('B'), g('C')], ['A', 'C'])).toEqual(['B']);
+    expect(unsentGroupNames([g('A')], ['A'])).toEqual([]);
+    expect(sendResultToast([])).toEqual({ msg: '募集を送りました', error: false });
+    expect(sendResultToast(['B', 'C'])).toEqual({ msg: 'B・Cには送れませんでした', error: true });
   });
 });

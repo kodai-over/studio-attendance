@@ -396,11 +396,14 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
   },
 
   remindPractice(ctx, me, { id, groups }) {
+    // デプロイ前に開いた古い画面は、groups ではなく group を送ってくる
+    if (!Array.isArray(groups)) throw new UserError('アプリを開き直してください。');
     remindRecruitMany(ctx, me.userId, [id], groups);
     return view(ctx, id, me);
   },
 
   remindPractices(ctx, me, { ids, groups }) {
+    if (!Array.isArray(ids) || !Array.isArray(groups)) throw new UserError('アプリを開き直してください。');
     return remindRecruitMany(ctx, me.userId, ids, groups);
   },
 

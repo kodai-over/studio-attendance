@@ -4,7 +4,7 @@ import { api } from '../api';
 import { shareLink } from '../liff';
 import { Icon, Spinner, Syncing, TopBar, go, shareData, useApp } from '../ui';
 import { AnswerRow, Attendees, EditForm, PracticePass, usePractice } from './Detail';
-import { sendConfirmMessage, resolveRecruitGroups } from './recruitLogic';
+import { canSendRecruit, resolveRecruitGroups, sendConfirmMessage, sendResultToast, unsentGroupNames } from './recruitLogic';
 
 /** 「募集」から開く練習の画面。募集先のグループ・ゲストの追加・参加リンク・（予約者と管理者は）編集と削除 */
 export function RecruitDetailPage({ id }: { id: string }) {
@@ -37,9 +37,7 @@ export function RecruitDetailPage({ id }: { id: string }) {
             <RecruitForm
               v={v}
               busy={busy}
-              onRemind={async (groups) => {
-                await update(() => api('remindPractice', { id, groups }), '募集を送りました');
-              }}
+              onRemind={(groups) => update(() => api('remindPractice', { id, groups }))}
             />
           )}
 
@@ -113,8 +111,8 @@ function GuestForm({ onAdd, busy }: { onAdd: (name: string) => Promise<unknown>;
 }
 
 /** グループへの募集。いつも出し、グループがない・送れない人にはその旨を一行だけ出す */
-function RecruitForm({ v, onRemind, busy }: { v: PracticeView; onRemind: (groups: string[]) => Promise<unknown>; busy: boolean }) {
-  const { me } = useApp();
+function RecruitForm({ v, onRemind, busy }: { v: PracticeView; onRemind: (groups: string[]) => Promise<PracticeView | undefined>; busy: boolean }) {
+  const { me, toast } = useApp();
   const { unrecruited, sent } = resolveRecruitGroups(me.groups, me.member.groups, v.practice.groups);
   // 送り先は、自分とBotが入っているグループすべて（募集済のグループを先に）。選んだグループにまとめて送る
   const groups = [...sent, ...unrecruited];
@@ -123,11 +121,16 @@ function RecruitForm({ v, onRemind, busy }: { v: PracticeView; onRemind: (groups
   // 確認中か（アプリ内のダイアログで確かめる。端末の確認画面は、出ない環境があるため使わない）
   const [confirming, setConfirming] = useState(false);
   const chosen = groups.filter((g) => picked.includes(g.id));
-  const canSend = v.canEdit && v.practice.status !== '満員' && chosen.length > 0;
+  const canSend = canSendRecruit(v, chosen.length);
 
   const send = async () => {
     setConfirming(false);
-    await onRemind(chosen.map((g) => g.id));
+    const r = await onRemind(chosen.map((g) => g.id));
+    if (!r) return;
+    // 一部のグループにしか送れなかったときは、送れなかったグループを知らせる（送れたグループは募集済になっている）
+    const sentNow = chosen.filter((g) => r.practice.groups.includes(g.id)).map((g) => g.name);
+    const res = sendResultToast(unsentGroupNames(chosen, sentNow));
+    toast(res.msg, res.error);
   };
 
   return (

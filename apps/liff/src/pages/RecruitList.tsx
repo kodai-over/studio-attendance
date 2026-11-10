@@ -4,14 +4,14 @@ import { isAdmin, labelDate, toJstDate, type PracticeView } from '@studio-attend
 import { api } from '../api';
 import { MyAnswerBadge, TicketSub } from './List';
 import { DeleteConfirmDialog, Fee, Icon, Spinner, StatusBadge, Stub, Tabs, TopBar, go, place, useApp, useRunner } from '../ui';
-import { canPickForRemind, defaultRemindTargets, filterAvailableGroups, filterRecruitPractices, readRecruitScope, saveRecruitScope, type RecruitScope } from './recruitLogic';
+import { canPickForRemind, defaultRemindTargets, filterAvailableGroups, filterRecruitPractices, readRecruitScope, saveRecruitScope, sendResultToast, unsentGroupNames, type RecruitScope } from './recruitLogic';
 
 /**
  * 「募集」。自分が登録した練習（管理者はすべての練習）を並べ、押すと募集・編集の画面へ。
  * 左にスワイプすると削除が出る。右上の＋から登録する
  */
 export function RecruitListPage() {
-  const { me, practices, setPractices, deletePractice } = useApp();
+  const { me, practices, setPractices, deletePractice, toast } = useApp();
   const [run, busy] = useRunner();
   const [fresh, setFresh] = useState(false);
   // 削除ボタンを出しているチケット（一度に1枚だけ）
@@ -61,9 +61,13 @@ export function RecruitListPage() {
   };
   const remindPicked = async () => {
     if (pickedViews.length === 0 || targets.length === 0) return;
-    const sent = await run(() => api('remindPractices', { ids: pickedViews.map((v) => v.practice.id), groups: targets }), '募集を送りました');
+    const sent = await run(() => api('remindPractices', { ids: pickedViews.map((v) => v.practice.id), groups: targets }));
     setChoosing(false);
-    if (sent) stopSelecting();
+    if (!sent) return;
+    // 一部のグループにしか送れなかったときは、送れなかったグループを知らせる
+    const r = sendResultToast(unsentGroupNames(myGroups.filter((g) => targets.includes(g.id)), sent));
+    toast(r.msg, r.error);
+    stopSelecting();
   };
 
   const remove = (v: PracticeView) => {

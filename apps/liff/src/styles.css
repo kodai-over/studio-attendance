@@ -2161,29 +2161,6 @@ html {
   display: none;
 }
 
-/* ---------- 募集: 再募集 ---------- */
-.remind-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-  margin-top: var(--sp-2);
-}
-.remind-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--sp-2) var(--sp-3);
-  background: var(--surface);
-  border-radius: var(--r-md);
-  border: 1px solid var(--separator);
-  font-size: var(--fs-sm);
-}
-.remind-item .btn {
-  margin-left: var(--sp-2);
-}
-.remind-item .label {
-  margin-left: var(--sp-2);
-}
 :root[data-chrome='hidden'] .schedule-head {
   top: 0;
   padding-top: calc(var(--sp-2) + env(safe-area-inset-top));
