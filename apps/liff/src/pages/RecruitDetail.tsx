@@ -9,7 +9,7 @@ import { canSendRecruit, resolveRecruitGroups, sendConfirmMessage, sendResultToa
 /** 「募集」から開く練習の画面。募集先のグループ・ゲストの追加・参加リンク・（予約者と管理者は）編集と削除 */
 export function RecruitDetailPage({ id }: { id: string }) {
   const { me, deletePractice } = useApp();
-  const { v, loading, busy, update } = usePractice(id);
+  const { v, loading, busy, update, run } = usePractice(id);
   if (!v) return <><TopBar back />{loading ? <Spinner /> : <div class="empty">予約情報が見つかりません</div>}</>;
   const remove = (a: AttendeeView) => update(() => api('removeAttendance', { id, participant: a.participant }), '削除しました');
 
@@ -37,7 +37,12 @@ export function RecruitDetailPage({ id }: { id: string }) {
             <RecruitForm
               v={v}
               busy={busy}
-              onRemind={(groups) => update(() => api('remindPractice', { id, groups }))}
+              onRemind={async (groups) => {
+                // 送れたグループ名はサーバーが返す。そのあと、画面の予約情報（募集済のグループ）を取り直す
+                const sent = await run(() => api('remindPractices', { ids: [id], groups }));
+                if (sent) await update(() => api('getPractice', { id }));
+                return sent;
+              }}
             />
           )}
 
@@ -111,7 +116,7 @@ function GuestForm({ onAdd, busy }: { onAdd: (name: string) => Promise<unknown>;
 }
 
 /** グループへの募集。いつも出し、グループがない・送れない人にはその旨を一行だけ出す */
-function RecruitForm({ v, onRemind, busy }: { v: PracticeView; onRemind: (groups: string[]) => Promise<PracticeView | undefined>; busy: boolean }) {
+function RecruitForm({ v, onRemind, busy }: { v: PracticeView; onRemind: (groups: string[]) => Promise<string[] | undefined>; busy: boolean }) {
   const { me, toast } = useApp();
   const { unrecruited, sent } = resolveRecruitGroups(me.groups, me.member.groups, v.practice.groups);
   // 送り先は、自分とBotが入っているグループすべて（募集済のグループを先に）。選んだグループにまとめて送る
@@ -125,11 +130,10 @@ function RecruitForm({ v, onRemind, busy }: { v: PracticeView; onRemind: (groups
 
   const send = async () => {
     setConfirming(false);
-    const r = await onRemind(chosen.map((g) => g.id));
-    if (!r) return;
-    // 一部のグループにしか送れなかったときは、送れなかったグループを知らせる（送れたグループは募集済になっている）
-    const sentNow = chosen.filter((g) => r.practice.groups.includes(g.id)).map((g) => g.name);
-    const res = sendResultToast(unsentGroupNames(chosen, sentNow));
+    const sent = await onRemind(chosen.map((g) => g.id));
+    if (!sent) return;
+    // 一部のグループにしか送れなかったときは、送れなかったグループを知らせる（募集済のグループへの送信に失敗したときも）
+    const res = sendResultToast(unsentGroupNames(chosen, sent));
     toast(res.msg, res.error);
   };
 

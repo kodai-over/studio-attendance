@@ -905,6 +905,17 @@ describe('募集の送り先の決まり', () => {
     expect(JSON.stringify(toG2.messages[0])).toContain('参加者募集');
   });
 
+  it('募集済のグループへの送信に失敗したときは、送れたグループ名だけを返す（画面で送れなかったグループを知らせるため）', () => {
+    const t = setup();
+    t.store.s.groups.push({ id: G2, name: 'チームB' });
+    t.store.m.find((m) => m.userId === BOOKER)!.groups = [G1, G2];
+    const p = mk(t, [G1]);
+    t.line.failPushTo = [G1];
+    const names = handleApi(t.ctx, { userId: BOOKER }, 'remindPractices', { ids: [p.id], groups: [G1, G2] }) as string[];
+    expect(names).toEqual(['チームB']);
+    expect(t.store.getPractice(p.id)!.groups).toEqual([G1, G2]); // 募集済だったチームAはそのまま
+  });
+
   it('管理者は、自分が入っていないグループにも送れる。一般の予約者は入っているグループだけ', () => {
     const t = setup();
     t.store.s.groups.push({ id: G2, name: 'チームB' });
