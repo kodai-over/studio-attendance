@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { handleApi } from '../src/app/api';
-import { backfillGroupMembers } from '../src/app/practices';
+import { backfillGroupMembers, remindGroups } from '../src/app/practices';
 import { DEFAULT_FEES, TEST_MEMBER_ID } from '@studio-attendance/shared';
 import { INITIAL_SETTINGS, rowsToSettings, settingsToRows, toCell } from '../src/app/schema';
 import { handleJoin } from '../src/app/join';
@@ -813,8 +813,9 @@ describe('まとめて募集を送る', () => {
     expect(names.sort()).toEqual(['チームA', 'チームB']);
     expect(t.line.pushes).toHaveLength(2);
     for (const push of t.line.pushes) {
-      expect(push.messages).toHaveLength(2); // 一文 + 2件を並べた1枚のカード
-      const card = JSON.stringify(push.messages[1]);
+      const g1 = push.to === G1; // すでに募集済のグループには一文が付き、初めて送るグループにはカードだけ
+      expect(push.messages).toHaveLength(g1 ? 2 : 1);
+      const card = JSON.stringify(push.messages[g1 ? 1 : 0]);
       expect(card).toContain('10/21');
       expect(card).toContain('10/22');
     }
@@ -859,6 +860,62 @@ describe('まとめて募集を送る', () => {
     t.clock.now = new Date('2026-10-30T00:00:00Z');
     expect(() => many(t, BOOKER, [b], [G1])).toThrow('終了した予約情報');
     expect(t.line.pushes).toHaveLength(0);
+  });
+});
+
+describe('募集の送り先の決まり', () => {
+  const G2 = 'Cgroup2';
+  const mk = (t: ReturnType<typeof setup>, groups: string[]) => {
+    handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [{ ...reservation, max: null, min: null, memo: '' }], groups });
+    t.line.pushes = [];
+    return t.store.p[t.store.p.length - 1];
+  };
+
+  it('お知らせの再募集ボタンは、募集済を先に並べ、最大6個まで', () => {
+    const t = setup();
+    for (let i = 2; i <= 8; i++) t.store.s.groups.push({ id: `Cg${i}`, name: `グループ${i}` });
+    t.store.m.find((m) => m.userId === BOOKER)!.groups = t.store.s.groups.map((g) => g.id);
+    const p = mk(t, ['Cg8']);
+    const ids = remindGroups(t.ctx, p).map((g) => g.id);
+    expect(ids).toHaveLength(6);
+    expect(ids[0]).toBe('Cg8');
+  });
+
+  it('入っているグループが記録されていない予約者も、ふだんの送り先には再募集を送れる', () => {
+    const t = setup();
+    const booker = t.store.m.find((m) => m.userId === BOOKER)!;
+    booker.groups = [];
+    const p = mk(t, []);
+    expect(remindGroups(t.ctx, p).map((g) => g.id)).toEqual([G1]);
+    handleWebhook(t.ctx, { events: [postback(BOOKER, `a=remind&p=${p.id}&g=${G1}`)] });
+    expect(t.line.pushes.map((x) => x.to)).toEqual([G1]);
+  });
+
+  it('初めて募集を送るグループには「まだ募集しています」の一文を付けず、募集済のグループにだけ付ける', () => {
+    const t = setup();
+    t.store.s.groups.push({ id: G2, name: 'チームB' });
+    t.store.m.find((m) => m.userId === BOOKER)!.groups = [G1, G2];
+    const p = mk(t, [G1]);
+    handleApi(t.ctx, { userId: BOOKER }, 'remindPractice', { id: p.id, groups: [G1, G2] });
+    const toG1 = t.line.pushes.find((x) => x.to === G1)!;
+    const toG2 = t.line.pushes.find((x) => x.to === G2)!;
+    expect(toG1.messages).toHaveLength(2);
+    expect(JSON.stringify(toG1.messages[0])).toContain('まだ参加者を募集しています');
+    expect(toG2.messages).toHaveLength(1);
+    expect(JSON.stringify(toG2.messages[0])).toContain('参加者募集');
+  });
+
+  it('一部のグループにだけ送れたときは、送れたグループだけ募集済にし、送れなかったグループはすぐ押し直せる', () => {
+    const t = setup();
+    t.store.s.groups.push({ id: G2, name: 'チームB' });
+    t.store.m.find((m) => m.userId === BOOKER)!.groups = [G1, G2];
+    const p = mk(t, []);
+    t.line.failPushTo = [G2];
+    const names = handleApi(t.ctx, { userId: BOOKER }, 'remindPractices', { ids: [p.id], groups: [G1, G2] }) as string[];
+    expect(names).toHaveLength(1);
+    expect(t.store.getPractice(p.id)!.groups).toEqual([G1]);
+    expect(t.kv.data.has(`remind:${p.id}:${G1}`)).toBe(true);
+    expect(t.kv.data.has(`remind:${p.id}:${G2}`)).toBe(false);
   });
 });
 

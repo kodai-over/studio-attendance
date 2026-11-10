@@ -395,7 +395,7 @@ export function remindRecruitMany(ctx: Ctx, userId: string, practiceIds: string[
   if (targets.length === 0) throw new UserError('募集を送るグループを選んでください。');
   for (const g of targets) {
     if (!known.some((k) => k.id === g)) throw new UserError('このグループには今は送れません（Bot がグループにいません）。');
-    if (!practices.every((p) => canRemindTo(me, p, g))) throw new UserError('あなたが入っているグループにだけ送れます。');
+    if (!practices.every((p) => canRemindTo(ctx, me, p, g))) throw new UserError('あなたが入っているグループにだけ送れます。');
   }
   const byGroup = new Map<string, Practice[]>(targets.map((g) => [g, practices]));
   // 続けて押しても二重に流さない（1件ずつの「再募集」と同じ印を使う）
@@ -414,7 +414,9 @@ export function remindRecruitMany(ctx: Ctx, userId: string, practiceIds: string[
   const sent: string[] = [];
   try {
     for (const [g, ps] of byGroup) {
-      if (sendRecruit(ctx, ps, [g], (p) => memberName(ctx, p.booker), lead).length > 0) sent.push(g);
+      // 「まだ募集しています」の一文は、すでに募集済のグループにだけ付ける（初めて送るグループには、募集カードだけ）
+      const again = ps.every((p) => p.groups.includes(g));
+      if (sendRecruit(ctx, ps, [g], (p) => memberName(ctx, p.booker), again ? lead : undefined).length > 0) sent.push(g);
     }
   } finally {
     // 送れなかったグループの分は、すぐ押し直せるようにする
@@ -526,9 +528,13 @@ export function refreshStatus(ctx: Ctx, p: Practice): void {
   if (status !== p.status) ctx.store.savePractice({ ...p, status });
 }
 
-/** 募集の送り先に選べるか（まとめて・個別の「募集を送る」）。本人が入っているグループ（Bot も入っているもの）。すでに募集済のグループは、本人が入っていなくても選べる */
-export function canRemindTo(me: Member | null, p: Pick<Practice, 'groups'>, groupId: string): boolean {
-  return (me?.groups ?? []).includes(groupId) || p.groups.includes(groupId);
+/**
+ * 募集の送り先に選べるか（まとめて・個別の「募集を送る」、お知らせの「再募集」）。
+ * 本人が入っているグループ（Bot も入っているもの）。すでに募集済のグループと、本人のふだんの送り先は、入っているグループとして記録されていなくても選べる
+ */
+export function canRemindTo(ctx: Ctx, me: Member | null, p: Pick<Practice, 'groups'>, groupId: string): boolean {
+  if ((me?.groups ?? []).includes(groupId) || p.groups.includes(groupId)) return true;
+  return me != null && defaultGroupsFor(me, ctx.store.settings().groups.map((g) => g.id)).includes(groupId);
 }
 
 /** カードに並べる再募集のボタンの数（多いとカードが長くなるので、募集済のグループを先に並べて切る） */
@@ -566,7 +572,7 @@ export function remindRecruit(ctx: Ctx, userId: string, practiceId: string, grou
   if (p.status === '満員') throw new UserError('満員なので、募集は送れません。');
   const group = ctx.store.settings().groups.find((g) => g.id === groupId);
   if (!group) throw new UserError('このグループには今は送れません（Bot がグループにいません）。');
-  if (!canRemindTo(ctx.store.getMember(userId), p, groupId)) throw new UserError('あなたが入っているグループにだけ送れます。');
+  if (!canRemindTo(ctx, ctx.store.getMember(userId), p, groupId)) throw new UserError('あなたが入っているグループにだけ送れます。');
   const key = remindKey(p.id, group.id);
   const fresh = ctx.withLock(() => {
     if (ctx.kv.get(key)) return false;
