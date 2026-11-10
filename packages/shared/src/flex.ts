@@ -408,9 +408,10 @@ function names(list: string[]): string {
  */
 export function dayBeforeCard({ practice: p, going, maybe, perPerson, appUrl, group }: DayBeforeCardInput): LineMessage {
   // 料金は合計を大きく、1人あたりは小さく添える（人数が決まらないなど出せないときは合計だけ）
+  // LINE は baseline の箱の中に箱を置けない（置くとカードごと送れない）ので、この行だけ horizontal にする
   const fee: Node = {
     type: 'box',
-    layout: 'baseline',
+    layout: 'horizontal',
     spacing: 'sm',
     contents: [
       text('料金', { size: 'sm', color: GRAY, flex: 2 }),
