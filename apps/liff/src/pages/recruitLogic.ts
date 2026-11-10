@@ -51,7 +51,7 @@ export function filterRecruitPractices(
 }
 
 /**
- * 募集済のグループへ「もう一度募集」を送信できるか判定する。
+ * 募集済のグループへ「再募集」を送信できるか判定する。
  * - 予約情報の編集権限（canEdit: 予約者または管理者）が必要
  * - 満員の場合は送信不可（disabled）
  */
@@ -62,25 +62,26 @@ export function canRemindGroup(v: PracticeView): { canShow: boolean; canSubmit: 
   };
 }
 
+/** 一覧でまとめて「募集を送る」に選べるか。自分で送れる、募集済で、まだ始まる前の募集中の予約情報だけ */
+export function canPickForRemind(v: PracticeView, today: string): boolean {
+  const p = v.practice;
+  return v.canEdit && p.groups.length > 0 && p.status === '募集中' && p.date >= today;
+}
+
+/** 一覧でまとめて募集を送る送り先の初期値。選んだ予約情報の募集済のグループのうち、本人が選べるものすべて */
+export function defaultRemindTargets(picked: PracticeView[], available: Group[]): string[] {
+  const sent = new Set(picked.flatMap((v) => v.practice.groups));
+  return available.filter((g) => sent.has(g.id)).map((g) => g.id);
+}
+
 /**
- * 確認ダイアログを経て「もう一度募集」を実行する。
- * キャンセルされた場合は false を返し onRemind は実行しない。
- * 確認用アカウント（actAs === 'test'）の場合は確認文にその旨を明記する。
+ * 個別予約詳細画面の「募集を送る」の確認文。
+ * 確認用アカウント（actAs === 'test'）の場合は、その旨を明記する。
  */
-export async function confirmAndRemind(
-  group: { id: string; name: string },
-  onRemind: (groupId: string) => Promise<unknown>,
-  isTestUser = false,
-  confirmFn: (msg: string) => boolean = (msg) => (typeof confirm !== 'undefined' ? confirm(msg) : true),
-): Promise<boolean> {
-  const msg = isTestUser
-    ? `確認用アカウント「admin」として、${group.name} にもう一度募集カードを送りますか？`
-    : `${group.name} にもう一度募集カードを送りますか？`;
-  if (!confirmFn(msg)) {
-    return false;
-  }
-  await onRemind(group.id);
-  return true;
+export function sendConfirmMessage(group: { name: string }, isTestUser = false): string {
+  return isTestUser
+    ? `確認用アカウント「admin」として、${group.name} に募集カードを送りますか？`
+    : `${group.name} に募集カードを送りますか？`;
 }
 
 /**
@@ -99,7 +100,7 @@ export function filterAvailableGroups(
 }
 
 /**
- * 操作者が募集・再募集できるグループを分類する。
+ * 操作者が募集を送れるグループを分類する。
  * - unrecruited: 未募集のグループ（本人が所属しており、まだこの予約情報が送られていない）
  * - sent: 募集済のグループ（本人が所属しており、すでにこの予約情報が送られている）
  */

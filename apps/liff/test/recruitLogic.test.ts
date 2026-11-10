@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Group, PracticeView } from '@studio-attendance/shared';
 import {
+  canPickForRemind,
   canRemindGroup,
-  confirmAndRemind,
   filterAvailableGroups,
   filterRecruitPractices,
   readRecruitScope,
+  sendConfirmMessage,
+  defaultRemindTargets,
   resolveRecruitGroups,
   saveRecruitScope,
   type RecruitScope,
@@ -144,39 +146,39 @@ describe('募集ロジック（recruitLogic）', () => {
     });
   });
 
-  describe('canRemindGroup / confirmAndRemind', () => {
+  describe('canRemindGroup / sendConfirmMessage', () => {
     it('満員の場合は canSubmit が false になる', () => {
       const pFull = createMockPractice('p1', 'U_ME', true);
       pFull.practice.status = '満員';
       expect(canRemindGroup(pFull)).toEqual({ canShow: true, canSubmit: false });
     });
 
-    it('確認ダイアログでOKした場合は onRemind が呼ばれる', async () => {
-      let calledWith = '';
-      const ok = await confirmAndRemind(
-        { id: 'g1', name: 'チームA' },
-        async (gid) => {
-          calledWith = gid;
-        },
-        false,
-        () => true,
-      );
-      expect(ok).toBe(true);
-      expect(calledWith).toBe('g1');
+    it('確認文は送り先のグループ名を含み、確認用アカウントのときはその旨を添える', () => {
+      expect(sendConfirmMessage({ name: 'チームA' })).toBe('チームA に募集カードを送りますか？');
+      expect(sendConfirmMessage({ name: 'チームA' }, true)).toBe('確認用アカウント「admin」として、チームA に募集カードを送りますか？');
     });
+  });
+});
 
-    it('確認ダイアログでキャンセルした場合は onRemind が呼ばれない', async () => {
-      let called = false;
-      const ok = await confirmAndRemind(
-        { id: 'g1', name: 'チームA' },
-        async () => {
-          called = true;
-        },
-        false,
-        () => false,
-      );
-      expect(ok).toBe(false);
-      expect(called).toBe(false);
-    });
+describe('まとめて募集を送る', () => {
+  const mk = (over: Partial<PracticeView['practice']> = {}, canEdit = true, groupNames: string[] = ['A組']): PracticeView => {
+    const v = createMockPractice('p', 'U1', canEdit);
+    return { ...v, groupNames, practice: { ...v.practice, groups: ['G1'], ...over } };
+  };
+
+  it('選べるのは、自分で送れる・募集済・募集中・開始前の予約情報だけ', () => {
+    expect(canPickForRemind(mk(), '2026-11-10')).toBe(true);
+    expect(canPickForRemind(mk({}, false), '2026-11-10')).toBe(false);
+    expect(canPickForRemind(mk({ groups: [] }), '2026-11-10')).toBe(false);
+    expect(canPickForRemind(mk({ status: '満員' }), '2026-11-10')).toBe(false);
+    expect(canPickForRemind(mk({ status: '中止' }), '2026-11-10')).toBe(false);
+    expect(canPickForRemind(mk({ date: '2026-11-09' }), '2026-11-10')).toBe(false);
+  });
+
+  it('送り先の初期値は、選んだ予約情報の募集済のグループのうち、自分が選べるもの', () => {
+    const g = (id: string): Group => ({ id, name: id });
+    const picked = [mk({ groups: ['A', 'B'] }), mk({ groups: ['B', 'X'] })];
+    expect(defaultRemindTargets(picked, [g('A'), g('B'), g('C')])).toEqual(['A', 'B']);
+    expect(defaultRemindTargets(picked, [])).toEqual([]);
   });
 });

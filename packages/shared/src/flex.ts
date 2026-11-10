@@ -335,23 +335,23 @@ export interface WarningCardInput {
   practice: Practice;
   going: number;
   min: number;
-  /** 「もう一度募集」を出すグループ */
+  /** 「再募集」を出すグループ */
   groups: Group[];
   appUrl: string;
 }
 
 /**
  * キャンセル期限前のお知らせ（予約者の個別トークに送る）。
- * グループごとの「もう一度募集」と、削除などをする「予約情報を開く」（「募集」の練習の画面）を付ける
+ * グループごとの「再募集」と、削除などをする「予約情報を開く」（「募集」の練習の画面）を付ける
  */
 export function warningCard({ practice: p, going, min, groups, appUrl }: WarningCardInput): LineMessage {
   const remind: Node[] = groups
-    .map((g) => ({ label: `${[...g.name].length > 20 ? [...g.name].slice(0, 20).join('') + '…' : g.name}にもう一度募集`, data: encodePostback({ a: 'remind', p: p.id, g: g.id }) }))
+    .map((g) => ({ label: `${[...g.name].length > 20 ? [...g.name].slice(0, 20).join('') + '…' : g.name}に再募集`, data: encodePostback({ a: 'remind', p: p.id, g: g.id }) }))
     // 入りきらないボタンは出さない（カードごと送れなくなるので）
     .filter((b) => b.data.length <= MAX_POSTBACK)
     // ボタンの文字は40文字まで
     .map(({ label, data }) => ({ type: 'button', style: 'primary', color: GREEN, height: 'sm', action: { type: 'postback', label, data, displayText: label } }));
-  const next = remind.length > 0 ? 'もう一度募集するか、キャンセルするか判断してください。' : 'キャンセルするか判断してください。';
+  const next = remind.length > 0 ? '再募集するか、キャンセルするか判断してください。' : 'キャンセルするか判断してください。';
   return {
     type: 'flex',
     altText: `参加は現在${going}人です（最低人数${min}人）: ${labelDate(p.date)}`,

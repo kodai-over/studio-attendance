@@ -340,9 +340,9 @@ export function createPractices(ctx: Ctx, booker: Member, inputs: NewPracticeInp
 }
 
 /** 練習の募集をグループに流す（1グループにつき1メッセージ）。送れたグループを返す。lead はカードの前に送る文 */
-export function sendRecruit(ctx: Ctx, practices: Practice[], groups: string[], bookerName: string, lead?: string): string[] {
+export function sendRecruit(ctx: Ctx, practices: Practice[], groups: string[], bookerName: string | ((p: Practice) => string), lead?: string): string[] {
   if (practices.length === 0 || groups.length === 0) return [];
-  const items = practices.map((practice) => ({ practice, bookerName }));
+  const items = practices.map((practice) => ({ practice, bookerName: typeof bookerName === 'function' ? bookerName(practice) : bookerName }));
   const sent: string[] = [];
   for (const g of groups) {
     try {
@@ -368,6 +368,67 @@ export function sendRecruit(ctx: Ctx, practices: Practice[], groups: string[], b
     }
   }
   return sent;
+}
+
+/**
+ * 選んだ予約情報を、選んだグループにまとめて募集を送る。送り先は、本人が入っているグループ（Bot も入っているもの）から選ぶ。
+ * グループごとに、選んだ予約情報を1枚（多いときだけ複数枚）のカードにして送り、まだ募集していなかったグループは募集済にする。
+ * 送ったグループ名を返す。1件でも送れない予約情報や送れないグループが混じっていたら、何も送らずに理由を UserError で返す
+ */
+export function remindRecruitMany(ctx: Ctx, userId: string, practiceIds: string[], groupIds: string[]): string[] {
+  const ids = [...new Set(practiceIds)];
+  if (ids.length === 0) throw new UserError('募集を送る予約情報を選んでください。');
+  const me = ctx.store.getMember(userId);
+  const today = toJstDate(ctx.now());
+  const known = ctx.store.settings().groups;
+  const practices: Practice[] = [];
+  for (const id of ids) {
+    const p = ctx.store.getPractice(id);
+    if (!p) throw new UserError('削除された予約情報が含まれています。選び直してください。');
+    if (!canEditPractice(me, p)) throw new UserError('予約者か管理者の予約情報だけ、募集を送れます。');
+    if (!isActive(p) || p.date < today) throw new UserError('終了した予約情報には募集を送れません。');
+    if (p.status === '満員') throw new UserError('満員の予約情報には募集を送れません。');
+    practices.push(p);
+  }
+  // 送り先は、Bot が入っていて、本人も入っているグループ（選んだ予約情報がすでに募集済のグループも可）
+  const targets = [...new Set(groupIds ?? [])];
+  if (targets.length === 0) throw new UserError('募集を送るグループを選んでください。');
+  for (const g of targets) {
+    if (!known.some((k) => k.id === g)) throw new UserError('このグループには今は送れません（Bot がグループにいません）。');
+    if (!practices.every((p) => canRemindTo(me, p, g))) throw new UserError('あなたが入っているグループにだけ送れます。');
+  }
+  const byGroup = new Map<string, Practice[]>(targets.map((g) => [g, practices]));
+  // 続けて押しても二重に流さない（1件ずつの「再募集」と同じ印を使う）
+  const keys = [...byGroup].flatMap(([g, ps]) => ps.map((p) => remindKey(p.id, g)));
+  const fresh = ctx.withLock(() => {
+    if (keys.some((k) => ctx.kv.get(k))) return false;
+    for (const k of keys) ctx.kv.put(k, '1', REMIND_GAP);
+    return true;
+  });
+  if (!fresh) throw new UserError('少し前に募集を送った予約情報が含まれています。続けて送るときは10分ほどあけてください。');
+  // 1件だけのときは、今の人数も添える
+  const only = practices.length === 1 ? practices[0] : null;
+  const lead = only
+    ? `まだ参加者を募集しています。参加は現在${goingList(ctx.store.attendance(only.id), only.id).length}人です（最低人数${only.min ?? ctx.store.settings().minDefault}人）。`
+    : 'まだ参加者を募集しています。';
+  const sent: string[] = [];
+  try {
+    for (const [g, ps] of byGroup) {
+      if (sendRecruit(ctx, ps, [g], (p) => memberName(ctx, p.booker), lead).length > 0) sent.push(g);
+    }
+  } finally {
+    // 送れなかったグループの分は、すぐ押し直せるようにする
+    for (const [g, ps] of byGroup) if (!sent.includes(g)) for (const p of ps) ctx.kv.remove(remindKey(p.id, g));
+  }
+  if (sent.length === 0) throw new UserError('募集を送れませんでした。時間をおいてもう一度お試しください。');
+  // まだ募集していなかったグループは、募集済にする
+  ctx.withLock(() => {
+    for (const p of practices) {
+      const cur = ctx.store.getPractice(p.id);
+      if (cur) ctx.store.savePractice({ ...cur, groups: [...new Set([...cur.groups, ...sent])] });
+    }
+  });
+  return sent.map((g) => known.find((k) => k.id === g)?.name ?? g);
 }
 
 /** 予約情報が削除されたことを募集済グループに知らせる */
@@ -465,23 +526,36 @@ export function refreshStatus(ctx: Ctx, p: Practice): void {
   if (status !== p.status) ctx.store.savePractice({ ...p, status });
 }
 
-/** キャンセル期限前のお知らせで「もう一度募集」を出すグループ。募集済のグループ、まだなければ予約者のふだんの送り先 */
+/** 募集の送り先に選べるか（まとめて・個別の「募集を送る」）。本人が入っているグループ（Bot も入っているもの）。すでに募集済のグループは、本人が入っていなくても選べる */
+export function canRemindTo(me: Member | null, p: Pick<Practice, 'groups'>, groupId: string): boolean {
+  return (me?.groups ?? []).includes(groupId) || p.groups.includes(groupId);
+}
+
+/** カードに並べる再募集のボタンの数（多いとカードが長くなるので、募集済のグループを先に並べて切る） */
+const MAX_REMIND_BUTTONS = 6;
+
+/**
+ * キャンセル期限前のお知らせで「再募集」を出すグループ。募集済のグループを先に、続けて予約者が入っているグループ（Bot も入っているもの）。
+ * 入っているグループが分からない予約者は、ふだんの送り先
+ */
 export function remindGroups(ctx: Ctx, p: Practice, allGroups?: Group[]): Group[] {
   const groups = allGroups ?? ctx.store.settings().groups;
-  const sent = groups.filter((g) => p.groups.includes(g.id));
-  if (sent.length > 0) return sent;
   const booker = ctx.store.getMember(p.booker);
+  const sent = groups.filter((g) => p.groups.includes(g.id));
+  const mine = groups.filter((g) => !p.groups.includes(g.id) && (booker?.groups ?? []).includes(g.id));
+  const all = [...sent, ...mine];
+  if (all.length > 0) return all.slice(0, MAX_REMIND_BUTTONS);
   if (!booker) return [];
   const ids = defaultGroupsFor(booker, groups.map((g) => g.id));
   return groups.filter((g) => ids.includes(g.id));
 }
 
-/** 続けて押しても二重に流さないよう、同じグループへのもう一度募集はこの時間あける */
+/** 続けて押しても二重に流さないよう、同じグループへの再募集はこの時間あける */
 const REMIND_GAP = 10 * 60;
 export const remindKey = (practiceId: string, groupId: string) => `remind:${practiceId}:${groupId}`;
 
 /**
- * お知らせの「もう一度募集」。募集済でも、そのグループに募集カードをもう一度送る。
+ * お知らせの「再募集」。募集済でも、そのグループに募集カードをもう一度送る。
  * 送れたらグループ名を返す。送れないときは理由を UserError で返す
  */
 export function remindRecruit(ctx: Ctx, userId: string, practiceId: string, groupId: string): string {
@@ -492,6 +566,7 @@ export function remindRecruit(ctx: Ctx, userId: string, practiceId: string, grou
   if (p.status === '満員') throw new UserError('満員なので、募集は送れません。');
   const group = ctx.store.settings().groups.find((g) => g.id === groupId);
   if (!group) throw new UserError('このグループには今は送れません（Bot がグループにいません）。');
+  if (!canRemindTo(ctx.store.getMember(userId), p, groupId)) throw new UserError('あなたが入っているグループにだけ送れます。');
   const key = remindKey(p.id, group.id);
   const fresh = ctx.withLock(() => {
     if (ctx.kv.get(key)) return false;
