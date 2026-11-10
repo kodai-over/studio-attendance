@@ -10,6 +10,7 @@ import {
   computeCancelDeadline,
   classifyReservations,
   confirmCard,
+  dayBeforeCard,
   defaultFee,
   DEFAULT_FEES,
   formatFeeValue,
@@ -671,5 +672,33 @@ describe('Flex Message', () => {
       p: 'BUZZ横浜-20261021-1900-A',
       v: '1',
     });
+  });
+});
+
+describe('LINE のカードの形（送れない形になっていないか）', () => {
+  const appUrl = 'https://liff.line.me/123-abc';
+  /** LINE は baseline の箱の中に、文字・アイコン以外（箱やボタンなど）を置けない。置くとカードごと送信に失敗する */
+  const badBaseline = (node: unknown, path = 'root'): string[] => {
+    if (Array.isArray(node)) return node.flatMap((n, i) => badBaseline(n, `${path}[${i}]`));
+    if (!node || typeof node !== 'object') return [];
+    const n = node as Record<string, unknown>;
+    const here =
+      n.type === 'box' && n.layout === 'baseline'
+        ? ((n.contents as { type: string }[]) ?? []).filter((c) => !['text', 'icon', 'span', 'filler'].includes(c.type)).map((c) => `${path}: baseline の中に ${c.type}`)
+        : [];
+    return [...here, ...Object.entries(n).flatMap(([k, v]) => badBaseline(v, `${path}.${k}`))];
+  };
+
+  it('リマインドカード・募集カード・キャンセル期限前のお知らせ・予約情報の一覧', () => {
+    const p = practice({ id: 'p1', max: 8, memo: 'メモ' });
+    const group = { id: 'C1', key: 'k1' };
+    const cards = [
+      dayBeforeCard({ practice: p, going: ['a', 'b'], maybe: ['c'], perPerson: 1200, appUrl, group }),
+      dayBeforeCard({ practice: p, going: [], maybe: [], perPerson: null, appUrl }),
+      ...recruitMessages([{ practice: p, bookerName: 'a' }], appUrl, group),
+      warningCard({ practice: p, going: 1, min: 3, groups: [{ id: 'C1', name: 'チームA' }], appUrl }),
+      practiceListMessage([{ practice: p, going: 2 }], appUrl, group),
+    ];
+    expect(cards.flatMap((c) => badBaseline(c))).toEqual([]);
   });
 });
