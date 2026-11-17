@@ -1,6 +1,7 @@
 // 使う機能だけを読み込む（SDK を丸ごと読み込むより小さく、開くのが速い）
 import liff from '@line/liff/core';
 import CloseWindow from '@line/liff/close-window';
+import GetAccessToken from '@line/liff/get-access-token';
 import GetContext from '@line/liff/get-context';
 import GetIDToken from '@line/liff/get-id-token';
 import GetProfile from '@line/liff/get-profile';
@@ -17,6 +18,7 @@ liff
   .use(new IsLoggedIn())
   .use(new Login())
   .use(new Logout())
+  .use(new GetAccessToken())
   .use(new GetIDToken())
   .use(new GetProfile())
   .use(new IsInClient())
@@ -147,7 +149,7 @@ export async function initLiff(): Promise<URLSearchParams | null> {
       /* 消せなくても動く */
     }
     configureAuth(
-      () => liff.getIDToken(),
+      () => ({ accessToken: liff.getAccessToken(), idToken: liff.getIDToken() }),
       () => {
         // 設定ミスで無限にログインし直さないよう、1回だけ試す
         if (sessionStorage.getItem('pb:relogin')) return;

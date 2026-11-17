@@ -1074,6 +1074,7 @@ describe('再募集', () => {
 describe('ルーター', () => {
   const verify = {
     relay: (_ts: number, _b: string, mac: string) => mac === 'good',
+    accessToken: (tok: string) => (tok === 'valid-at' ? { userId: ADMIN } : null),
     idToken: (tok: string) => (tok === 'valid' ? { userId: ADMIN } : null),
   };
 
@@ -1090,6 +1091,23 @@ describe('ルーター', () => {
     expect(route(t.ctx, JSON.stringify({ kind: 'api', idToken: 'x', action: 'me' }), verify).ok).toBe(false);
     const res = route(t.ctx, JSON.stringify({ kind: 'api', idToken: 'valid', action: 'me' }), verify);
     expect(res.ok && (res.data as any).member.role).toBe('管理者');
+  });
+
+  it('アクセストークンが有効なら、IDトークンが切れていても受け付ける', () => {
+    const t = setup();
+    const res = route(t.ctx, JSON.stringify({ kind: 'api', accessToken: 'valid-at', idToken: 'expired', action: 'me' }), verify);
+    expect(res.ok && (res.data as any).member.role).toBe('管理者');
+  });
+
+  it('アクセストークンが無効でも、IDトークンが有効なら受け付ける', () => {
+    const t = setup();
+    const res = route(t.ctx, JSON.stringify({ kind: 'api', accessToken: 'x', idToken: 'valid', action: 'me' }), verify);
+    expect(res.ok && (res.data as any).member.role).toBe('管理者');
+  });
+
+  it('どちらのトークンも無効なら受け付けない', () => {
+    const t = setup();
+    expect(route(t.ctx, JSON.stringify({ kind: 'api', accessToken: 'x', idToken: 'y', action: 'me' }), verify).ok).toBe(false);
   });
 
   it('Botのグループ参加で設定にグループが載る', () => {
