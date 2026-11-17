@@ -233,7 +233,9 @@ export function TopBar({
   const large = hasLargeTitle(title, back);
   const barRef = useRef<HTMLElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
+  const headRef = useRef<HTMLDivElement>(null);
   const [scrolled, setScrolled] = useState(false);
+  const [actionsUp, setActionsUp] = useState(false);
 
   useEffect(() => {
     const onScroll = () => {
@@ -241,7 +243,13 @@ export function TopBar({
       if (!bar) return;
       const heading = titleRef.current;
       const barBottom = bar.getBoundingClientRect().bottom;
-      setScrolled(heading ? heading.getBoundingClientRect().bottom <= barBottom : window.scrollY > 0);
+      const isScrolled = heading ? heading.getBoundingClientRect().bottom <= barBottom : window.scrollY > 0;
+      setScrolled(isScrolled);
+      // 上のバーが隠れている間は、見出しの行がステータスバーの裏に入ったら右上のボタンもバー側へ移す。
+      // ホーム画面のアプリでは、ステータスバーの裏（ダイナミックアイランドの下）までページが描かれるため
+      const head = headRef.current;
+      const safeTop = parseFloat(getComputedStyle(bar).paddingTop) || 0;
+      setActionsUp(isScrolled || (!!head && head.getBoundingClientRect().top < safeTop));
     };
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
@@ -280,14 +288,14 @@ export function TopBar({
           ) : (
             <h1 class="topbar-title">{title}</h1>
           ))}
-        {(!large || scrolled) && actions}
+        {(!large || actionsUp) && actions}
       </header>
       {large && (
-        <div class="large-head">
+        <div ref={headRef} class="large-head">
           <h1 ref={titleRef} class="large-title">
             {title}
           </h1>
-          {!scrolled && actions}
+          {!actionsUp && actions}
         </div>
       )}
     </>
