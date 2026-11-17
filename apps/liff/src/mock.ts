@@ -355,5 +355,6 @@ export async function mockRoute(body: Record<string, unknown>) {
   // 読み取りは本番でも時間がかかるので、モックでも待たせて表示を確かめられるようにする
   await new Promise((r) => setTimeout(r, body.action === 'parseReservations' ? 2000 : 150));
   const user = new URLSearchParams(location.search).get('as') ?? 'Ume';
-  return route(ctx, JSON.stringify({ ...body, idToken: 'mock' }), { relay: () => false, idToken: () => ({ userId: user, name: 'ゲストユーザー' }) });
+  const me = () => ({ userId: user, name: 'ゲストユーザー' });
+  return route(ctx, JSON.stringify({ ...body, accessToken: 'mock' }), { relay: () => false, accessToken: me, idToken: me });
 }

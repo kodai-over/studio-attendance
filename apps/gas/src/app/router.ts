@@ -7,7 +7,9 @@ import { handleWebhook } from './webhook';
 export interface Verifiers {
   /** Worker が付けた中継用署名を確かめる */
   relay(ts: number, body: string, mac: string): boolean;
-  /** LINEログインのIDトークンを確かめ、ユーザーを返す。無効なら null */
+  /** LINEログインのアクセストークンを確かめ、ユーザーを返す。無効なら null（期限は約30日） */
+  accessToken(token: string): { userId: string; name?: string } | null;
+  /** LINEログインのIDトークンを確かめ、ユーザーを返す。無効なら null（期限は約1時間。古い画面のために残す） */
   idToken(token: string): { userId: string; name?: string } | null;
 }
 
@@ -33,7 +35,10 @@ export function route(ctx: Ctx, raw: string, verify: Verifiers): ApiResponse<unk
         return { ok: true, data: null };
       }
       case 'api': {
-        const auth = typeof req.idToken === 'string' ? verify.idToken(req.idToken) : null;
+        // ホーム画面のアプリやブラウザでは IDトークンが新しくならず1時間で切れるので、期限の長いアクセストークンを先に使う
+        const auth =
+          (typeof req.accessToken === 'string' ? verify.accessToken(req.accessToken) : null) ??
+          (typeof req.idToken === 'string' ? verify.idToken(req.idToken) : null);
         if (!auth) return { ok: false, error: 'ログインの有効期限が切れました。アプリを開き直してください。' };
         return { ok: true, data: handleApi(ctx, { ...auth, actAs: req.actAs }, String(req.action), req.params) };
       }
