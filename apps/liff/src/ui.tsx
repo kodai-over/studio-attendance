@@ -214,6 +214,17 @@ export function ThemeToggle() {
 export const hasLargeTitle = (title?: string, back?: boolean) => !!title && !back;
 
 /**
+ * 見出し右上のボタンを上のバー側へ移すか。
+ * ホーム画面のアプリ（apple-mobile-web-app-status-bar-style="default"）では、
+ * 表示範囲の上端（y = 0, safeTop = 0）がステータスバーの下端にあたり、
+ * スクロール中は y < 0（ステータスバーの裏）までページが描かれる。
+ * 上のバーが translateY(-100%) で隠れている間も、見出し行の上端（headTop）が
+ * safeTop より上に出た時点でボタンをバー側へ移し、ステータスバーの裏に残らないようにする。
+ */
+export const shouldMoveActionsToBar = (headTop: number | null, safeTop: number, isScrolled: boolean): boolean =>
+  isScrolled || (headTop !== null && headTop < safeTop);
+
+/**
  * 画面上部のバー。メニューから開く画面（戻るがない画面）は大きい見出しを出し、
  * 見出しがバーの下に隠れたら、バーの中央に小さく出す
  */
@@ -234,10 +245,16 @@ export function TopBar({
   const barRef = useRef<HTMLElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const headRef = useRef<HTMLDivElement>(null);
+  const safeTopRef = useRef(0);
   const [scrolled, setScrolled] = useState(false);
   const [actionsUp, setActionsUp] = useState(false);
 
   useEffect(() => {
+    const updateSafeTop = () => {
+      const bar = barRef.current;
+      if (!bar) return;
+      safeTopRef.current = parseFloat(getComputedStyle(bar).paddingTop) || 0;
+    };
     const onScroll = () => {
       const bar = barRef.current;
       if (!bar) return;
@@ -245,15 +262,22 @@ export function TopBar({
       const barBottom = bar.getBoundingClientRect().bottom;
       const isScrolled = heading ? heading.getBoundingClientRect().bottom <= barBottom : window.scrollY > 0;
       setScrolled(isScrolled);
-      // 上のバーが隠れている間は、見出しの行がステータスバーの裏に入ったら右上のボタンもバー側へ移す。
-      // ホーム画面のアプリでは、ステータスバーの裏（ダイナミックアイランドの下）までページが描かれるため
       const head = headRef.current;
-      const safeTop = parseFloat(getComputedStyle(bar).paddingTop) || 0;
-      setActionsUp(isScrolled || (!!head && head.getBoundingClientRect().top < safeTop));
+      const headTop = head ? head.getBoundingClientRect().top : null;
+      setActionsUp(shouldMoveActionsToBar(headTop, safeTopRef.current, isScrolled));
     };
+    const onResize = () => {
+      updateSafeTop();
+      onScroll();
+    };
+    updateSafeTop();
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    window.addEventListener('resize', onResize, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onResize);
+    };
   }, []);
 
   if (!title && !back && children === undefined && !showTheme) return null;

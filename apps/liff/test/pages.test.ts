@@ -20,7 +20,7 @@ import { MyAnswerBadge, readTab } from '../src/pages/List';
 import { filterByDayKind, groupByMonthWeek, resolveNextSelectedDate, toggleCollapseKey } from '../src/pages/calendarLogic';
 import { canRemindGroup, sendConfirmMessage } from '../src/pages/recruitLogic';
 import { resolveInitialHash } from '../src/route';
-import { RsvpButtons, cancelDeadlineDisplay, go, handleHashChangeGuard, hasLargeTitle, parseHash, setNavigationGuard } from '../src/ui';
+import { RsvpButtons, cancelDeadlineDisplay, go, handleHashChangeGuard, hasLargeTitle, parseHash, setNavigationGuard, shouldMoveActionsToBar } from '../src/ui';
 
 describe('MyAnswerBadge（予定一覧・詳細の回答ステータスバッジ）', () => {
   it('行く（○）のバッジが正しく返る', () => {
@@ -560,6 +560,31 @@ describe('hasLargeTitle（画面上部の大きい見出し）', () => {
     expect(hasLargeTitle('管理画面', true)).toBe(false);
     expect(hasLargeTitle(undefined, true)).toBe(false);
     expect(hasLargeTitle(undefined, false)).toBe(false);
+  });
+});
+
+describe('shouldMoveActionsToBar（見出し右上のボタンを上のバーへ移す判定）', () => {
+  it('safeTop が 0（ホーム画面のアプリ）のとき、headTop が 0 以上なら見出し横に残し、0 未満（ステータスバーの裏）に入ったらバーへ移す', () => {
+    expect(shouldMoveActionsToBar(12, 0, false)).toBe(false);
+    expect(shouldMoveActionsToBar(0, 0, false)).toBe(false);
+    expect(shouldMoveActionsToBar(-0.5, 0, false)).toBe(true);
+    expect(shouldMoveActionsToBar(-20, 0, false)).toBe(true);
+  });
+
+  it('safeTop が正の値のとき、headTop === safeTop では見出し横に残し、headTop < safeTop でバーへ移す', () => {
+    expect(shouldMoveActionsToBar(60, 59, false)).toBe(false);
+    expect(shouldMoveActionsToBar(59, 59, false)).toBe(false);
+    expect(shouldMoveActionsToBar(58.9, 59, false)).toBe(true);
+  });
+
+  it('isScrolled が true のときは headTop に関わらずバーへ移す', () => {
+    expect(shouldMoveActionsToBar(100, 0, true)).toBe(true);
+    expect(shouldMoveActionsToBar(null, 0, true)).toBe(true);
+  });
+
+  it('大きい見出しがない画面（headTop === null）では isScrolled に従う', () => {
+    expect(shouldMoveActionsToBar(null, 0, false)).toBe(false);
+    expect(shouldMoveActionsToBar(null, 59, false)).toBe(false);
   });
 });
 
