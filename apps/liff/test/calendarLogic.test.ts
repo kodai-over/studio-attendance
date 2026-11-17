@@ -302,8 +302,10 @@ describe('カレンダーロジック（calendarLogic）', () => {
         date: '2026-11-10',
         goingCount: 1,
       });
-      expect(getPracticeCalendarTone(v, undefined)).toBe('neutral');
-      expect(getPracticeCalendarTone(v, null)).toBe('neutral');
+      // 今日の日付で結果が変わらないよう、予約日より前の時刻で判定する
+      const now = new Date('2026-11-05T00:00:00Z');
+      expect(getPracticeCalendarTone(v, undefined, now)).toBe('neutral');
+      expect(getPracticeCalendarTone(v, null, now)).toBe('neutral');
     });
 
     it('トーン種別ごとのアクセシビリティ用ラベルが正しく返る', () => {

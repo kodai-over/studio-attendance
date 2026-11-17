@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { addDays, defaultFee, endAfterStart, labelDate, MAX_SCREENSHOTS, skippedNote, toJstDate, type DraftItemKind, type NewPracticeInput, type Reservation } from '@studio-attendance/shared';
 import { api } from '../api';
 import { RoomInfo, RoomSelect, StudioSelect } from '../components/StudioRoom';
+import { filterAvailableGroups } from './recruitLogic';
 import { BusyOverlay, Icon, ParsingProgressOverlay, Spinner, TopBar, go, useApp, useRunner } from '../ui';
 
 interface FormRow {
@@ -91,6 +92,8 @@ async function shrink(file: File): Promise<{ mimeType: string; data: string }> {
 export function RegisterPage({ draftId, recruit = false }: { draftId: string | null; recruit?: boolean }) {
   const { me, toast, setPractices } = useApp();
   const [phase, setPhase] = useState<null | 'readingImage' | 'readingText' | 'saving'>(null);
+  // 送り先に選べるのは、本人が入っているグループ（Bot も入っているもの）だけ。募集の画面と同じ
+  const myGroups = filterAvailableGroups(me.groups, me.member.groups);
   const [rows, setRows] = useState<FormRow[]>(() => [emptyRow({ date: addDays(toJstDate(new Date()), 7) })]);
   // 募集先は予約ごとに、その予約の欄で選ぶ（空なら登録だけ）。2件以上なら下でまとめて付け外しもできる
   // 延長（既存の練習を伸ばす）と登録済みの予約には募集を送らないので、選べるのは新しく登録する予約だけ
@@ -129,7 +132,9 @@ export function RegisterPage({ draftId, recruit = false }: { draftId: string | n
         return;
       }
       // 「登録して募集」から開いたら、新しく登録する予約にふだんの送り先を入れておく（延長には募集を送らない）
-      const g = (kind: string) => (recruit && kind !== 'extension' && kind !== 'duplicate' ? d.groups : []);
+      // ふだんの送り先でも、入っていないグループは入れない
+      const mineIds = new Set(myGroups.map((x) => x.id));
+      const g = (kind: string) => (recruit && kind !== 'extension' && kind !== 'duplicate' ? d.groups.filter((x) => mineIds.has(x)) : []);
       setRows([...d.items.map((i) => fromReservation(i.reservation, i.kind, g(i.kind), i.parts)), ...d.incomplete.map((r) => fromReservation(r, 'incomplete', g('incomplete')))]);
     });
   }, [draftId]);
@@ -347,10 +352,10 @@ export function RegisterPage({ draftId, recruit = false }: { draftId: string | n
                   </button>
                 </div>
               )}
-              {me.groups.length > 0 && pickable(r) && (
+              {myGroups.length > 0 && pickable(r) && (
                 <div class="field">
                   <span>送り先（選ばなければ登録のみ）</span>
-                  <GroupToggles groups={me.groups} defaults={me.member.defaultGroups} value={r.groups} onChange={(g) => setRowGroups(r.key, g)} />
+                  <GroupToggles groups={myGroups} defaults={me.member.defaultGroups} value={r.groups} onChange={(g) => setRowGroups(r.key, g)} />
                 </div>
               )}
             </section>
@@ -363,11 +368,11 @@ export function RegisterPage({ draftId, recruit = false }: { draftId: string | n
         予約情報を追加
       </button>
 
-      {me.groups.length > 0 && rows.filter(pickable).length > 1 && (
+      {myGroups.length > 0 && rows.filter(pickable).length > 1 && (
         <>
           <div class="sec-head">すべての予約情報の送り先</div>
           <div class="chips">
-            {me.groups.map((g) => (
+            {myGroups.map((g) => (
               <button class="chip" aria-pressed={allHave(g.id)} onClick={() => toggleAll(g.id)}>
                 {g.name}
               </button>
@@ -377,7 +382,7 @@ export function RegisterPage({ draftId, recruit = false }: { draftId: string | n
         </>
       )}
 
-      {recruit && !recruiting && me.groups.length > 0 && (
+      {recruit && !recruiting && myGroups.length > 0 && (
         <p class="note section-gap">募集するときは、予約情報ごとに「送り先」を選んでください</p>
       )}
       <button class="btn primary block submit" disabled={busy} onClick={submit}>
