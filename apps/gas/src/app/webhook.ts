@@ -28,6 +28,7 @@ import {
   recordAnswer,
   remindRecruit,
   removeDraft,
+  rotateGroupKey,
   saveDraft,
   upcoming,
 } from './practices';
@@ -85,8 +86,12 @@ function handleEvent(ctx: Ctx, ev: LineEvent): void {
       return onLeave(ctx, ev);
     case 'memberJoined':
       return eachUser(ctx, ev.joined?.members, (u) => noteGroupMember(ctx, chatId(ev.source), u));
-    case 'memberLeft':
-      return eachUser(ctx, ev.left?.members, (u) => forgetGroupMember(ctx, chatId(ev.source), u));
+    case 'memberLeft': {
+      const gid = chatId(ev.source);
+      eachUser(ctx, ev.left?.members, (u) => forgetGroupMember(ctx, gid, u));
+      if (gid && (ev.left?.members?.length ?? 0) > 0) rotateGroupKey(ctx, gid);
+      return;
+    }
     case 'follow':
       if (ev.source.userId) ensureMember(ctx, ev.source.userId);
       return;

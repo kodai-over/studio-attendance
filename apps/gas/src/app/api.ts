@@ -13,6 +13,7 @@ import {
   minutes,
   normalizeTime,
   perPersonFee,
+  safeEqual,
   sortPractices,
   toJstDate,
   toJstTime,
@@ -35,7 +36,7 @@ import {
   type StudioDef,
 } from '@studio-attendance/shared';
 import { UserError, type Ctx, type RawReservation } from './ports';
-import { buildDraft, classifyFor, createPractices, ensureMember, inGroupKey, loadDraft, noteGroupMember, readReservations, recordAnswer, refreshStatus, remindRecruitMany, removeDraft, sendPracticeCancellation, sendRecruit, withDefaultFee } from './practices';
+import { buildDraft, canRemindTo, classifyFor, createPractices, ensureMember, inGroupKey, loadDraft, noteGroupMember, readReservations, recordAnswer, refreshStatus, remindRecruitMany, removeDraft, sendPracticeCancellation, sendRecruit, withDefaultFee } from './practices';
 
 /** 誰として操作しているか（管理者の見え方の切り替え） */
 interface Acting {
@@ -208,14 +209,20 @@ const cleanName = (s: unknown, max = 30) => {
   return name;
 };
 
-/** アプリに渡す設定。グループの合言葉は渡さない */
-const publicSettings = (s: Settings): Settings => ({ ...s, groups: s.groups.map(({ id, name }) => ({ id, name })) });
+/** アプリに渡す設定。グループの合言葉は渡さない。非管理者には本人が所属する（またはふだんの送り先の）グループだけを返す */
+const publicSettings = (s: Settings, me?: Member): Settings => {
+  const visible =
+    !me || isAdmin(me)
+      ? s.groups
+      : s.groups.filter((g) => me.groups.includes(g.id) || me.defaultGroups.includes(g.id));
+  return { ...s, groups: visible.map(({ id, name }) => ({ id, name })) };
+};
 
 // ---------------------------------------------------------------- 各操作
 
 const handlers: { [A in ApiAction]: Handler<A> } = {
   me(ctx, me, _params, acting = { actAs: 'self', canSwitch: isAdmin(me), realUserId: me.userId }) {
-    const pub = publicSettings(ctx.store.settings());
+    const pub = publicSettings(ctx.store.settings(), me);
     return { member: me, groups: pub.groups, settings: pub, actAs: acting.actAs, canSwitch: acting.canSwitch };
   },
 
@@ -253,7 +260,19 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
     const g = ctx.store.settings().groups.find((x) => x.id === group);
     // グループの合言葉はそのグループに送ったカードにしか出ないので、合っていればそのグループのカードから開いたとみなす
     // 切り替えていても、カードを開いたのは本人なので本人の所属として覚える
-    if (g?.key && typeof key === 'string' && key === g.key) noteGroupMember(ctx, g.id, acting?.realUserId ?? me.userId);
+    if (!g?.key || typeof key !== 'string' || !safeEqual(key, g.key)) return null;
+    const realUserId = acting?.realUserId ?? me.userId;
+    if (ctx.store.getMember(realUserId)?.groups.includes(g.id)) return null;
+    // グループ（C で始まる）は LINE API で現在も実在籍していることを確かめてから登録する（脱退後の過去URL悪用を防止）
+    if (g.id.startsWith('C')) {
+      try {
+        if (!ctx.line.groupMemberProfile(g.id, realUserId)) return null;
+      } catch (e) {
+        ctx.log('groupMemberProfile verify failed', g.id, realUserId, e);
+        return null;
+      }
+    }
+    noteGroupMember(ctx, g.id, realUserId);
     return null;
   },
 
@@ -388,6 +407,7 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
     // 同じグループに二重に流さない
     const targets = [...new Set(groups ?? [])].filter((g) => known.has(g) && !p.groups.includes(g));
     if (targets.length === 0) throw new UserError('募集を送るグループを選んでください');
+    if (targets.some((g) => !canRemindTo(ctx, me, p, g))) throw new UserError('あなたが入っているグループにだけ送れます。');
     const sent = sendRecruit(ctx, [p], targets, memberNameOf(ctx, p.booker));
     if (sent.length === 0) throw new UserError('募集を送れませんでした。時間をおいてもう一度お試しください');
     ctx.withLock(() => {
@@ -454,6 +474,7 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
   },
 
   postFeedback(ctx, me, { text }) {
+    if (!canRegister(me)) throw new UserError('要望を送れません');
     const t = typeof text === 'string' ? text.trim().slice(0, 1000) : '';
     if (!t) throw new UserError('要望を入力してください');
     ctx.withLock(() =>

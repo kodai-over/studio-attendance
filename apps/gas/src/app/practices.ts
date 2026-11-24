@@ -81,13 +81,31 @@ export function noteGroupMember(ctx: Ctx, groupId: string, userId: string): void
   ctx.kv.put(mark, '1', IN_GROUP_TTL);
 }
 
-/** グループを抜けた人を、そのグループのメンバーから外す */
+/** グループを抜けた人を、そのグループのメンバーとふだんの送り先から外す */
 export function forgetGroupMember(ctx: Ctx, groupId: string, userId: string): void {
   ctx.kv.remove(inGroupKey(groupId, userId));
-  if (!ctx.store.getMember(userId)?.groups.includes(groupId)) return;
+  const cur = ctx.store.getMember(userId);
+  if (!cur?.groups.includes(groupId) && !cur?.defaultGroups.includes(groupId)) return;
   ctx.withLock(() => {
     const m = ctx.store.getMember(userId);
-    if (m?.groups.includes(groupId)) ctx.store.saveMember({ ...m, groups: m.groups.filter((g) => g !== groupId) });
+    if (m && (m.groups.includes(groupId) || m.defaultGroups.includes(groupId))) {
+      ctx.store.saveMember({
+        ...m,
+        groups: m.groups.filter((g) => g !== groupId),
+        defaultGroups: m.defaultGroups.filter((g) => g !== groupId),
+      });
+    }
+  });
+}
+
+/** グループの合言葉を新しく作り直す（メンバー退出時など、過去のカードURLを無効化する） */
+export function rotateGroupKey(ctx: Ctx, groupId: string): void {
+  ctx.withLock(() => {
+    const s = ctx.store.settings();
+    const g = s.groups.find((x) => x.id === groupId);
+    if (!g) return;
+    g.key = ctx.uuid();
+    ctx.store.saveSettings(s);
   });
 }
 
@@ -198,11 +216,12 @@ export function withDefaultFee<T extends { reservation: Reservation; parts?: Res
   return { ...item, reservation: { ...item.reservation, fee }, ...(parts ? { parts } : {}) };
 }
 
-/** ふだんの送り先。未設定でグループが1つしかなければ、そのグループにする */
+/** ふだんの送り先。未設定で、本人が送れるグループが1つしかなければ、そのグループにする */
 export function defaultGroupsFor(m: Member, groupIds: string[]): string[] {
   const mine = m.defaultGroups.filter((g) => groupIds.includes(g));
   if (mine.length > 0) return mine;
-  return groupIds.length === 1 ? groupIds : [];
+  const allowed = isAdmin(m) ? groupIds : groupIds.filter((g) => m.groups.includes(g));
+  return allowed.length === 1 ? allowed : [];
 }
 
 /** 読み取れなかった項目がある予約も、スタジオ名・部屋名だけは正式な名前にそろえる */
@@ -243,7 +262,12 @@ export function removeDraft(ctx: Ctx, id: string): void {
 export function createPractices(ctx: Ctx, booker: Member, inputs: NewPracticeInput[], groups: string[]): CreateResult {
   if (!canRegister(booker)) throw new UserError('予約情報を登録できません');
   const settings = ctx.store.settings();
-  const known = (gs: string[]) => [...new Set(gs)].filter((g) => settings.groups.some((s) => s.id === g));
+  const canSendTo = (g: string) => isAdmin(booker) || booker.groups.includes(g) || booker.defaultGroups.includes(g);
+  const known = (gs: string[]) => {
+    const uniq = [...new Set(gs)].filter((g) => settings.groups.some((s) => s.id === g));
+    if (uniq.some((g) => !canSendTo(g))) throw new UserError('あなたが入っているグループにだけ送れます。');
+    return uniq;
+  };
   const validGroups = known(groups);
   // 予約ごとに募集先を選んだときは、そちらを使う
   const groupsOf = (input: NewPracticeInput) => (Array.isArray(input.groups) ? known(input.groups) : validGroups);
@@ -541,11 +565,11 @@ export function refreshStatus(ctx: Ctx, p: Practice): void {
  * 募集の送り先に選べるか（まとめて・個別の「募集を送る」、お知らせの「再募集」）。
  * 本人が入っているグループ（Bot も入っているもの）。管理者はどのグループにも送れる。すでに募集済のグループと、本人のふだんの送り先は、入っているグループとして記録されていなくても選べる
  */
-export function canRemindTo(ctx: Ctx, me: Member | null, p: Pick<Practice, 'groups'>, groupId: string): boolean {
+export function canRemindTo(_ctx: Ctx, me: Member | null, p: Pick<Practice, 'groups'>, groupId: string): boolean {
   // 管理者は、これまでどおりBotが入っているグループならどこにでも送れる
   if (isAdmin(me)) return true;
-  if ((me?.groups ?? []).includes(groupId) || p.groups.includes(groupId)) return true;
-  return me != null && defaultGroupsFor(me, ctx.store.settings().groups.map((g) => g.id)).includes(groupId);
+  if (!me) return false;
+  return me.groups.includes(groupId) || p.groups.includes(groupId) || me.defaultGroups.includes(groupId);
 }
 
 /** カードに並べる再募集のボタンの数（多いとカードが長くなるので、募集済のグループを先に並べて切る） */

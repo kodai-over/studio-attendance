@@ -21,7 +21,12 @@ export class FakeLine implements LineApi {
   profile(userId: string) {
     return this.profiles[userId] ? { displayName: this.profiles[userId] } : null;
   }
-  groupMemberProfile(_g: string, userId: string) {
+  /** グループごとの実在籍メンバー。設定されていればここだけで判定し、未設定なら profiles を使う */
+  groupMembers: Record<string, string[]> = {};
+  groupMemberProfile(groupId: string, userId: string) {
+    if (Object.prototype.hasOwnProperty.call(this.groupMembers, groupId)) {
+      return this.groupMembers[groupId].includes(userId) ? { displayName: this.profiles[userId] ?? userId } : null;
+    }
     return this.profile(userId);
   }
   /** グループ名を差し替える。値が Error なら取得失敗、null なら見つからない（Botが外れたグループ）にする */

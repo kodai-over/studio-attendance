@@ -1,11 +1,11 @@
 /** 参加リンク（LINEを使わない人の出欠）。合言葉が合う練習への出欠登録だけができる */
-import { goingList, isAnswer, perPersonFee, roomInfo, toJstDate, type Answer, type JoinActions, type JoinView, type Practice } from '@studio-attendance/shared';
+import { goingList, isAnswer, perPersonFee, roomInfo, safeEqual, toJstDate, type Answer, type JoinActions, type JoinView, type Practice } from '@studio-attendance/shared';
 import { UserError, type Ctx } from './ports';
 import { recordAnswer } from './practices';
 
 function openPractice(ctx: Ctx, id: unknown, key: unknown): Practice {
   const p = typeof id === 'string' ? ctx.store.getPractice(id) : null;
-  if (!p || typeof key !== 'string' || !key || p.joinKey !== key) throw new UserError('参加リンクが無効です');
+  if (!p || typeof key !== 'string' || !key || !p.joinKey || !safeEqual(p.joinKey, key)) throw new UserError('参加リンクが無効です');
   if (p.status === '終了' || p.date < toJstDate(ctx.now())) throw new UserError('この予約情報は終了しました');
   return p;
 }
