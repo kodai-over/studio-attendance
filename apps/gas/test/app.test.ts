@@ -7,6 +7,8 @@ import { handleJoin } from '../src/app/join';
 import { route } from '../src/app/router';
 import { hourlyJob } from '../src/app/triggers';
 import { handleWebhook, type LineEvent } from '../src/app/webhook';
+import { GeminiReader } from '../src/gas/gemini';
+import { LineClient } from '../src/gas/lineClient';
 import { makeTestCtx } from './fakes';
 
 const BOOKER = 'Ubooker';
@@ -1108,6 +1110,24 @@ describe('ルーター', () => {
   it('どちらのトークンも無効なら受け付けない', () => {
     const t = setup();
     expect(route(t.ctx, JSON.stringify({ kind: 'api', accessToken: 'x', idToken: 'y', action: 'me' }), verify).ok).toBe(false);
+  });
+
+  it('Object.prototype 由来のプロパティ名を action に指定しても実行しない', () => {
+    const t = setup();
+    for (const action of ['constructor', 'toString', 'valueOf', '__proto__', 'hasOwnProperty']) {
+      const res = route(t.ctx, JSON.stringify({ kind: 'api', accessToken: 'valid-at', action }), verify);
+      expect(res).toEqual({ ok: false, error: `不明な操作です: ${action}` });
+    }
+  });
+
+  it('LineClient と GeminiReader は JSON.stringify で秘密情報を露出しない', () => {
+    const line = new LineClient('line-secret-token');
+    const reader = new GeminiReader('gemini-secret-key', 'gemini-flash-latest');
+    const serialized = JSON.stringify({ line, reader });
+    expect(serialized).not.toContain('line-secret-token');
+    expect(serialized).not.toContain('gemini-secret-key');
+    expect(Object.keys(line)).toEqual([]);
+    expect(Object.keys(reader)).toEqual([]);
   });
 
   it('Botのグループ参加で設定にグループが載る', () => {

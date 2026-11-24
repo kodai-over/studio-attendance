@@ -5,13 +5,17 @@ const API = 'https://api.line.me/v2/bot';
 const DATA_API = 'https://api-data.line.me/v2/bot';
 
 export class LineClient implements LineApi {
-  constructor(private readonly token: string) {}
+  readonly #token: string;
+
+  constructor(token: string) {
+    this.#token = token;
+  }
 
   private fetch(method: 'get' | 'post', url: string, payload?: unknown, headers: Record<string, string> = {}) {
     const res = UrlFetchApp.fetch(url, {
       method,
       contentType: 'application/json',
-      headers: { Authorization: `Bearer ${this.token}`, ...headers },
+      headers: { Authorization: `Bearer ${this.#token}`, ...headers },
       payload: payload === undefined ? undefined : JSON.stringify(payload),
       muteHttpExceptions: true,
     });

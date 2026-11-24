@@ -151,6 +151,12 @@ describe('LIFF 初期化 & 画面遷移ロジック', () => {
       expect(resolveInitialHash(new URLSearchParams('view=feedback'))).toBe('/feedback');
     });
 
+    it('?view= に Object.prototype 由来の名前を指定しても解決しない', () => {
+      expect(resolveInitialHash(new URLSearchParams('view=constructor'))).toBeUndefined();
+      expect(resolveInitialHash(new URLSearchParams('view=toString'))).toBeUndefined();
+      expect(resolveInitialHash(new URLSearchParams('view=__proto__'))).toBeUndefined();
+    });
+
     it('予約詳細や募集カードのリンクが優先して振り分けられる', () => {
       expect(resolveInitialHash(new URLSearchParams('p=p123'))).toBe('/p/p123');
       expect(resolveInitialHash(new URLSearchParams('p=p123&cal=1'))).toBe('/p/p123?cal=1');

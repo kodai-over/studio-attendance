@@ -27,7 +27,8 @@ export function resolveInitialHash(params: URLSearchParams, opts?: InitialRouteO
     answer: '/answer',
     feedback: '/feedback',
   };
-  const view = views[params.get('view') ?? ''];
+  const viewKey = params.get('view') ?? '';
+  const view = Object.prototype.hasOwnProperty.call(views, viewKey) ? views[viewKey] : undefined;
 
   // 優先順位: 回答画面(?r=) > 募集詳細(?manage=) > 予約詳細(?p=) > 下書き登録(?draft=) > メニューリンク(?view=)
   const paramHash = answers.length
