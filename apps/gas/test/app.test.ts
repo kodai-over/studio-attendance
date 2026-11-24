@@ -63,11 +63,18 @@ describe('スクショから募集まで', () => {
     t = setup();
   });
 
-  it('一般メンバー（未登録の人も）スクショから登録できる。「登録して募集」はアプリを開く', () => {
+  it('グループ所属の一般メンバーはスクショから登録できる。未所属の外部ユーザーは登録できない', () => {
     t.reader.result = [reservation];
+    t.line.groupMembers[G1] = ['Umember'];
     t.line.profiles['Ustranger'] = 'はじめて';
     handleWebhook(t.ctx, { events: [imageEvent('Ustranger')] });
-    expect(t.store.m.find((m) => m.userId === 'Ustranger')).toMatchObject({ name: 'はじめて', role: '一般' });
+    expect(t.store.m.find((m) => m.userId === 'Ustranger')).toMatchObject({ name: 'はじめて', role: '一般', groups: [] });
+    expect(t.line.lastReplyText()).toContain('グループに所属すると予約情報を登録できます');
+    expect(t.reader.calls).toHaveLength(0);
+
+    // 所属を付けたあとは同じユーザーでも登録できる
+    t.store.m.find((m) => m.userId === 'Ustranger')!.groups = [G1];
+    handleWebhook(t.ctx, { events: [imageEvent('Ustranger')] });
     const card = t.line.lastReplyText();
     expect(card).toContain('予約内容の確認');
     // グループが1つでも、アプリで内容を確かめてから募集する
@@ -79,8 +86,9 @@ describe('スクショから募集まで', () => {
 
   it('グループが複数でも「登録して募集」でアプリを開き、予約ごとに募集先を選ぶ', () => {
     t.store.s.groups.push({ id: 'C2', name: 'チームB' });
+    inG1(t, 'Umember', 'メンバー');
     t.reader.result = [reservation];
-    handleWebhook(t.ctx, { events: [imageEvent('Ustranger')] });
+    handleWebhook(t.ctx, { events: [imageEvent('Umember')] });
     const card = t.line.lastReplyText();
     expect(card).toMatch(/"label":"登録して募集","uri":"https:\/\/liff\.line\.me\/APP\?draft=[^"]+&recruit=1"/);
     expect(card).toContain('"label":"登録のみ"');
@@ -89,7 +97,7 @@ describe('スクショから募集まで', () => {
   it('グループが1つもなければ「登録のみ」と「やめる」', () => {
     t.store.s.groups = [];
     t.reader.result = [reservation];
-    handleWebhook(t.ctx, { events: [imageEvent('Ustranger')] });
+    handleWebhook(t.ctx, { events: [imageEvent(BOOKER)] });
     const card = t.line.lastReplyText();
     expect(card).not.toContain('登録して募集');
     expect(card).toContain('"label":"登録のみ"');
@@ -399,6 +407,7 @@ describe('出欠', () => {
   });
 
   it('練習は、登録した本人と管理者だけ削除できる', () => {
+    inG1(t, 'U9', 'きゅう');
     const item = { ...reservation, date: '2026-10-30', max: null, min: null, memo: '' };
     const { created } = handleApi(t.ctx, { userId: 'U9', name: 'きゅう' }, 'createPractices', { items: [item], groups: [] }) as any;
     expect(() => handleApi(t.ctx, { userId: 'U1', name: 'いち' }, 'deletePractice', { id: created[0] })).toThrow('予約者か管理者');
@@ -411,6 +420,7 @@ describe('出欠', () => {
 
   it('募集を流した練習も削除でき、notifyGroups が省略または false のときはグループに何も送らない', () => {
     t.store.s.groups.push({ id: 'C2', name: 'チームB' });
+    t.store.m.find((m) => m.userId === BOOKER)!.groups.push('C2');
     handleApi(t.ctx, { userId: BOOKER }, 'recruitPractice', { id: PID, groups: ['C2'] });
     const pushes = t.line.pushes.length;
     // notifyGroups: undefined
@@ -442,6 +452,7 @@ describe('出欠', () => {
 
   it('終了済み・中止の練習は notifyGroups: true を指定しても削除の連絡は送られない', () => {
     t.store.s.groups.push({ id: 'C_PAST', name: 'チーム過去' });
+    t.store.m.find((m) => m.userId === BOOKER)!.groups.push('C_PAST');
     // 過去日の予約（2026-10-01）
     const pastItem = { ...reservation, date: '2026-10-01', max: null, min: null, memo: '' };
     const { created: pastCreated } = handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [pastItem], groups: ['C_PAST'] }) as any;
@@ -478,6 +489,7 @@ describe('出欠', () => {
   it('notifyGroups: true を指定した場合は募集済グループに削除の連絡が送られ、pushが失敗しても削除は完了する', () => {
     const item = { ...reservation, date: '2026-11-05', max: null, min: null, memo: '' };
     t.store.s.groups.push({ id: 'C3', name: 'チームC' });
+    t.store.m.find((m) => m.userId === BOOKER)!.groups.push('C3');
     const { created } = handleApi(t.ctx, { userId: BOOKER, name: 'よやくしゃ' }, 'createPractices', { items: [item], groups: ['C3'] }) as any;
     const pid = created[0];
     const initialPushes = t.line.pushes.length;
@@ -511,6 +523,7 @@ describe('出欠', () => {
   it('権限のない人は削除もグループ通知も実行できない', () => {
     const item = { ...reservation, date: '2026-11-08', max: null, min: null, memo: '' };
     t.store.s.groups.push({ id: 'C4', name: 'チームD' });
+    t.store.m.find((m) => m.userId === BOOKER)!.groups.push('C4');
     const { created } = handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [item], groups: ['C4'] }) as any;
     const pid = created[0];
     const initialPushes = t.line.pushes.length;
@@ -599,6 +612,7 @@ describe('出欠', () => {
   });
 
   it('アプリから手動登録（送り先なしなら登録だけ、一般メンバーも登録でき予約者になる）', () => {
+    inG1(t, 'U9', 'きゅう');
     const item = { ...reservation, date: '2026-10-30', fee: null, max: 8, min: null, memo: 'ショーケースの通し' };
     const pushes = t.line.pushes.length;
     const only = handleApi(t.ctx, { userId: 'U9', name: 'きゅう' }, 'createPractices', { items: [item], groups: [] }) as any;
@@ -617,10 +631,13 @@ describe('出欠', () => {
 
   it('あとからグループに募集できる。同じグループには二重に流さない。登録した本人と管理者だけ', () => {
     t.store.s.groups.push({ id: 'C2', name: 'チームB' });
+    inG1(t, 'U9', 'きゅう');
     const item = { ...reservation, date: '2026-10-30', max: null, min: null, memo: '' };
     const { created } = handleApi(t.ctx, { userId: 'U9', name: 'きゅう' }, 'createPractices', { items: [item], groups: [] }) as any;
     const id = created[0];
     expect(() => handleApi(t.ctx, { userId: 'U1', name: 'いち' }, 'recruitPractice', { id, groups: [G1] })).toThrow('予約者か管理者');
+    // 所属していないグループには送れない
+    expect(() => handleApi(t.ctx, { userId: 'U9' }, 'recruitPractice', { id, groups: ['C2'] })).toThrow('所属しているグループにだけ送れます');
     const pushes = t.line.pushes.length;
     const v = handleApi(t.ctx, { userId: 'U9' }, 'recruitPractice', { id, groups: [G1] }) as any;
     expect(v.groupNames).toEqual(['チームA']);
@@ -632,6 +649,7 @@ describe('出欠', () => {
   });
 
   it('すでに募集済のグループに再募集を送れる。10分あける制限と権限チェックがある', () => {
+    inG1(t, 'U9', 'きゅう');
     const item = { ...reservation, date: '2026-10-30', max: null, min: null, memo: '' };
     const { created } = handleApi(t.ctx, { userId: 'U9', name: 'きゅう' }, 'createPractices', { items: [item], groups: [G1] }) as any;
     const id = created[0];
@@ -657,8 +675,10 @@ describe('出欠', () => {
 });
 
 describe('改善要望', () => {
-  it('誰でも投稿できるが、一覧を見て状態とコメントを付けられるのは管理者だけ', () => {
+  it('グループ所属メンバーは投稿できるが、未所属ユーザーは投稿できず、一覧を見て状態とコメントを付けられるのは管理者だけ', () => {
     const t = setup();
+    expect(() => handleApi(t.ctx, { userId: 'Ustranger', name: '部外者' }, 'postFeedback', { text: 'スパム' })).toThrow('グループに所属すると要望を送れます');
+    inG1(t, 'U1', 'いち');
     expect(handleApi(t.ctx, { userId: 'U1', name: 'いち' }, 'postFeedback', { text: '  前日にリマインドがほしい  ' })).toEqual([]);
     expect(handleApi(t.ctx, { userId: BOOKER }, 'listFeedback', {})).toEqual([]);
     expect(handleApi(t.ctx, { userId: 'U1' }, 'listFeedback', {})).toEqual([]);
@@ -968,6 +988,7 @@ describe('再募集', () => {
   it('お知らせのボタンは募集済のグループを先に出し、押すと人数の一文と募集カードをもう一度送る', () => {
     const t = setup();
     t.store.s.groups.push({ id: G2, name: 'チームB' });
+    t.store.m.find((m) => m.userId === BOOKER)!.groups.push(G2);
     t.line.groupNames = { [G1]: 'チームA', [G2]: 'チームB' };
     const id = make(t, [G2]);
     t.clock.now = new Date('2026-10-17T01:00:00Z');
@@ -1405,6 +1426,7 @@ describe('見える練習', () => {
     expect(JSON.stringify(handleApi(t.ctx, { userId: ADMIN }, 'updateSettings', {}))).not.toContain(key1);
 
     member('UE', []);
+    t.line.groupMembers[G1] = ['UE', 'UF'];
     // 練習の合言葉（参加リンクに出る）や、別のグループの合言葉では覚えない
     handleApi(t.ctx, { userId: 'UE' }, 'openedFromGroup', { group: G1, key: p.joinKey });
     handleApi(t.ctx, { userId: 'UE' }, 'openedFromGroup', { group: G2, key: key1 });
@@ -1477,9 +1499,14 @@ describe('見える練習', () => {
 
 describe('予約ごとの募集先', () => {
   const G2 = 'Cgroup2';
-  it('予約ごとに募集先を選ぶと、グループごとにその予約だけを送る。まとめて選ぶのも今までどおり', () => {
+  const setup2 = () => {
     const t = setup();
     t.store.s.groups.push({ id: G2, name: 'チームB' });
+    t.store.m.find((m) => m.userId === BOOKER)!.groups.push(G2);
+    return t;
+  };
+  it('予約ごとに募集先を選ぶと、グループごとにその予約だけを送る。まとめて選ぶのも今までどおり', () => {
+    const t = setup2();
     const item = (date: string, groups?: string[]) => ({ ...reservation, date, max: null, min: null, memo: '', ...(groups ? { groups } : {}) });
     const res = handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [item('2026-10-28', [G1]), item('2026-10-29', [G2]), item('2026-10-30', [])], groups: [] }) as any;
     expect(res.created).toHaveLength(3);
@@ -1501,8 +1528,7 @@ describe('予約ごとの募集先', () => {
   });
 
   it('続けて取った予約は、募集先が違えば別の練習にする。同じならまとめる', () => {
-    const t = setup();
-    t.store.s.groups.push({ id: G2, name: 'チームB' });
+    const t = setup2();
     const items = [
       { ...reservation, date: '2026-10-28', start: '19:00', end: '21:00', max: null, min: null, memo: '', groups: [G1] },
       { ...reservation, date: '2026-10-28', start: '21:00', end: '22:00', max: null, min: null, memo: '', groups: [G2] },
@@ -1534,8 +1560,7 @@ describe('予約ごとの募集先', () => {
   });
 
   it('3件続く予約も、募集先が同じなら1つに、途中で変われば分ける。既存の練習に続く2件は1つの延長にする', () => {
-    const t = setup();
-    t.store.s.groups.push({ id: G2, name: 'チームB' });
+    const t = setup2();
     const slot = (date: string, start: string, end: string, groups: string[]) => ({ ...reservation, date, start, end, fee: 1000, max: null, min: null, memo: '', groups });
     handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [slot('2026-10-28', '19:00', '20:00', [G1]), slot('2026-10-28', '20:00', '21:00', [G1]), slot('2026-10-28', '21:00', '22:00', [G1])], groups: [] });
     expect(t.store.p.map((p) => [p.start, p.end, p.fee])).toEqual([['19:00', '22:00', 3000]]);
@@ -1552,8 +1577,7 @@ describe('予約ごとの募集先', () => {
   });
 
   it('既存の練習に続く予約に、まだ送っていない募集先を選んだら、延長にせず別の練習として募集する', () => {
-    const t = setup();
-    t.store.s.groups.push({ id: G2, name: 'チームB' });
+    const t = setup2();
     const slot = (start: string, end: string, groups?: string[]) => ({ ...reservation, date: '2026-10-28', start, end, fee: 1000, max: null, min: null, memo: '', ...(groups ? { groups } : {}) });
     const first = handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [slot('18:00', '19:00', [G1])], groups: [] }) as any;
     // 延長の部分（募集先なし）と、G2 を選んだ部分
@@ -1592,8 +1616,7 @@ describe('予約ごとの募集先', () => {
   });
 
   it('送れなかったグループは練習の送り先から外し、あとから送り直せる', () => {
-    const t = setup();
-    t.store.s.groups.push({ id: G2, name: 'チームB' });
+    const t = setup2();
     t.line.failPushTo = [G2];
     const res = handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [{ ...reservation, date: '2026-10-28', max: null, min: null, memo: '' }], groups: [G1, G2] }) as any;
     expect(res.recruited).toEqual([G1]);
@@ -1652,6 +1675,7 @@ describe('管理者の見え方の切り替え', () => {
   it('切り替えていても、カードから開いた所属は本人に付ける。確認用アカウントにはキャンセル期限前の警告を送らない', () => {
     const t = setup();
     t.store.s.groups[0].key = 'k1';
+    t.line.groupMembers[G1] = [ADMIN];
     t.store.m.find((m) => m.userId === ADMIN)!.groups = [];
     as(t, ADMIN, 'test', 'openedFromGroup', { group: G1, key: 'k1' });
     expect(t.store.getMember(ADMIN)?.groups).toEqual([G1]);
@@ -1663,5 +1687,227 @@ describe('管理者の見え方の切り替え', () => {
     hourlyJob(t.ctx);
     expect(t.store.p.find((p) => p.booker === TEST_MEMBER_ID)?.warned).toBe(true); // 警告の時刻は来ている
     expect(t.line.pushes.filter((p) => p.to === TEST_MEMBER_ID)).toEqual([]);
+  });
+});
+
+describe('グループ所属と外部ユーザーのアクセス制限', () => {
+  const G2 = 'Cgroup2';
+  const item = { ...reservation, date: '2026-10-30', max: null, min: null, memo: '' };
+
+  it('未所属の外部ユーザーには登録グループ一覧を返さず、登録・読み取り・要望投稿も拒否する', () => {
+    const t = setup();
+    t.store.s.groups.push({ id: G2, name: 'チームB' });
+    const me = handleApi(t.ctx, { userId: 'Uoutsider', name: '外部' }, 'me', {}) as any;
+    expect(me.groups).toEqual([]);
+    expect(me.settings.groups).toEqual([]);
+
+    const home = handleApi(t.ctx, { userId: 'Uoutsider' }, 'home', {}) as any;
+    expect(home.me.groups).toEqual([]);
+    expect(home.practices).toEqual([]);
+
+    expect(() => handleApi(t.ctx, { userId: 'Uoutsider' }, 'parseReservations', { text: '10/30 19:00-21:00 worcle' })).toThrow('グループに所属すると予約情報を登録できます');
+    expect(() => handleApi(t.ctx, { userId: 'Uoutsider' }, 'classify', { reservations: [reservation] })).toThrow('グループに所属すると予約情報を登録できます');
+    expect(() => handleApi(t.ctx, { userId: 'Uoutsider' }, 'createPractices', { items: [item], groups: [G1] })).toThrow('グループに所属すると予約情報を登録できます');
+    expect(() => handleApi(t.ctx, { userId: 'Uoutsider' }, 'postFeedback', { text: 'テスト' })).toThrow('グループに所属すると要望を送れます');
+    expect(t.line.pushes).toHaveLength(0);
+    expect(t.reader.calls).toHaveLength(0);
+  });
+
+  it('所属が空の既存一般メンバーでも、LINE側で実在籍が確認できれば自動で所属補完され登録・閲覧できる', () => {
+    const t = setup();
+    t.store.m.push({ userId: 'Uexisting', name: '既存一般', role: '一般', defaultGroups: [], groups: [] });
+    t.line.groupMembers[G1] = ['Uexisting'];
+    t.reader.result = [reservation];
+
+    // DM スクショ送信時に LINE 実在籍から自動補完され登録できる
+    handleWebhook(t.ctx, { events: [imageEvent('Uexisting')] });
+    expect(t.store.getMember('Uexisting')?.groups).toEqual([G1]);
+    expect(t.line.lastReplyText()).toContain('予約内容の確認');
+
+    // アプリの home / me でも同様に自動補完される
+    t.store.m.push({ userId: 'Uexisting2', name: '既存一般2', role: '一般', defaultGroups: [], groups: [] });
+    t.line.groupMembers[G1].push('Uexisting2');
+    const home = handleApi(t.ctx, { userId: 'Uexisting2' }, 'home', {}) as any;
+    expect(home.me.member.groups).toEqual([G1]);
+    expect(home.me.groups.map((g: any) => g.id)).toEqual([G1]);
+
+    // 所属・ふだんの送り先が空の予約者も自動補完され、そのまま募集を送信できる
+    t.store.m.push({ userId: 'UbookerEmpty', name: '未記録予約者', role: '予約者', defaultGroups: [], groups: [] });
+    t.line.groupMembers[G1].push('UbookerEmpty');
+    const bHome = handleApi(t.ctx, { userId: 'UbookerEmpty' }, 'home', {}) as any;
+    expect(bHome.me.member.groups).toEqual([G1]);
+    const res = handleApi(t.ctx, { userId: 'UbookerEmpty' }, 'createPractices', { items: [item], groups: [G1] }) as any;
+    expect(res.recruited).toEqual([G1]);
+  });
+
+  it('syncMemberGroupsFromLine は LINE API 一時障害時にキャッシュを残さず、復旧後の再試行で補完できる', () => {
+    const t = setup();
+    t.store.m.push({ userId: 'Uretry', name: '再試行', role: '一般', defaultGroups: [], groups: [] });
+    t.line.groupMembers[G1] = ['Uretry'];
+    const orig = t.line.groupMemberProfile.bind(t.line);
+    let calls = 0;
+    t.line.groupMemberProfile = () => {
+      calls++;
+      throw new Error('LINE API 503');
+    };
+    try {
+      // home 内で例外が起きても、同じリクエスト内で 2 回呼ばれず 1 回だけ試行される
+      const first = handleApi(t.ctx, { userId: 'Uretry' }, 'home', {}) as any;
+      expect(first.me.member.groups).toEqual([]);
+      expect(calls).toBe(1);
+      expect(t.kv.get('linesync:Uretry')).toBeNull();
+    } finally {
+      t.line.groupMemberProfile = orig;
+    }
+    const second = handleApi(t.ctx, { userId: 'Uretry' }, 'me', {}) as any;
+    expect(second.member.groups).toEqual([G1]);
+  });
+
+  it('確認カードの onConfirm で所属外グループ送信エラーになった場合、下書きは消えず保持される', () => {
+    const t = setup();
+    t.store.s.groups.push({ id: G2, name: 'チームB' });
+    t.reader.result = [reservation];
+    handleWebhook(t.ctx, { events: [imageEvent(BOOKER)] });
+    const draftKey = [...t.kv.data.keys()].find((k) => k.startsWith('draft:'))!;
+    const draftId = draftKey.replace('draft:', '');
+    // 下書きの送り先に所属外グループ G2 が入っていた場合を模擬
+    const saved = JSON.parse(t.kv.data.get(draftKey)!);
+    saved.groups = [G2];
+    t.kv.data.set(draftKey, JSON.stringify(saved));
+
+    handleWebhook(t.ctx, { events: [postback(BOOKER, `a=confirm&d=${draftId}&r=1`)] });
+    expect(t.line.lastReplyText()).toContain('所属しているグループにだけ送れます');
+    expect(t.kv.data.has(draftKey)).toBe(true);
+    expect(t.store.p).toHaveLength(0);
+    expect(t.line.pushes).toHaveLength(0);
+  });
+
+  it('複数人トーク（R始まり）のみの一般メンバーは、トークでの発言やカード起動で所属が付いたあとに登録・募集できる', () => {
+    const t = setup();
+    const R = 'Ronly1';
+    t.store.s.groups.push({ id: R, name: '複数人', key: 'rk1' });
+    t.store.m.push({ userId: 'UroomOnly', name: 'ルーム一般', role: '一般', defaultGroups: [], groups: [] });
+
+    // 未記録時は R トークの自動補完対象外のため登録不可
+    expect(() => handleApi(t.ctx, { userId: 'UroomOnly' }, 'createPractices', { items: [item], groups: [R] })).toThrow(
+      'グループに所属すると予約情報を登録できます',
+    );
+    // カード起動（またはトークでの発言）で所属が付いたあとは登録・募集できる
+    const home = handleApi(t.ctx, { userId: 'UroomOnly' }, 'home', { group: R, key: 'rk1' }) as any;
+    expect(home.me.member.groups).toEqual([R]);
+    expect(home.me.groups.map((g: any) => g.id)).toEqual([R]);
+    const res = handleApi(t.ctx, { userId: 'UroomOnly' }, 'createPractices', { items: [item], groups: [R] }) as any;
+    expect(res.recruited).toEqual([R]);
+  });
+
+  it('非管理者には所属グループのみ返し、管理者は全グループを取得できる。閲覧可能な予約情報の groupNames は募集済グループ名を正しく解決する', () => {
+    const t = setup();
+    t.store.s.groups.push({ id: G2, name: 'チームB' });
+    inG1(t, 'Um1', 'メンバー1');
+    const memberMe = handleApi(t.ctx, { userId: 'Um1' }, 'me', {}) as any;
+    expect(memberMe.groups.map((g: any) => g.id)).toEqual([G1]);
+    expect(memberMe.settings.groups.map((g: any) => g.id)).toEqual([G1]);
+
+    // 管理者が G1・G2 の両方に募集した練習を G1 のみのメンバーが見ても、groupNames に ID ではなくグループ名が出る
+    const { created } = handleApi(t.ctx, { userId: ADMIN }, 'createPractices', { items: [item], groups: [G1, G2] }) as any;
+    const view = handleApi(t.ctx, { userId: 'Um1' }, 'getPractice', { id: created[0] }) as any;
+    expect(view.groupNames).toEqual(['チームA', 'チームB']);
+
+    const adminMe = handleApi(t.ctx, { userId: ADMIN }, 'me', {}) as any;
+    expect(adminMe.groups.map((g: any) => g.id)).toEqual([G1, G2]);
+  });
+
+  it('所属メンバーでも所属外グループが1つでも混ざった募集作成・追加募集はまとめて拒否される', () => {
+    const t = setup();
+    t.store.s.groups.push({ id: G2, name: 'チームB' });
+    inG1(t, 'Um1', 'メンバー1');
+
+    expect(() => handleApi(t.ctx, { userId: 'Um1' }, 'createPractices', { items: [item], groups: [G2] })).toThrow('所属しているグループにだけ送れます');
+    // 所属グループと所属外グループが混在している場合も1件も作成せずまとめて拒否する
+    expect(() =>
+      handleApi(t.ctx, { userId: 'Um1' }, 'createPractices', {
+        items: [
+          { ...item, date: '2026-10-30', groups: [G1] },
+          { ...item, date: '2026-10-31', groups: [G1, G2] },
+        ],
+        groups: [],
+      }),
+    ).toThrow('所属しているグループにだけ送れます');
+    expect(t.store.p).toHaveLength(0);
+    expect(t.line.pushes).toHaveLength(0);
+
+    const { created } = handleApi(t.ctx, { userId: 'Um1' }, 'createPractices', { items: [item], groups: [G1] }) as any;
+    expect(() => handleApi(t.ctx, { userId: 'Um1' }, 'recruitPractice', { id: created[0], groups: [G2] })).toThrow('所属しているグループにだけ送れます');
+    expect(t.line.pushes.map((p) => p.to)).toEqual([G1]);
+  });
+
+  it('グループを退出したメンバーは defaultGroups からも外され、登録グループが1つでも募集・再募集できない', () => {
+    const t = setup();
+    const { created } = handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [item], groups: [] }) as any;
+    t.line.pushes = [];
+
+    // グループ1から退出
+    handleWebhook(t.ctx, { events: [{ type: 'memberLeft', source: { type: 'group', groupId: G1 }, left: { members: [{ type: 'user', userId: BOOKER }] } }] });
+    expect(t.store.getMember(BOOKER)?.groups).toEqual([]);
+    expect(t.store.getMember(BOOKER)?.defaultGroups).toEqual([]);
+
+    expect(() => handleApi(t.ctx, { userId: BOOKER }, 'recruitPractice', { id: created[0], groups: [G1] })).toThrow('所属しているグループにだけ送れます');
+    expect(() => handleApi(t.ctx, { userId: BOOKER }, 'remindPractice', { id: created[0], groups: [G1] })).toThrow('入っているグループにだけ');
+    expect(() => handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [{ ...item, date: '2026-10-31' }], groups: [G1] })).toThrow(
+      '所属しているグループにだけ送れます',
+    );
+    expect(t.line.pushes).toHaveLength(0);
+  });
+
+  it('グループの合言葉が合っていても、LINE側でグループ未在籍なら所属に追加されない（フェイルクローズ）', () => {
+    const t = setup();
+    t.store.s.groups[0].key = 'secret-g1';
+    t.line.groupMembers[G1] = ['Uin'];
+
+    // 実在籍しているユーザーは追加される
+    handleApi(t.ctx, { userId: 'Uin', name: '在籍者' }, 'openedFromGroup', { group: G1, key: 'secret-g1' });
+    expect(t.store.getMember('Uin')?.groups).toEqual([G1]);
+
+    // 合言葉を知っていても LINE グループ未在籍のユーザーは追加されない
+    handleApi(t.ctx, { userId: 'Uex', name: '脱退者' }, 'openedFromGroup', { group: G1, key: 'secret-g1' });
+    expect(t.store.getMember('Uex')?.groups).toEqual([]);
+
+    // LINE API 障害時もフェイルクローズで追加されない
+    const orig = t.line.groupMemberProfile.bind(t.line);
+    t.line.groupMemberProfile = () => {
+      throw new Error('LINE API 500');
+    };
+    try {
+      handleApi(t.ctx, { userId: 'Uerr', name: '通信失敗' }, 'openedFromGroup', { group: G1, key: 'secret-g1' });
+      expect(t.store.getMember('Uerr')?.groups).toEqual([]);
+    } finally {
+      t.line.groupMemberProfile = orig;
+    }
+  });
+
+  it('memberLeft 時：複数人トーク（R）は合言葉を再発行して旧URLを無効化し、グループ（C）は合言葉を維持しつつ設定外グループは無視する', () => {
+    const t = setup();
+    const R = 'Rroom1';
+    t.store.s.groups.push({ id: R, name: '複数人トーク', key: 'old-room-key' });
+    t.store.s.groups[0].key = 'old-g1-key';
+
+    // グループ（C）は既存カードを壊さないよう合言葉を維持（退出者は groupMemberProfile で拒否される）
+    handleWebhook(t.ctx, { events: [{ type: 'memberLeft', source: { type: 'group', groupId: G1 }, left: { members: [{ type: 'user', userId: BOOKER }] } }] });
+    expect(t.store.s.groups.find((g) => g.id === G1)?.key).toBe('old-g1-key');
+
+    // 複数人トーク（R）は退出時に合言葉を再発行し、旧URLでは復帰できない
+    handleWebhook(t.ctx, { events: [{ type: 'memberLeft', source: { type: 'room', roomId: R }, left: { members: [{ type: 'user', userId: 'Uleft' }] } }] });
+    const newRoomKey = t.store.s.groups.find((g) => g.id === R)?.key;
+    expect(newRoomKey).toBeTruthy();
+    expect(newRoomKey).not.toBe('old-room-key');
+
+    const opened = handleApi(t.ctx, { userId: 'Uleft', name: '退出者' }, 'openedFromGroup', { group: R, key: 'old-room-key' });
+    expect(opened).toBeNull();
+    expect(t.store.getMember('Uleft')?.groups).toEqual([]);
+
+    // 設定にない（Bot が入っていない）グループ/トークの memberLeft もエラーなく無視される
+    expect(() =>
+      handleWebhook(t.ctx, { events: [{ type: 'memberLeft', source: { type: 'room', roomId: 'Runknown' }, left: { members: [{ type: 'user', userId: 'Ux' }] } }] }),
+    ).not.toThrow();
   });
 });

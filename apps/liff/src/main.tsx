@@ -124,6 +124,8 @@ function App() {
       if (hash) {
         history.replaceState(null, '', `${location.pathname}#${hash}`);
         window.dispatchEvent(new HashChangeEvent('hashchange'));
+      } else if (group || key) {
+        history.replaceState(null, '', `${location.pathname}${location.hash}`);
       }
       // グループのカードから開いたときは、そのグループのメンバーとして覚えてから一覧を返してもらう（問い合わせは1回だけ）
       await loadHome();

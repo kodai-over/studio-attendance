@@ -1,8 +1,8 @@
 import type { Attendance, Feedback, Member, Practice } from './types';
 
-/** 練習の登録（スクショ送信・アプリでの登録）はメンバーなら誰でもできる */
+/** 練習の登録（スクショ送信・アプリでの登録）は、いずれかのグループに所属するメンバーか予約者・管理者だけができる */
 export function canRegister(m: Member | null): boolean {
-  return m != null;
+  return m != null && (m.role !== '一般' || m.groups.length > 0);
 }
 
 export function isAdmin(m: Member | null): boolean {
@@ -36,4 +36,12 @@ export function canRemoveAttendance(m: Member | null, p: Practice, a: Attendance
 /** 要望を消せるのは投稿した本人と管理者 */
 export function canDeleteFeedback(m: Member | null, f: Feedback): boolean {
   return m != null && (m.role === '管理者' || f.userId === m.userId);
+}
+
+/** タイミング差を抑えた文字列比較（合言葉・キーの照合用） */
+export function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
 }

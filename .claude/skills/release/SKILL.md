@@ -50,4 +50,4 @@ description: スタジオ練出欠管理 の新しいバージョンを出す。
    ```bash
    gh release create vX.Y.Z --title "vX.Y.Z" --notes-file <その版の部分を書き出したファイル>
    ```
-7. Release の URL と、グループにそのまま貼れる短いお知らせ（3〜5行）をユーザーに渡す。グループに送るのはユーザーが行う。
+7. Release の URL をユーザーに渡す（グループ向けのお知らせ文は出力しない）。
