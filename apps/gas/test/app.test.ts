@@ -2079,6 +2079,19 @@ describe('Webhookリプレイ対策とGemini読み取り防御', () => {
     // timestamp・webhookEventId が付いていない従来のイベント形式もそのまま処理される
     handleWebhook(t.ctx, { events: [baseText()] });
     expect(t.line.replies).toHaveLength(3);
+
+    // 想定外エラーで失敗したイベントは記録が戻され、同じ webhookEventId の再送で再実行できる
+    const origReply = t.line.reply.bind(t.line);
+    const origAttendance = t.store.attendance.bind(t.store);
+    t.store.attendance = () => {
+      throw new Error('temporary sheet failure');
+    };
+    handleWebhook(t.ctx, { events: [baseText({ webhookEventId: 'ev-retry', timestamp: nowMs })] });
+    expect(t.line.replies).toHaveLength(3);
+    t.store.attendance = origAttendance;
+    t.line.reply = origReply;
+    handleWebhook(t.ctx, { events: [baseText({ webhookEventId: 'ev-retry', timestamp: nowMs })] });
+    expect(t.line.replies).toHaveLength(4);
   });
 
   it('readReservations は他ユーザーが入力した過去予約の studio 名をプロンプトヒントに混ぜない', () => {

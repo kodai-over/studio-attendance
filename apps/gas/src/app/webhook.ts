@@ -73,8 +73,9 @@ export function handleWebhook(ctx: Ctx, body: { events?: LineEvent[] }): void {
     }
     // 同じ webhookEventId の再送・リプレイは二重処理しない
     // （Gemini 読み取り等の長時間処理中に再送が並列到着しても二重実行されないよう、処理開始前に記録する）
+    let evKey = '';
     if (typeof ev.webhookEventId === 'string' && ev.webhookEventId) {
-      const evKey = `whev:${ev.webhookEventId}`;
+      evKey = `whev:${ev.webhookEventId}`;
       if (ctx.kv.get(evKey)) {
         ctx.log('duplicate webhook event ignored', ev.webhookEventId);
         continue;
@@ -85,7 +86,12 @@ export function handleWebhook(ctx: Ctx, body: { events?: LineEvent[] }): void {
       handleEvent(ctx, ev);
     } catch (e) {
       ctx.log('event error', ev.type, e);
-      if (e instanceof UserError && ev.replyToken) safeReply(ctx, ev, [textMsg(e.message)]);
+      if (e instanceof UserError) {
+        if (ev.replyToken) safeReply(ctx, ev, [textMsg(e.message)]);
+      } else if (evKey) {
+        // 想定外エラーで途中失敗した場合は LINE の再送を受け付けられるよう記録を戻す
+        ctx.kv.remove(evKey);
+      }
     }
   }
 }
