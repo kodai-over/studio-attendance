@@ -50,8 +50,10 @@ type Handler<A extends ApiAction> = (ctx: Ctx, me: Member, params: ApiActions[A]
 
 /** LINE内アプリからの呼び出し。userId はIDトークンの検証で得たもの */
 export function handleApi(ctx: Ctx, auth: { userId: string; name?: string; actAs?: unknown }, action: string, params: unknown): unknown {
-  const handler = (handlers as Record<string, Handler<ApiAction>>)[action];
-  if (!handler) throw new UserError(`不明な操作です: ${action}`);
+  const handler = Object.prototype.hasOwnProperty.call(handlers, action)
+    ? (handlers as Record<string, Handler<ApiAction>>)[action]
+    : undefined;
+  if (typeof handler !== 'function') throw new UserError(`不明な操作です: ${action}`);
   // 登録済みならロックを取らない（起動を速くするため）。未登録のときだけロックして登録する
   const real = ctx.store.getMember(auth.userId) ?? ensureMember(ctx, auth.userId, { name: auth.name });
   const { me, acting } = actingAs(ctx, real, auth.actAs);

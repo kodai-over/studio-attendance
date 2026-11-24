@@ -41,15 +41,18 @@ export function callWithFallback(
 }
 
 export class GeminiReader implements ScreenshotReader {
-  constructor(
-    private readonly apiKey: string,
-    private readonly model: string,
-  ) {}
+  readonly #apiKey: string;
+  readonly #model: string;
+
+  constructor(apiKey: string, model: string) {
+    this.#apiKey = apiKey;
+    this.#model = model;
+  }
 
   read(input: ReaderInput, hints: ReaderHints) {
-    if (!this.apiKey) throw new Error('GEMINI_API_KEY が設定されていません');
+    if (!this.#apiKey) throw new Error('GEMINI_API_KEY が設定されていません');
     const res = callWithFallback(
-      [this.model, DEFAULT_GEMINI_MODEL, FALLBACK_GEMINI_MODEL],
+      [this.#model, DEFAULT_GEMINI_MODEL, FALLBACK_GEMINI_MODEL],
       (model) => this.call(model, input, hints),
       (ms) => Utilities.sleep(ms),
       (msg) => console.log(msg),
@@ -68,7 +71,7 @@ export class GeminiReader implements ScreenshotReader {
     const res = UrlFetchApp.fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: 'post',
       contentType: 'application/json',
-      headers: { 'x-goog-api-key': this.apiKey },
+      headers: { 'x-goog-api-key': this.#apiKey },
       payload: JSON.stringify({
         contents: [
           {
