@@ -13,6 +13,7 @@ import {
   confirmCard,
   dayBeforeCard,
   defaultFee,
+  deriveIcsKey,
   DEFAULT_FEES,
   formatFeeValue,
   isHoliday,
@@ -28,11 +29,13 @@ import {
   labelDate,
   looksLikeReservation,
   makePracticeId,
+  maskJoinGuestId,
   nextStatus,
   normalizeReservation,
   parsePostback,
   perPersonFee,
   safeEqual,
+  sha256Hex,
   endAfterStart,
   practiceCancellationMessage,
   practiceListMessage,
@@ -342,6 +345,17 @@ describe('カレンダー', () => {
     expect(ics).toContain('DTSTART:20261021T100000Z');
     expect(ics).toContain('DESCRIPTION:通し\\, 確認\\nhttps://example.com');
     expect(ics.endsWith('\r\n')).toBe(true);
+  });
+  it('ICS: CR/CRLF を含む入力でもプロパティインジェクションされない', () => {
+    const ics = buildIcs(
+      practice({ studio: 'worcle\rX-INJECTED:1', room: 'A\r\nTRIGGER:PT0S', memo: '1行目\r\n2行目\r3行目' }),
+      'https://example.com',
+      new Date('2026-10-01T00:00:00Z'),
+    );
+    expect(ics).not.toContain('\rX-INJECTED:1');
+    expect(ics).not.toContain('\r\nTRIGGER:PT0S');
+    expect(ics).toContain('LOCATION:worcle\\nX-INJECTED:1 A\\nTRIGGER:PT0S');
+    expect(ics).toContain('DESCRIPTION:1行目\\n2行目\\n3行目\\nhttps://example.com');
   });
 });
 
@@ -719,5 +733,29 @@ describe('権限と定数時間比較', () => {
     expect(safeEqual('abc', 'abd')).toBe(false);
     expect(safeEqual('abc', 'ab')).toBe(false);
     expect(safeEqual('', '')).toBe(true);
+  });
+
+  it('sha256Hex・deriveIcsKey・maskJoinGuestId が決定的に導出される', () => {
+    // NIST FIPS 180-4 テストベクタ（単一ブロック・複数ブロック・日本語UTF-8）
+    expect(sha256Hex('abc')).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+    expect(sha256Hex('abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq')).toBe(
+      '248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1',
+    );
+    expect(sha256Hex('ダンス練習:worcle横浜-20261021-1900-A')).toBe(
+      'b6f52b8ee3912cf4225d798e4c3ae62bad6989611d9d46f235a16a942966f0eb',
+    );
+
+    const k1 = deriveIcsKey('p1', 'join-secret');
+    const k2 = deriveIcsKey('p2', 'join-secret');
+    expect(k1).toHaveLength(32);
+    expect(k1).toBe(deriveIcsKey('p1', 'join-secret'));
+    expect(k1).not.toBe('join-secret');
+    expect(k1).not.toBe(k2);
+
+    const m1 = maskJoinGuestId('p1', 'guest:uuid-1');
+    expect(m1).toMatch(/^guest:v:[0-9a-f]{16}$/);
+    expect(m1).toBe(maskJoinGuestId('p1', 'guest:uuid-1'));
+    expect(m1).not.toBe('guest:uuid-1');
+    expect(m1).not.toBe(maskJoinGuestId('p2', 'guest:uuid-1'));
   });
 });

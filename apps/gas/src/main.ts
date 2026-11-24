@@ -1,7 +1,7 @@
 /**
  * Apps Script の入口。build.mjs がここで export した関数を GAS のグローバル関数として公開する。
  */
-import { buildIcs, appLink, safeEqual } from '@studio-attendance/shared';
+import { buildPracticeIcs } from './app/join';
 import type { Ctx, Kv } from './app/ports';
 import { richMenuDefinition } from './app/richmenu';
 import { route } from './app/router';
@@ -128,11 +128,10 @@ export function doPost(e: GoogleAppsScript.Events.DoPost) {
 
 export function doGet(e: GoogleAppsScript.Events.DoGet) {
   if (e.parameter.action === 'ics' && e.parameter.id) {
-    const ctx = makeCtx();
-    const p = ctx.store.getPractice(e.parameter.id);
-    // 練習IDは推測できるので、合言葉が合うときだけ返す
-    if (p && p.joinKey && typeof e.parameter.k === 'string' && safeEqual(e.parameter.k, p.joinKey)) {
-      return ContentService.createTextOutput(buildIcs(p, appLink(ctx.config.appUrl, { p: p.id }), new Date()))
+    // 練習IDは推測できるので、.ics 専用の導出キーが一致する有効な予約情報だけ返す
+    const ics = buildPracticeIcs(makeCtx(), e.parameter.id, e.parameter.k);
+    if (ics) {
+      return ContentService.createTextOutput(ics)
         .setMimeType(ContentService.MimeType.ICAL)
         .downloadAsFile('practice.ics');
     }

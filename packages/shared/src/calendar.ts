@@ -20,7 +20,8 @@ export function googleCalendarUrl(p: Practice, detailUrl: string): string {
   return `https://calendar.google.com/calendar/render?${q}`;
 }
 
-const escapeIcs = (s: string) => s.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/([,;])/g, '\\$1');
+const escapeIcs = (s: string) =>
+  s.replace(/\r\n?/g, '\n').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/([,;])/g, '\\$1');
 
 export function buildIcs(p: Practice, detailUrl: string, now: Date): string {
   const lines = [
