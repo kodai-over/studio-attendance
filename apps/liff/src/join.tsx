@@ -11,31 +11,7 @@ initTheme();
 
 const q = new URLSearchParams(location.search);
 const id = q.get('p') ?? '';
-const KEY_SESSION = `pb:joinKey:${id}`;
-const urlKey = q.get('k') ?? '';
-const key = (() => {
-  if (urlKey) {
-    try {
-      sessionStorage.setItem(KEY_SESSION, urlKey);
-    } catch {
-      /* 保存できなくてもメモリ上の値で動作する */
-    }
-    try {
-      const next = new URLSearchParams(location.search);
-      next.delete('k');
-      const qs = next.toString();
-      history.replaceState(null, '', `${location.pathname}${qs ? `?${qs}` : ''}${location.hash}`);
-    } catch {
-      /* replaceState が使えない環境でも動作する */
-    }
-    return urlKey;
-  }
-  try {
-    return sessionStorage.getItem(KEY_SESSION) ?? '';
-  } catch {
-    return '';
-  }
-})();
+const key = q.get('k') ?? '';
 const NAME_KEY = 'pb:name';
 const pidKey = `pb:join:${id}`;
 

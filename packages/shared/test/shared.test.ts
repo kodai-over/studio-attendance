@@ -736,8 +736,15 @@ describe('権限と定数時間比較', () => {
   });
 
   it('sha256Hex・deriveIcsKey・maskJoinGuestId が決定的に導出される', () => {
-    // NIST FIPS 180-4 テストベクタ
+    // NIST FIPS 180-4 テストベクタ（単一ブロック・複数ブロック・日本語UTF-8）
     expect(sha256Hex('abc')).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+    expect(sha256Hex('abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq')).toBe(
+      '248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1',
+    );
+    expect(sha256Hex('ダンス練習:worcle横浜-20261021-1900-A')).toBe(
+      'b6f52b8ee3912cf4225d798e4c3ae62bad6989611d9d46f235a16a942966f0eb',
+    );
+
     const k1 = deriveIcsKey('p1', 'join-secret');
     const k2 = deriveIcsKey('p2', 'join-secret');
     expect(k1).toHaveLength(32);

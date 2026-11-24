@@ -3,7 +3,7 @@ import { handleApi } from '../src/app/api';
 import { backfillGroupMembers, remindGroups } from '../src/app/practices';
 import { DEFAULT_FEES, TEST_MEMBER_ID, deriveIcsKey, maskJoinGuestId } from '@studio-attendance/shared';
 import { INITIAL_SETTINGS, rowsToSettings, settingsToRows, toCell } from '../src/app/schema';
-import { handleJoin } from '../src/app/join';
+import { buildPracticeIcs, handleJoin } from '../src/app/join';
 import { route } from '../src/app/router';
 import { hourlyJob } from '../src/app/triggers';
 import { handleWebhook, type LineEvent } from '../src/app/webhook';
@@ -1965,19 +1965,43 @@ describe('参加リンク・ICS・ゲスト登録のセキュリティ対策', (
     expect(() => handleJoin(t.ctx, 'answer', { id: pid, key: icsKey, name: '不正', answer: '行く' })).toThrow('参加リンクが無効です');
   });
 
-  it('参加リンクの新規登録は1分あたり5件まで制限され、既存回答の更新は制限されない', () => {
+  it('buildPracticeIcs は有効な予約情報と派生キーのときだけ ICS を返し、旧 joinKey や中止・終了予約は拒否する', () => {
+    const t = setup();
+    const { created } = handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [item], groups: [G1] }) as any;
+    const pid = created[0];
+    const joinKey = t.store.getPractice(pid)!.joinKey;
+    const icsKey = deriveIcsKey(pid, joinKey);
+
+    // 派生キー + 有効な予約情報は取得できる
+    const ics = buildPracticeIcs(t.ctx, pid, icsKey);
+    expect(ics).toContain('BEGIN:VCALENDAR');
+    expect(ics).toContain(`UID:${pid}@practice-board`);
+
+    // 生の joinKey や不正キーは拒否される
+    expect(buildPracticeIcs(t.ctx, pid, joinKey)).toBeNull();
+    expect(buildPracticeIcs(t.ctx, pid, 'invalid')).toBeNull();
+    expect(buildPracticeIcs(t.ctx, 'non-existent', icsKey)).toBeNull();
+
+    // 中止・終了した予約情報は正しい派生キーでも拒否される
+    t.store.p.find((p) => p.id === pid)!.status = '中止';
+    expect(buildPracticeIcs(t.ctx, pid, icsKey)).toBeNull();
+    t.store.p.find((p) => p.id === pid)!.status = '終了';
+    expect(buildPracticeIcs(t.ctx, pid, icsKey)).toBeNull();
+  });
+
+  it('参加リンクの新規登録は1分あたり20件まで制限され、既存回答の更新は制限されない', () => {
     const t = setup();
     const { created } = handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [item], groups: [G1] }) as any;
     const pid = created[0];
     const joinKey = t.store.getPractice(pid)!.joinKey;
 
     let firstGuestId = '';
-    for (let i = 1; i <= 5; i++) {
+    for (let i = 1; i <= 20; i++) {
       const res = handleJoin(t.ctx, 'answer', { id: pid, key: joinKey, name: `ゲスト${i}`, answer: '行く' }) as any;
       if (i === 1) firstGuestId = res.participant;
     }
-    // 6件目の新規登録はレート制限で拒否される
-    expect(() => handleJoin(t.ctx, 'answer', { id: pid, key: joinKey, name: 'ゲスト6', answer: '行く' })).toThrow('短時間に登録が集中しています');
+    // 21件目の新規登録はレート制限で拒否される
+    expect(() => handleJoin(t.ctx, 'answer', { id: pid, key: joinKey, name: 'ゲスト21', answer: '行く' })).toThrow('短時間に登録が集中しています');
 
     // 既存回答の更新は制限されずに通る
     const updated = handleJoin(t.ctx, 'answer', { id: pid, key: joinKey, name: 'ゲスト1', answer: '保留', participant: firstGuestId }) as any;
@@ -1985,7 +2009,7 @@ describe('参加リンク・ICS・ゲスト登録のセキュリティ対策', (
 
     // 1分経過すれば新規登録できるようになる
     t.clock.now = new Date(t.clock.now.getTime() + 60_000);
-    const afterWait = handleJoin(t.ctx, 'answer', { id: pid, key: joinKey, name: 'ゲスト6', answer: '行く' }) as any;
+    const afterWait = handleJoin(t.ctx, 'answer', { id: pid, key: joinKey, name: 'ゲスト21', answer: '行く' }) as any;
     expect(afterWait.participant).toBeTruthy();
   });
 

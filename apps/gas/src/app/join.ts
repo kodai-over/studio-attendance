@@ -1,5 +1,20 @@
 /** 参加リンク（LINEを使わない人の出欠）。合言葉が合う練習への出欠登録だけができる */
-import { goingList, isAnswer, perPersonFee, roomInfo, safeEqual, toJstDate, type Answer, type JoinActions, type JoinView, type Practice } from '@studio-attendance/shared';
+import {
+  appLink,
+  buildIcs,
+  deriveIcsKey,
+  goingList,
+  isActive,
+  isAnswer,
+  perPersonFee,
+  roomInfo,
+  safeEqual,
+  toJstDate,
+  type Answer,
+  type JoinActions,
+  type JoinView,
+  type Practice,
+} from '@studio-attendance/shared';
 import { UserError, type Ctx } from './ports';
 import { recordAnswer } from './practices';
 
@@ -33,9 +48,17 @@ function joinView(ctx: Ctx, p: Practice, participant?: string): JoinView {
 
 /** 1つの予約情報に対して参加リンクから新規登録できるゲスト数の上限 */
 const MAX_JOIN_LINK_GUESTS = 30;
-/** 同一予約情報への参加リンクからの新規登録レート制限（1分間に5件まで。既存回答の更新は制限しない） */
+/** 同一予約情報への参加リンクからの新規登録レート制限（1分間に20件まで。既存回答の更新は制限しない） */
 const JOIN_RATE_WINDOW_SEC = 60;
-const JOIN_RATE_LIMIT = 5;
+const JOIN_RATE_LIMIT = 20;
+
+/** 有効な予約情報かつ .ics 専用の導出キーが一致するときだけ .ics 本文を返す */
+export function buildPracticeIcs(ctx: Ctx, id: unknown, key: unknown): string | null {
+  if (typeof id !== 'string' || !id || typeof key !== 'string' || !key) return null;
+  const p = ctx.store.getPractice(id);
+  if (!p || !isActive(p) || !p.joinKey || !safeEqual(key, deriveIcsKey(p.id, p.joinKey))) return null;
+  return buildIcs(p, appLink(ctx.config.appUrl, { p: p.id }), ctx.now());
+}
 
 export function handleJoin(ctx: Ctx, action: string, params: Record<string, unknown>): unknown {
   if (action === 'get') {
