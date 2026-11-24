@@ -2181,26 +2181,33 @@ describe('Medium セキュリティ対策（閲覧絞り込み・権限・入力
     expect(g2Res[0].kind).toBe('duplicate');
   });
 
-  it('appendMemo は予約者・管理者のみ実行でき、一般閲覧者は拒否される', () => {
+  it('appendMemo は予約者・管理者のみ実行でき、一般閲覧者は拒否され、メモは1000文字に制限される', () => {
     const t = setup();
     inG1(t, 'Uviewer', '閲覧者');
-    const { created } = handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [item], groups: [G1] }) as any;
+    const { created } = handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [{ ...item, memo: 'あ'.repeat(995) }], groups: [G1] }) as any;
     const pid = created[0];
 
     expect(() => handleApi(t.ctx, { userId: 'Uviewer' }, 'appendMemo', { id: pid, text: '勝手な追記' })).toThrow('予約者か管理者だけが操作できます');
     const updated = handleApi(t.ctx, { userId: BOOKER }, 'appendMemo', { id: pid, text: '予約者の追記' }) as any;
-    expect(updated.practice.memo).toContain('予約者の追記');
+    expect(updated.practice.memo.length).toBeLessThanOrEqual(1000);
   });
 
-  it('createPractices は31件以上の一括登録を拒否し、postFeedback は1分5件で制限される', () => {
+  it('createPractices / classify は31件以上を拒否し、room長は50文字に制限され、postFeedback は1分5件で制限され翌分には回復する', () => {
     const t = setup();
     const many = Array.from({ length: 31 }, (_, i) => ({ ...item, date: `2026-11-${String((i % 28) + 1).padStart(2, '0')}`, start: `${String(10 + (i % 10)).padStart(2, '0')}:00`, end: `${String(11 + (i % 10)).padStart(2, '0')}:00` }));
     expect(() => handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: many, groups: [] })).toThrow('一度に登録できる予約情報は30件までです');
+    expect(() => handleApi(t.ctx, { userId: BOOKER }, 'classify', { reservations: many })).toThrow('一度に登録できる予約情報は30件までです');
+
+    const { created } = handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [item], groups: [G1] }) as any;
+    const patched = handleApi(t.ctx, { userId: BOOKER }, 'updatePractice', { id: created[0], patch: { room: 'R'.repeat(80) } }) as any;
+    expect(patched.practice.room).toHaveLength(50);
 
     for (let i = 1; i <= 5; i++) {
       handleApi(t.ctx, { userId: BOOKER }, 'postFeedback', { text: `要望${i}` });
     }
     expect(() => handleApi(t.ctx, { userId: BOOKER }, 'postFeedback', { text: '要望6' })).toThrow('短時間に送信が集中しています');
+    t.clock.now = new Date(t.clock.now.getTime() + 60_000);
+    expect(() => handleApi(t.ctx, { userId: BOOKER }, 'postFeedback', { text: '要望6' })).not.toThrow();
   });
 
   it('onJoin はグループ登録上限（50件）を超えると自動登録しない', () => {

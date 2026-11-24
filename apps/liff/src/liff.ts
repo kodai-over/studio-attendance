@@ -173,19 +173,26 @@ export function closeApp() {
   if (!MOCK && liff.isInClient()) liff.closeWindow();
 }
 
-/** ブラウザ・ホーム画面のアプリでログアウトする。この端末に残したアプリ用キャッシュ（テーマ除く）も消す */
+/** ログアウト時に消すべきログイン本人のキャッシュを消す（テーマ設定・参加リンクの回答記録は残す） */
+export function clearAuthStorage(local: Storage, session: Storage) {
+  const keepLocal = new Set(['pb:theme', LOGGED_OUT_KEY, 'pb:name']);
+  for (let i = local.length - 1; i >= 0; i--) {
+    const k = local.key(i);
+    if (k && k.startsWith('pb:') && !keepLocal.has(k) && !k.startsWith('pb:join:')) {
+      local.removeItem(k);
+    }
+  }
+  for (let i = session.length - 1; i >= 0; i--) {
+    const k = session.key(i);
+    if (k && k.startsWith('pb:')) session.removeItem(k);
+  }
+  local.setItem(LOGGED_OUT_KEY, '1');
+}
+
+/** ブラウザ・ホーム画面のアプリでログアウトする。この端末に残したアプリ用キャッシュ（テーマ・参加リンク記録除く）も消す */
 export function logoutApp() {
   try {
-    const keepLocal = new Set(['pb:theme', LOGGED_OUT_KEY]);
-    for (let i = localStorage.length - 1; i >= 0; i--) {
-      const k = localStorage.key(i);
-      if (k && k.startsWith('pb:') && !keepLocal.has(k)) localStorage.removeItem(k);
-    }
-    for (let i = sessionStorage.length - 1; i >= 0; i--) {
-      const k = sessionStorage.key(i);
-      if (k && k.startsWith('pb:')) sessionStorage.removeItem(k);
-    }
-    localStorage.setItem(LOGGED_OUT_KEY, '1');
+    clearAuthStorage(localStorage, sessionStorage);
     if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   } catch {
     /* 消せなくてもログアウトは続ける */

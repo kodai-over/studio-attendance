@@ -364,7 +364,9 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
 
   classify(ctx, me, { reservations }) {
     if (!canRegister(me)) throw new UserError('グループに所属すると予約情報を登録できます');
-    return classifyFor(visiblePractices(ctx, me), me, (reservations ?? []).slice(0, 30));
+    const list = reservations ?? [];
+    if (list.length > 30) throw new UserError('一度に登録できる予約情報は30件までです');
+    return classifyFor(visiblePractices(ctx, me), me, list);
   },
 
   createPractices(ctx, me, { items, groups, draftId }) {
