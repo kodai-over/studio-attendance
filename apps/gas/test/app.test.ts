@@ -1777,7 +1777,7 @@ describe('グループ所属と外部ユーザーのアクセス制限', () => {
     expect(res.recruited).toEqual([R]);
   });
 
-  it('非管理者には所属グループのみ返し、管理者は全グループを取得できる', () => {
+  it('非管理者には所属グループのみ返し、管理者は全グループを取得できる。閲覧可能な予約情報の groupNames は募集済グループ名を正しく解決する', () => {
     const t = setup();
     t.store.s.groups.push({ id: G2, name: 'チームB' });
     inG1(t, 'Um1', 'メンバー1');
@@ -1785,18 +1785,30 @@ describe('グループ所属と外部ユーザーのアクセス制限', () => {
     expect(memberMe.groups.map((g: any) => g.id)).toEqual([G1]);
     expect(memberMe.settings.groups.map((g: any) => g.id)).toEqual([G1]);
 
+    // 管理者が G1・G2 の両方に募集した練習を G1 のみのメンバーが見ても、groupNames に ID ではなくグループ名が出る
+    const { created } = handleApi(t.ctx, { userId: ADMIN }, 'createPractices', { items: [item], groups: [G1, G2] }) as any;
+    const view = handleApi(t.ctx, { userId: 'Um1' }, 'getPractice', { id: created[0] }) as any;
+    expect(view.groupNames).toEqual(['チームA', 'チームB']);
+
     const adminMe = handleApi(t.ctx, { userId: ADMIN }, 'me', {}) as any;
     expect(adminMe.groups.map((g: any) => g.id)).toEqual([G1, G2]);
   });
 
-  it('所属メンバーでも所属外グループへの募集作成・追加募集は拒否される', () => {
+  it('所属メンバーでも所属外グループが1つでも混ざった募集作成・追加募集はまとめて拒否される', () => {
     const t = setup();
     t.store.s.groups.push({ id: G2, name: 'チームB' });
     inG1(t, 'Um1', 'メンバー1');
 
     expect(() => handleApi(t.ctx, { userId: 'Um1' }, 'createPractices', { items: [item], groups: [G2] })).toThrow('所属しているグループにだけ送れます');
+    // 所属グループと所属外グループが混在している場合も1件も作成せずまとめて拒否する
     expect(() =>
-      handleApi(t.ctx, { userId: 'Um1' }, 'createPractices', { items: [{ ...item, groups: [G2] }], groups: [] }),
+      handleApi(t.ctx, { userId: 'Um1' }, 'createPractices', {
+        items: [
+          { ...item, date: '2026-10-30', groups: [G1] },
+          { ...item, date: '2026-10-31', groups: [G1, G2] },
+        ],
+        groups: [],
+      }),
     ).toThrow('所属しているグループにだけ送れます');
     expect(t.store.p).toHaveLength(0);
     expect(t.line.pushes).toHaveLength(0);
@@ -1866,7 +1878,8 @@ describe('グループ所属と外部ユーザーのアクセス制限', () => {
     expect(newRoomKey).toBeTruthy();
     expect(newRoomKey).not.toBe('old-room-key');
 
-    handleApi(t.ctx, { userId: 'Uleft', name: '退出者' }, 'openedFromGroup', { group: R, key: 'old-room-key' });
+    const opened = handleApi(t.ctx, { userId: 'Uleft', name: '退出者' }, 'openedFromGroup', { group: R, key: 'old-room-key' });
+    expect(opened).toBeNull();
     expect(t.store.getMember('Uleft')?.groups).toEqual([]);
 
     // 設定にない（Bot が入っていない）グループ/トークの memberLeft もエラーなく無視される
