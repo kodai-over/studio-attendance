@@ -45,6 +45,8 @@ interface Source {
 
 export interface LineEvent {
   type: string;
+  webhookEventId?: string;
+  timestamp?: number;
   replyToken?: string;
   source: Source;
   message?: { id: string; type: string; text?: string; imageSet?: { id: string; index: number; total: number } };
@@ -54,13 +56,42 @@ export interface LineEvent {
   left?: { members: { type: string; userId?: string }[] };
 }
 
+/** Webhook イベントの許容時刻ずれ（5分）。リプレイ攻撃を防ぐ */
+const WEBHOOK_MAX_AGE_MS = 5 * 60 * 1000;
+/** 処理済み webhookEventId の保持期間（許容時刻ずれより長く10分） */
+const WEBHOOK_EVENT_TTL_SEC = 10 * 60;
+/** Webhook テキストメッセージの読み取り上限文字数 */
+const MAX_WEBHOOK_TEXT_LEN = 5000;
+
 export function handleWebhook(ctx: Ctx, body: { events?: LineEvent[] }): void {
+  const nowMs = ctx.now().getTime();
   for (const ev of body.events ?? []) {
+    // タイムスタンプが古すぎる・未来すぎるイベントは無視する（リプレイ対策）
+    if (typeof ev.timestamp === 'number' && Math.abs(nowMs - ev.timestamp) > WEBHOOK_MAX_AGE_MS) {
+      ctx.log('stale webhook event ignored', ev.type, ev.timestamp);
+      continue;
+    }
+    // 同じ webhookEventId の再送・リプレイは二重処理しない
+    // （Gemini 読み取り等の長時間処理中に再送が並列到着しても二重実行されないよう、処理開始前に記録する）
+    let evKey = '';
+    if (typeof ev.webhookEventId === 'string' && ev.webhookEventId) {
+      evKey = `whev:${ev.webhookEventId}`;
+      if (ctx.kv.get(evKey)) {
+        ctx.log('duplicate webhook event ignored', ev.webhookEventId);
+        continue;
+      }
+      ctx.kv.put(evKey, '1', WEBHOOK_EVENT_TTL_SEC);
+    }
     try {
       handleEvent(ctx, ev);
     } catch (e) {
       ctx.log('event error', ev.type, e);
-      if (e instanceof UserError && ev.replyToken) safeReply(ctx, ev, [textMsg(e.message)]);
+      if (e instanceof UserError) {
+        if (ev.replyToken) safeReply(ctx, ev, [textMsg(e.message)]);
+      } else if (evKey) {
+        // 想定外エラーで途中失敗した場合は LINE の再送を受け付けられるよう記録を戻す
+        ctx.kv.remove(evKey);
+      }
     }
   }
 }
@@ -129,7 +160,7 @@ function safeReply(ctx: Ctx, ev: LineEvent, messages: LineMessage[]): boolean {
 // ---------------------------------------------------------------- テキスト
 
 function onText(ctx: Ctx, ev: LineEvent): void {
-  const text = (ev.message?.text ?? '').trim();
+  const text = (ev.message?.text ?? '').trim().slice(0, MAX_WEBHOOK_TEXT_LEN);
   // 「予約」の一語はふだんの会話でも出やすいので、反応するのは「予約情報」と以前からの「練習」だけ
   if (text === '予約情報' || text === '練習') {
     const groupId = ev.source.type === 'user' ? undefined : chatId(ev.source);
@@ -196,8 +227,12 @@ function registerFrom(ctx: Ctx, ev: LineEvent, userId: string, src: { messageIds
   let raws: RawReservation[];
   try {
     const images = (src.messageIds ?? []).map((id) => ctx.line.content(id));
-    raws = readReservations(ctx, { images, text: src.text });
+    raws = readReservations(ctx, { images, text: src.text }, userId);
   } catch (e) {
+    if (e instanceof UserError) {
+      sendToUser(ctx, ev, userId, [textMsg(e.message)]);
+      return;
+    }
     ctx.log('read error', e);
     sendToUser(ctx, ev, userId, [
       textMsg(`${what}の読み取りでエラーが起きました。時間をおいてもう一度送るか、アプリの「募集」の右上の＋から入力してください。\n${ctx.config.appUrl}`),

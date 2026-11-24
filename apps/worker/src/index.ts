@@ -35,10 +35,19 @@ export async function relayPayload(body: string, secret: string, ts: number): Pr
   return JSON.stringify({ kind: 'line', ts, body, mac });
 }
 
+const MAX_WEBHOOK_BODY_BYTES = 256 * 1024;
+
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     if (req.method !== 'POST') return new Response('ok');
+    const contentLength = Number(req.headers.get('content-length') ?? '0');
+    if (contentLength > MAX_WEBHOOK_BODY_BYTES) {
+      return new Response('payload too large', { status: 413 });
+    }
     const body = await req.text();
+    if (enc.encode(body).byteLength > MAX_WEBHOOK_BODY_BYTES) {
+      return new Response('payload too large', { status: 413 });
+    }
     if (!(await verifyLineSignature(body, req.headers.get('x-line-signature'), env.LINE_CHANNEL_SECRET))) {
       return new Response('invalid signature', { status: 401 });
     }

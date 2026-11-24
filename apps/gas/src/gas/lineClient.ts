@@ -61,6 +61,8 @@ export class LineClient implements LineApi {
     const res = this.fetch('get', `${DATA_API}/message/${messageId}/content`);
     if (!res) throw new Error('画像を取得できませんでした');
     const blob = res.getBlob();
-    return { mimeType: blob.getContentType() || 'image/jpeg', data: Utilities.base64Encode(blob.getBytes()) };
+    const rawMime = (blob.getContentType() || '').split(';')[0].trim().toLowerCase();
+    const mimeType = !rawMime || rawMime === 'application/octet-stream' ? 'image/jpeg' : rawMime;
+    return { mimeType, data: Utilities.base64Encode(blob.getBytes()) };
   }
 }

@@ -184,14 +184,37 @@ export function backfillGroupMembers(ctx: Ctx): number {
 // ---------------------------------------------------------------- 下書き（確認カード）
 
 const DRAFT_TTL = 6 * 60 * 60;
+const ALLOWED_IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif']);
+/** 画像1枚あたりの base64 上限（約10.5MB バイナリ相当。Gemini インライン上限約20MBに収まる余裕値） */
+const MAX_IMAGE_BASE64_LEN = 14 * 1024 * 1024;
+/** ユーザーごとの読み取りレート制限（1分間に10回まで。ロックなしのベストエフォート抑止） */
+const READ_RATE_WINDOW_SEC = 60;
+const READ_RATE_LIMIT = 10;
 
-/** スクショか文章から予約を読み取る。スタジオ・部屋の一覧を手がかりとして渡す */
-export function readReservations(ctx: Ctx, input: ReaderInput): RawReservation[] {
+/** スクショか文章から予約を読み取る。設定済みのスタジオ・部屋一覧だけを手がかりとして渡す */
+export function readReservations(ctx: Ctx, input: ReaderInput, userId?: string): RawReservation[] {
+  const images = input.images.map((img) => {
+    const mime = typeof img?.mimeType === 'string' ? img.mimeType.split(';')[0].trim().toLowerCase() : '';
+    if (!ALLOWED_IMAGE_MIMES.has(mime)) {
+      throw new UserError('対応していない形式のスクショです');
+    }
+    if (typeof img.data !== 'string' || !img.data || img.data.length > MAX_IMAGE_BASE64_LEN) {
+      throw new UserError('スクショの容量が大きすぎます。画質を下げて送り直すか、アプリから入力してください');
+    }
+    return { mimeType: mime, data: img.data };
+  });
+  if (userId) {
+    // 厳密な上限ではなくスパム・課金乱用抑止のためのベストエフォート制限
+    const rateKey = `readrate:${userId}:${Math.floor(ctx.now().getTime() / (READ_RATE_WINDOW_SEC * 1000))}`;
+    const count = Number(ctx.kv.get(rateKey) ?? '0');
+    if (count >= READ_RATE_LIMIT) {
+      throw new UserError('短時間に読み取りが集中しています。少し時間をおいてお試しください');
+    }
+    ctx.kv.put(rateKey, String(count + 1), READ_RATE_WINDOW_SEC);
+  }
   const settings = ctx.store.settings();
-  const known = new Set(settings.studios.map((s) => s.name));
-  const others = [...new Set(ctx.store.practices().map((p) => p.studio))].filter((n) => n && !known.has(n));
-  const studios = [...settings.studios, ...others.map((name) => ({ name, aliases: [], rooms: [] }))];
-  return ctx.reader.read(input, { today: toJstDate(ctx.now()), studios });
+  // 他ユーザーが自由入力した過去予約の studio 名をプロンプトに混ぜない（間接プロンプトインジェクション防止）
+  return ctx.reader.read({ ...input, images }, { today: toJstDate(ctx.now()), studios: settings.studios });
 }
 
 /**
