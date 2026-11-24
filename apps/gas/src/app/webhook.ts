@@ -30,6 +30,7 @@ import {
   removeDraft,
   rotateGroupKey,
   saveDraft,
+  syncMemberGroupsFromLine,
   upcoming,
 } from './practices';
 import { goneKey } from './triggers';
@@ -89,7 +90,9 @@ function handleEvent(ctx: Ctx, ev: LineEvent): void {
     case 'memberLeft': {
       const gid = chatId(ev.source);
       eachUser(ctx, ev.left?.members, (u) => forgetGroupMember(ctx, gid, u));
-      if (gid && (ev.left?.members?.length ?? 0) > 0) rotateGroupKey(ctx, gid);
+      // 複数人トーク（R 始まり）は LINE API で実在籍を確認できないため、退出時に合言葉を再発行して旧URLを無効化する
+      // （グループ C 始まりは openedFromGroup で実在籍確認するため、既存カードが壊れないよう合言葉は維持する）
+      if (gid && !gid.startsWith('C') && (ev.left?.members?.length ?? 0) > 0) rotateGroupKey(ctx, gid);
       return;
     }
     case 'follow':
@@ -155,7 +158,7 @@ function onText(ctx: Ctx, ev: LineEvent): void {
 
 // ---------------------------------------------------------------- スクショ・文章からの登録
 
-const CANNOT_REGISTER = '予約情報を登録できません。管理者に確認してください。';
+const CANNOT_REGISTER = 'グループに所属すると予約情報を登録できます。管理者に確認してください。';
 
 function onImage(ctx: Ctx, ev: LineEvent): void {
   if (ev.source.type !== 'user' || !ev.source.userId || !ev.message) return;
@@ -166,7 +169,8 @@ function onImage(ctx: Ctx, ev: LineEvent): void {
     if (set.index !== 1) return;
     ctx.log('too many screenshots', set.total);
     // 登録できない人には、分けて送り直させずに、登録できないことを先に伝える
-    const text = canRegister(ensureMember(ctx, userId)) ? `スクショは${MAX_SCREENSHOTS}枚までにしてください。分けて送ってください。` : CANNOT_REGISTER;
+    const member = syncMemberGroupsFromLine(ctx, ensureMember(ctx, userId));
+    const text = canRegister(member) ? `スクショは${MAX_SCREENSHOTS}枚までにしてください。分けて送ってください。` : CANNOT_REGISTER;
     safeReply(ctx, ev, [textMsg(text)]);
     return;
   }
@@ -177,7 +181,7 @@ function onImage(ctx: Ctx, ev: LineEvent): void {
 
 /** スクショか文章から予約を読み取り、確認カードを返す */
 function registerFrom(ctx: Ctx, ev: LineEvent, userId: string, src: { messageIds?: string[]; text?: string }): void {
-  const member = ensureMember(ctx, userId);
+  const member = syncMemberGroupsFromLine(ctx, ensureMember(ctx, userId));
   if (!canRegister(member)) {
     safeReply(ctx, ev, [textMsg(CANNOT_REGISTER)]);
     return;

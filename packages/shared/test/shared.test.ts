@@ -6,6 +6,7 @@ import {
   roomInfo,
   buildIcs,
   canNotifyPracticeCancellation,
+  canRegister,
   cancelWarningAt,
   computeCancelDeadline,
   classifyReservations,
@@ -31,6 +32,7 @@ import {
   normalizeReservation,
   parsePostback,
   perPersonFee,
+  safeEqual,
   endAfterStart,
   practiceCancellationMessage,
   practiceListMessage,
@@ -700,5 +702,22 @@ describe('LINE のカードの形（送れない形になっていないか）',
       practiceListMessage([{ practice: p, going: 2 }], appUrl, group),
     ];
     expect(cards.flatMap((c) => badBaseline(c))).toEqual([]);
+  });
+});
+
+describe('権限と定数時間比較', () => {
+  it('canRegister は所属ありの一般・予約者・管理者のみ許可し、未所属の一般や null を拒否する', () => {
+    expect(canRegister(null)).toBe(false);
+    expect(canRegister({ userId: 'U1', name: '未所属', role: '一般', defaultGroups: [], groups: [] })).toBe(false);
+    expect(canRegister({ userId: 'U2', name: '所属済', role: '一般', defaultGroups: [], groups: ['C1'] })).toBe(true);
+    expect(canRegister({ userId: 'U3', name: '予約者', role: '予約者', defaultGroups: [], groups: [] })).toBe(true);
+    expect(canRegister({ userId: 'U4', name: '管理者', role: '管理者', defaultGroups: [], groups: [] })).toBe(true);
+  });
+
+  it('safeEqual は完全一致のときだけ true を返す', () => {
+    expect(safeEqual('abc', 'abc')).toBe(true);
+    expect(safeEqual('abc', 'abd')).toBe(false);
+    expect(safeEqual('abc', 'ab')).toBe(false);
+    expect(safeEqual('', '')).toBe(true);
   });
 });

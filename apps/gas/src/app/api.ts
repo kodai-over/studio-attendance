@@ -36,7 +36,7 @@ import {
   type StudioDef,
 } from '@studio-attendance/shared';
 import { UserError, type Ctx, type RawReservation } from './ports';
-import { buildDraft, canRemindTo, classifyFor, createPractices, ensureMember, inGroupKey, loadDraft, noteGroupMember, readReservations, recordAnswer, refreshStatus, remindRecruitMany, removeDraft, sendPracticeCancellation, sendRecruit, withDefaultFee } from './practices';
+import { buildDraft, canRemindTo, classifyFor, createPractices, ensureMember, inGroupKey, loadDraft, noteGroupMember, readReservations, recordAnswer, refreshStatus, remindRecruitMany, removeDraft, sendPracticeCancellation, sendRecruit, syncMemberGroupsFromLine, withDefaultFee } from './practices';
 
 /** 誰として操作しているか（管理者の見え方の切り替え） */
 interface Acting {
@@ -212,7 +212,7 @@ const cleanName = (s: unknown, max = 30) => {
 /** アプリに渡す設定。グループの合言葉は渡さない。非管理者には本人が所属する（またはふだんの送り先の）グループだけを返す */
 const publicSettings = (s: Settings, me?: Member): Settings => {
   const visible =
-    !me || isAdmin(me)
+    !me || isAdmin(me) || me.userId === TEST_MEMBER_ID
       ? s.groups
       : s.groups.filter((g) => me.groups.includes(g.id) || me.defaultGroups.includes(g.id));
   return { ...s, groups: visible.map(({ id, name }) => ({ id, name })) };
@@ -222,6 +222,7 @@ const publicSettings = (s: Settings, me?: Member): Settings => {
 
 const handlers: { [A in ApiAction]: Handler<A> } = {
   me(ctx, me, _params, acting = { actAs: 'self', canSwitch: isAdmin(me), realUserId: me.userId }) {
+    if (acting.actAs === 'self') me = syncMemberGroupsFromLine(ctx, me);
     const pub = publicSettings(ctx.store.settings(), me);
     return { member: me, groups: pub.groups, settings: pub, actAs: acting.actAs, canSwitch: acting.canSwitch };
   },
@@ -239,6 +240,7 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
       const saved = ctx.store.getMember(me.userId);
       if (saved && me.userId === (acting?.realUserId ?? me.userId)) me = { ...me, groups: saved.groups };
     }
+    if (!acting || acting.actAs === 'self') me = syncMemberGroupsFromLine(ctx, me);
     return { me: handlers.me(ctx, me, {}, acting), practices: handlers.listPractices(ctx, me, {}, acting) };
   },
 
@@ -320,7 +322,7 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
   },
 
   parseReservations(ctx, me, { images, text }) {
-    if (!canRegister(me)) throw new UserError('予約情報を登録できません');
+    if (!canRegister(me)) throw new UserError('グループに所属すると予約情報を登録できます');
     const imgs = Array.isArray(images) ? images : [];
     const t = typeof text === 'string' ? text.trim().slice(0, 5000) : '';
     if (imgs.length === 0 && !t) throw new UserError('スクショを選ぶか、予約内容の文章を貼り付けてください');
@@ -346,7 +348,7 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
   },
 
   classify(ctx, me, { reservations }) {
-    if (!canRegister(me)) throw new UserError('予約情報を登録できません');
+    if (!canRegister(me)) throw new UserError('グループに所属すると予約情報を登録できます');
     return classifyFor(ctx.store.practices(), me, reservations ?? []);
   },
 
@@ -407,7 +409,7 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
     // 同じグループに二重に流さない
     const targets = [...new Set(groups ?? [])].filter((g) => known.has(g) && !p.groups.includes(g));
     if (targets.length === 0) throw new UserError('募集を送るグループを選んでください');
-    if (targets.some((g) => !canRemindTo(ctx, me, p, g))) throw new UserError('あなたが入っているグループにだけ送れます。');
+    if (targets.some((g) => !canRemindTo(ctx, me, p, g))) throw new UserError('所属しているグループにだけ送れます');
     const sent = sendRecruit(ctx, [p], targets, memberNameOf(ctx, p.booker));
     if (sent.length === 0) throw new UserError('募集を送れませんでした。時間をおいてもう一度お試しください');
     ctx.withLock(() => {
@@ -474,7 +476,7 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
   },
 
   postFeedback(ctx, me, { text }) {
-    if (!canRegister(me)) throw new UserError('要望を送れません');
+    if (!canRegister(me)) throw new UserError('グループに所属すると要望を送れます');
     const t = typeof text === 'string' ? text.trim().slice(0, 1000) : '';
     if (!t) throw new UserError('要望を入力してください');
     ctx.withLock(() =>

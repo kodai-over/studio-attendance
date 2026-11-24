@@ -65,14 +65,16 @@ describe('スクショから募集まで', () => {
 
   it('グループ所属の一般メンバーはスクショから登録できる。未所属の外部ユーザーは登録できない', () => {
     t.reader.result = [reservation];
+    t.line.groupMembers[G1] = ['Umember'];
     t.line.profiles['Ustranger'] = 'はじめて';
     handleWebhook(t.ctx, { events: [imageEvent('Ustranger')] });
     expect(t.store.m.find((m) => m.userId === 'Ustranger')).toMatchObject({ name: 'はじめて', role: '一般', groups: [] });
-    expect(t.line.lastReplyText()).toContain('予約情報を登録できません');
+    expect(t.line.lastReplyText()).toContain('グループに所属すると予約情報を登録できます');
     expect(t.reader.calls).toHaveLength(0);
 
-    inG1(t, 'Umember', 'メンバー');
-    handleWebhook(t.ctx, { events: [imageEvent('Umember')] });
+    // 所属を付けたあとは同じユーザーでも登録できる
+    t.store.m.find((m) => m.userId === 'Ustranger')!.groups = [G1];
+    handleWebhook(t.ctx, { events: [imageEvent('Ustranger')] });
     const card = t.line.lastReplyText();
     expect(card).toContain('予約内容の確認');
     // グループが1つでも、アプリで内容を確かめてから募集する
@@ -635,7 +637,7 @@ describe('出欠', () => {
     const id = created[0];
     expect(() => handleApi(t.ctx, { userId: 'U1', name: 'いち' }, 'recruitPractice', { id, groups: [G1] })).toThrow('予約者か管理者');
     // 所属していないグループには送れない
-    expect(() => handleApi(t.ctx, { userId: 'U9' }, 'recruitPractice', { id, groups: ['C2'] })).toThrow('入っているグループにだけ');
+    expect(() => handleApi(t.ctx, { userId: 'U9' }, 'recruitPractice', { id, groups: ['C2'] })).toThrow('所属しているグループにだけ送れます');
     const pushes = t.line.pushes.length;
     const v = handleApi(t.ctx, { userId: 'U9' }, 'recruitPractice', { id, groups: [G1] }) as any;
     expect(v.groupNames).toEqual(['チームA']);
@@ -675,7 +677,7 @@ describe('出欠', () => {
 describe('改善要望', () => {
   it('グループ所属メンバーは投稿できるが、未所属ユーザーは投稿できず、一覧を見て状態とコメントを付けられるのは管理者だけ', () => {
     const t = setup();
-    expect(() => handleApi(t.ctx, { userId: 'Ustranger', name: '部外者' }, 'postFeedback', { text: 'スパム' })).toThrow('要望を送れません');
+    expect(() => handleApi(t.ctx, { userId: 'Ustranger', name: '部外者' }, 'postFeedback', { text: 'スパム' })).toThrow('グループに所属すると要望を送れます');
     inG1(t, 'U1', 'いち');
     expect(handleApi(t.ctx, { userId: 'U1', name: 'いち' }, 'postFeedback', { text: '  前日にリマインドがほしい  ' })).toEqual([]);
     expect(handleApi(t.ctx, { userId: BOOKER }, 'listFeedback', {})).toEqual([]);
@@ -1634,9 +1636,6 @@ describe('管理者の見え方の切り替え', () => {
   it('確認用の「admin」で登録し、自分を一般メンバーにすると、参加者からの見え方になる', () => {
     const t = setup();
     t.store.m.find((m) => m.userId === ADMIN)!.groups = [];
-    // 確認用アカウントをグループ1に所属させてから募集する
-    as(t, ADMIN, 'test', 'me');
-    as(t, ADMIN, 'self', 'updateMember', { userId: TEST_MEMBER_ID, patch: { groups: [G1] } });
     const { created } = as(t, ADMIN, 'test', 'createPractices', { items: [item], groups: [G1] });
     expect(t.store.getPractice(created[0])?.booker).toBe(TEST_MEMBER_ID);
     // 確認用アカウントは予約者。管理操作はできない
@@ -1706,12 +1705,31 @@ describe('グループ所属と外部ユーザーのアクセス制限', () => {
     expect(home.me.groups).toEqual([]);
     expect(home.practices).toEqual([]);
 
-    expect(() => handleApi(t.ctx, { userId: 'Uoutsider' }, 'parseReservations', { text: '10/30 19:00-21:00 worcle' })).toThrow('登録できません');
-    expect(() => handleApi(t.ctx, { userId: 'Uoutsider' }, 'classify', { reservations: [reservation] })).toThrow('登録できません');
-    expect(() => handleApi(t.ctx, { userId: 'Uoutsider' }, 'createPractices', { items: [item], groups: [G1] })).toThrow('登録できません');
-    expect(() => handleApi(t.ctx, { userId: 'Uoutsider' }, 'postFeedback', { text: 'テスト' })).toThrow('要望を送れません');
+    expect(() => handleApi(t.ctx, { userId: 'Uoutsider' }, 'parseReservations', { text: '10/30 19:00-21:00 worcle' })).toThrow('グループに所属すると予約情報を登録できます');
+    expect(() => handleApi(t.ctx, { userId: 'Uoutsider' }, 'classify', { reservations: [reservation] })).toThrow('グループに所属すると予約情報を登録できます');
+    expect(() => handleApi(t.ctx, { userId: 'Uoutsider' }, 'createPractices', { items: [item], groups: [G1] })).toThrow('グループに所属すると予約情報を登録できます');
+    expect(() => handleApi(t.ctx, { userId: 'Uoutsider' }, 'postFeedback', { text: 'テスト' })).toThrow('グループに所属すると要望を送れます');
     expect(t.line.pushes).toHaveLength(0);
     expect(t.reader.calls).toHaveLength(0);
+  });
+
+  it('所属が空の既存一般メンバーでも、LINE側で実在籍が確認できれば自動で所属補完され登録・閲覧できる', () => {
+    const t = setup();
+    t.store.m.push({ userId: 'Uexisting', name: '既存一般', role: '一般', defaultGroups: [], groups: [] });
+    t.line.groupMembers[G1] = ['Uexisting'];
+    t.reader.result = [reservation];
+
+    // DM スクショ送信時に LINE 実在籍から自動補完され登録できる
+    handleWebhook(t.ctx, { events: [imageEvent('Uexisting')] });
+    expect(t.store.getMember('Uexisting')?.groups).toEqual([G1]);
+    expect(t.line.lastReplyText()).toContain('予約内容の確認');
+
+    // アプリの home / me でも同様に自動補完される
+    t.store.m.push({ userId: 'Uexisting2', name: '既存一般2', role: '一般', defaultGroups: [], groups: [] });
+    t.line.groupMembers[G1].push('Uexisting2');
+    const home = handleApi(t.ctx, { userId: 'Uexisting2' }, 'home', {}) as any;
+    expect(home.me.member.groups).toEqual([G1]);
+    expect(home.me.groups.map((g: any) => g.id)).toEqual([G1]);
   });
 
   it('非管理者には所属グループのみ返し、管理者は全グループを取得できる', () => {
@@ -1731,15 +1749,15 @@ describe('グループ所属と外部ユーザーのアクセス制限', () => {
     t.store.s.groups.push({ id: G2, name: 'チームB' });
     inG1(t, 'Um1', 'メンバー1');
 
-    expect(() => handleApi(t.ctx, { userId: 'Um1' }, 'createPractices', { items: [item], groups: [G2] })).toThrow('入っているグループにだけ');
+    expect(() => handleApi(t.ctx, { userId: 'Um1' }, 'createPractices', { items: [item], groups: [G2] })).toThrow('所属しているグループにだけ送れます');
     expect(() =>
       handleApi(t.ctx, { userId: 'Um1' }, 'createPractices', { items: [{ ...item, groups: [G2] }], groups: [] }),
-    ).toThrow('入っているグループにだけ');
+    ).toThrow('所属しているグループにだけ送れます');
     expect(t.store.p).toHaveLength(0);
     expect(t.line.pushes).toHaveLength(0);
 
     const { created } = handleApi(t.ctx, { userId: 'Um1' }, 'createPractices', { items: [item], groups: [G1] }) as any;
-    expect(() => handleApi(t.ctx, { userId: 'Um1' }, 'recruitPractice', { id: created[0], groups: [G2] })).toThrow('入っているグループにだけ');
+    expect(() => handleApi(t.ctx, { userId: 'Um1' }, 'recruitPractice', { id: created[0], groups: [G2] })).toThrow('所属しているグループにだけ送れます');
     expect(t.line.pushes.map((p) => p.to)).toEqual([G1]);
   });
 
@@ -1753,10 +1771,10 @@ describe('グループ所属と外部ユーザーのアクセス制限', () => {
     expect(t.store.getMember(BOOKER)?.groups).toEqual([]);
     expect(t.store.getMember(BOOKER)?.defaultGroups).toEqual([]);
 
-    expect(() => handleApi(t.ctx, { userId: BOOKER }, 'recruitPractice', { id: created[0], groups: [G1] })).toThrow('入っているグループにだけ');
+    expect(() => handleApi(t.ctx, { userId: BOOKER }, 'recruitPractice', { id: created[0], groups: [G1] })).toThrow('所属しているグループにだけ送れます');
     expect(() => handleApi(t.ctx, { userId: BOOKER }, 'remindPractice', { id: created[0], groups: [G1] })).toThrow('入っているグループにだけ');
     expect(() => handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [{ ...item, date: '2026-10-31' }], groups: [G1] })).toThrow(
-      '入っているグループにだけ',
+      '所属しているグループにだけ送れます',
     );
     expect(t.line.pushes).toHaveLength(0);
   });
@@ -1787,18 +1805,17 @@ describe('グループ所属と外部ユーザーのアクセス制限', () => {
     }
   });
 
-  it('メンバー退出（memberLeft）時にグループの合言葉が再発行され、過去のURLでは再登録できない', () => {
+  it('memberLeft 時：複数人トーク（R）は合言葉を再発行して旧URLを無効化し、グループ（C）は合言葉を維持しつつ設定外グループは無視する', () => {
     const t = setup();
     const R = 'Rroom1';
     t.store.s.groups.push({ id: R, name: '複数人トーク', key: 'old-room-key' });
     t.store.s.groups[0].key = 'old-g1-key';
 
+    // グループ（C）は既存カードを壊さないよう合言葉を維持（退出者は groupMemberProfile で拒否される）
     handleWebhook(t.ctx, { events: [{ type: 'memberLeft', source: { type: 'group', groupId: G1 }, left: { members: [{ type: 'user', userId: BOOKER }] } }] });
-    const newG1Key = t.store.s.groups.find((g) => g.id === G1)?.key;
-    expect(newG1Key).toBeTruthy();
-    expect(newG1Key).not.toBe('old-g1-key');
+    expect(t.store.s.groups.find((g) => g.id === G1)?.key).toBe('old-g1-key');
 
-    // 複数人トーク（R...）でも退出時に合言葉が変わり、旧URLでは復帰できない
+    // 複数人トーク（R）は退出時に合言葉を再発行し、旧URLでは復帰できない
     handleWebhook(t.ctx, { events: [{ type: 'memberLeft', source: { type: 'room', roomId: R }, left: { members: [{ type: 'user', userId: 'Uleft' }] } }] });
     const newRoomKey = t.store.s.groups.find((g) => g.id === R)?.key;
     expect(newRoomKey).toBeTruthy();
@@ -1806,5 +1823,10 @@ describe('グループ所属と外部ユーザーのアクセス制限', () => {
 
     handleApi(t.ctx, { userId: 'Uleft', name: '退出者' }, 'openedFromGroup', { group: R, key: 'old-room-key' });
     expect(t.store.getMember('Uleft')?.groups).toEqual([]);
+
+    // 設定にない（Bot が入っていない）グループ/トークの memberLeft もエラーなく無視される
+    expect(() =>
+      handleWebhook(t.ctx, { events: [{ type: 'memberLeft', source: { type: 'room', roomId: 'Runknown' }, left: { members: [{ type: 'user', userId: 'Ux' }] } }] }),
+    ).not.toThrow();
   });
 });

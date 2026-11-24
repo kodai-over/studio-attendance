@@ -16,6 +16,7 @@ import {
   sortPractices,
   toJstDate,
   toJstTime,
+  TEST_MEMBER_ID,
   type Answer,
   type AttendeeKind,
   type CreateResult,
@@ -98,7 +99,7 @@ export function forgetGroupMember(ctx: Ctx, groupId: string, userId: string): vo
   });
 }
 
-/** グループの合言葉を新しく作り直す（メンバー退出時など、過去のカードURLを無効化する） */
+/** グループの合言葉を新しく作り直す（複数人トークのメンバー退出時など、過去のカードURLを無効化する） */
 export function rotateGroupKey(ctx: Ctx, groupId: string): void {
   ctx.withLock(() => {
     const s = ctx.store.settings();
@@ -107,6 +108,31 @@ export function rotateGroupKey(ctx: Ctx, groupId: string): void {
     g.key = ctx.uuid();
     ctx.store.saveSettings(s);
   });
+}
+
+const LINE_SYNC_TTL = 5 * 60;
+const lineSyncKey = (userId: string) => `linesync:${userId}`;
+
+/**
+ * 所属が空の一般メンバーについて、Bot が参加している LINE グループ（C 始まり）での実在籍を LINE API で確認して補完する。
+ * 既存の一般メンバーが未記録のまま締め出されるのを防ぎつつ、未在籍の外部ユーザーからの連続問い合わせは 5 分キャッシュで抑える。
+ */
+export function syncMemberGroupsFromLine(ctx: Ctx, m: Member): Member {
+  if (m.role !== '一般' || m.groups.length > 0) return m;
+  if (ctx.kv.get(lineSyncKey(m.userId))) return m;
+  const matched: string[] = [];
+  for (const g of ctx.store.settings().groups) {
+    if (!g.id.startsWith('C')) continue;
+    try {
+      if (ctx.line.groupMemberProfile(g.id, m.userId)) matched.push(g.id);
+    } catch (e) {
+      ctx.log('syncMemberGroupsFromLine failed', g.id, m.userId, e);
+    }
+  }
+  ctx.kv.put(lineSyncKey(m.userId), '1', LINE_SYNC_TTL);
+  if (matched.length === 0) return m;
+  for (const gid of matched) noteGroupMember(ctx, gid, m.userId);
+  return ctx.store.getMember(m.userId) ?? { ...m, groups: matched };
 }
 
 /** カードのリンクに付けるグループの合言葉。まだ無ければ作って設定に保存する。設定に無いグループなら null */
@@ -260,12 +286,13 @@ export function removeDraft(ctx: Ctx, id: string): void {
  * 同じ練習IDは登録済みとして飛ばし、直後に続く予約は既存の練習の延長として更新する（募集は出さない）。
  */
 export function createPractices(ctx: Ctx, booker: Member, inputs: NewPracticeInput[], groups: string[]): CreateResult {
-  if (!canRegister(booker)) throw new UserError('予約情報を登録できません');
+  if (!canRegister(booker)) throw new UserError('グループに所属すると予約情報を登録できます');
   const settings = ctx.store.settings();
-  const canSendTo = (g: string) => isAdmin(booker) || booker.groups.includes(g) || booker.defaultGroups.includes(g);
+  const canSendTo = (g: string) =>
+    isAdmin(booker) || booker.userId === TEST_MEMBER_ID || booker.groups.includes(g) || booker.defaultGroups.includes(g);
   const known = (gs: string[]) => {
     const uniq = [...new Set(gs)].filter((g) => settings.groups.some((s) => s.id === g));
-    if (uniq.some((g) => !canSendTo(g))) throw new UserError('あなたが入っているグループにだけ送れます。');
+    if (uniq.some((g) => !canSendTo(g))) throw new UserError('所属しているグループにだけ送れます');
     return uniq;
   };
   const validGroups = known(groups);
@@ -566,8 +593,8 @@ export function refreshStatus(ctx: Ctx, p: Practice): void {
  * 本人が入っているグループ（Bot も入っているもの）。管理者はどのグループにも送れる。すでに募集済のグループと、本人のふだんの送り先は、入っているグループとして記録されていなくても選べる
  */
 export function canRemindTo(_ctx: Ctx, me: Member | null, p: Pick<Practice, 'groups'>, groupId: string): boolean {
-  // 管理者は、これまでどおりBotが入っているグループならどこにでも送れる
-  if (isAdmin(me)) return true;
+  // 管理者（および管理者が切り替えた確認用アカウント）は Bot が入っているグループならどこにでも送れる
+  if (isAdmin(me) || me?.userId === TEST_MEMBER_ID) return true;
   if (!me) return false;
   return me.groups.includes(groupId) || p.groups.includes(groupId) || me.defaultGroups.includes(groupId);
 }
