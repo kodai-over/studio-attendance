@@ -48,7 +48,8 @@ describe('アクセストークンの確認', () => {
   it('このチャネルの有効なトークンなら、プロフィールの本人を返して覚える', () => {
     const { store } = stubGas({ [VERIFY]: ok({ client_id: CHANNEL, expires_in: 2592000 }), [PROFILE]: ok({ userId: 'U1', displayName: 'あ' }) });
     expect(verifiers().accessToken('tok')).toEqual({ userId: 'U1', name: 'あ' });
-    // 覚えるのは長くても1時間
+    // 覚えるのは長くても15分
+    expect(CACHE_MAX_SEC).toBe(900);
     expect([...store.values()][0].ttl).toBe(CACHE_MAX_SEC);
   });
 

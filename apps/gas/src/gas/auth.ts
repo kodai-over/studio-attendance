@@ -16,8 +16,8 @@ export function relayMac(secret: string, ts: number, body: string): string {
   return hex(Utilities.computeHmacSha256Signature(`${ts}.${body}`, secret, Utilities.Charset.UTF_8));
 }
 
-/** 確かめた結果を覚えておく長さ（秒） */
-export const CACHE_MAX_SEC = 3600;
+/** 確かめた結果を覚えておく長さ（秒）。トークン失効の反映遅れを抑えるため最大15分 */
+export const CACHE_MAX_SEC = 900;
 
 export function makeVerifiers(props: { relaySecret: string; loginChannelId: string }): Verifiers {
   const cache = CacheService.getScriptCache();

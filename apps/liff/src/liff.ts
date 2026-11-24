@@ -173,13 +173,19 @@ export function closeApp() {
   if (!MOCK && liff.isInClient()) liff.closeWindow();
 }
 
-/** ブラウザ・ホーム画面のアプリでログアウトする。この端末に残した前回の表示も消す */
+/** ブラウザ・ホーム画面のアプリでログアウトする。この端末に残したアプリ用キャッシュ（テーマ除く）も消す */
 export function logoutApp() {
   try {
+    const keepLocal = new Set(['pb:theme', LOGGED_OUT_KEY]);
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('pb:') && !keepLocal.has(k)) localStorage.removeItem(k);
+    }
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const k = sessionStorage.key(i);
+      if (k && k.startsWith('pb:')) sessionStorage.removeItem(k);
+    }
     localStorage.setItem(LOGGED_OUT_KEY, '1');
-    localStorage.removeItem('pb:home');
-    sessionStorage.removeItem('pb:relogin');
-    sessionStorage.removeItem('pb:actAs');
     if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   } catch {
     /* 消せなくてもログアウトは続ける */

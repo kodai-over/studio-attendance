@@ -2,6 +2,7 @@ import {
   canEditPractice,
   canExtendPractice,
   canRegister,
+  canSeePractice,
   canonicalizeStudio,
   classifyReservations,
   defaultFee,
@@ -239,8 +240,8 @@ export function buildDraft(ctx: Ctx, booker: Member, raws: RawReservation[]): Dr
     else if (r) complete.push(r);
     else incomplete.push(canonicalizePartial(settings.studios, partial!));
   }
-  // 続いている予約をまとめ、登録済みのものを除いてから、料金が読めなかったものに標準料金を入れる
-  const classified = classifyFor(ctx.store.practices(), booker, complete);
+  // 続いている予約をまとめ、閲覧可能な登録済みのものを除いてから、料金が読めなかったものに標準料金を入れる
+  const classified = classifyFor(visiblePractices(ctx, booker), booker, complete);
   const items = classified.filter((i) => i.kind !== 'duplicate').map((i) => withDefaultFee(settings, i));
   return {
     id: ctx.uuid(),
@@ -252,6 +253,15 @@ export function buildDraft(ctx: Ctx, booker: Member, raws: RawReservation[]): Dr
     groups: defaultGroupsFor(booker, settings.groups.map((g) => g.id)),
     createdAt: ctx.now().toISOString(),
   };
+}
+
+/** そのメンバーから見える予約情報だけに絞る（他グループの予約の存在推測を防ぐ） */
+export function visiblePractices(ctx: Ctx, me: Member): Practice[] {
+  const att = ctx.store.attendance();
+  return ctx.store.practices().filter((p) => {
+    const inv = att.some((a) => a.practiceId === p.id && (a.participant === me.userId || a.addedBy === me.userId));
+    return canSeePractice(me, p, inv);
+  });
 }
 
 /** 予約を分類する。延長するのは登録する人が予約した練習（管理者ならどの練習も）だけ */
@@ -311,8 +321,12 @@ export function removeDraft(ctx: Ctx, id: string): void {
  * 練習を登録する。送り先グループを指定したときだけ、新しく登録した練習の募集をそのグループに流す。
  * 同じ練習IDは登録済みとして飛ばし、直後に続く予約は既存の練習の延長として更新する（募集は出さない）。
  */
+/** 1回の一括登録で受け付ける予約情報の上限件数 */
+const MAX_CREATE_PRACTICES = 30;
+
 export function createPractices(ctx: Ctx, booker: Member, inputs: NewPracticeInput[], groups: string[]): CreateResult {
   if (!canRegister(booker)) throw new UserError('グループに所属すると予約情報を登録できます');
+  if (inputs.length > MAX_CREATE_PRACTICES) throw new UserError(`一度に登録できる予約情報は${MAX_CREATE_PRACTICES}件までです`);
   const settings = ctx.store.settings();
   const canSendTo = (g: string) =>
     isAdmin(booker) || booker.userId === TEST_MEMBER_ID || booker.groups.includes(g) || booker.defaultGroups.includes(g);
@@ -536,18 +550,20 @@ export function sendPracticeCancellation(ctx: Ctx, practice: Practice, groups: s
 }
 
 function draftPractice(ctx: Ctx, booker: Member, r: Reservation & { fee: number }, input: NewPracticeInput, groups: string[]): Practice {
+  const studio = r.studio.slice(0, 100);
+  const room = r.room.slice(0, 50);
   return {
-    id: makePracticeId(r),
+    id: makePracticeId({ ...r, studio, room }),
     date: r.date,
     start: r.start,
     end: r.end,
-    studio: r.studio,
-    room: r.room,
+    studio,
+    room,
     fee: r.fee,
     booker: booker.userId,
     max: positiveOrNull(input.max),
     min: positiveOrNull(input.min),
-    memo: (input.memo ?? '').trim(),
+    memo: (input.memo ?? '').trim().slice(0, 1000),
     status: '募集中',
     groups,
     joinKey: ctx.uuid(),

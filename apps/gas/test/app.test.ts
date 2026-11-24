@@ -2154,3 +2154,64 @@ describe('Webhookリプレイ対策とGemini読み取り防御', () => {
     expect(user).toContain('<reservation_text>\n10/21 19:00-21:00 横浜\n</reservation_text>');
   });
 });
+
+describe('Medium セキュリティ対策（閲覧絞り込み・権限・入力制限・グループ上限）', () => {
+  const item = { date: '2026-10-25', start: '19:00', end: '21:00', studio: 'worcle横浜', room: 'A', fee: 6000, max: null, min: null, memo: '' };
+
+  it('classify は他グループの予約を重複判定に混ぜない（存在推測を防止）', () => {
+    const t = setup();
+    const G2 = 'Cgroup2';
+    t.store.s.groups.push({ id: G2, name: 'チームB' });
+    inG1(t, 'Ug1', 'G1メンバー');
+    t.store.m.push({ userId: 'Ug2', name: 'G2メンバー', role: '予約者', defaultGroups: [G2], groups: [G2] });
+
+    // G2 にだけ募集された予約情報を作成
+    handleApi(t.ctx, { userId: 'Ug2' }, 'createPractices', { items: [item], groups: [G2] });
+
+    // G1 のみのメンバーが classify を呼んでも duplicate にならず new になる
+    const g1Res = handleApi(t.ctx, { userId: 'Ug1' }, 'classify', {
+      reservations: [{ date: item.date, start: item.start, end: item.end, studio: item.studio, room: item.room, fee: item.fee }],
+    }) as any[];
+    expect(g1Res[0].kind).toBe('new');
+
+    // G2 のメンバーや管理者には duplicate として見える
+    const g2Res = handleApi(t.ctx, { userId: 'Ug2' }, 'classify', {
+      reservations: [{ date: item.date, start: item.start, end: item.end, studio: item.studio, room: item.room, fee: item.fee }],
+    }) as any[];
+    expect(g2Res[0].kind).toBe('duplicate');
+  });
+
+  it('appendMemo は予約者・管理者のみ実行でき、一般閲覧者は拒否される', () => {
+    const t = setup();
+    inG1(t, 'Uviewer', '閲覧者');
+    const { created } = handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [item], groups: [G1] }) as any;
+    const pid = created[0];
+
+    expect(() => handleApi(t.ctx, { userId: 'Uviewer' }, 'appendMemo', { id: pid, text: '勝手な追記' })).toThrow('予約者か管理者だけが操作できます');
+    const updated = handleApi(t.ctx, { userId: BOOKER }, 'appendMemo', { id: pid, text: '予約者の追記' }) as any;
+    expect(updated.practice.memo).toContain('予約者の追記');
+  });
+
+  it('createPractices は31件以上の一括登録を拒否し、postFeedback は1分5件で制限される', () => {
+    const t = setup();
+    const many = Array.from({ length: 31 }, (_, i) => ({ ...item, date: `2026-11-${String((i % 28) + 1).padStart(2, '0')}`, start: `${String(10 + (i % 10)).padStart(2, '0')}:00`, end: `${String(11 + (i % 10)).padStart(2, '0')}:00` }));
+    expect(() => handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: many, groups: [] })).toThrow('一度に登録できる予約情報は30件までです');
+
+    for (let i = 1; i <= 5; i++) {
+      handleApi(t.ctx, { userId: BOOKER }, 'postFeedback', { text: `要望${i}` });
+    }
+    expect(() => handleApi(t.ctx, { userId: BOOKER }, 'postFeedback', { text: '要望6' })).toThrow('短時間に送信が集中しています');
+  });
+
+  it('onJoin はグループ登録上限（50件）を超えると自動登録しない', () => {
+    const t = setup();
+    for (let i = 2; i <= 50; i++) {
+      t.store.s.groups.push({ id: `Cextra${i}`, name: `グループ${i}` });
+    }
+    expect(t.store.s.groups).toHaveLength(50);
+    t.line.groupNames['C51'] = '51個目のグループ';
+    handleWebhook(t.ctx, { events: [{ type: 'join', source: { type: 'group', groupId: 'C51' } }] });
+    expect(t.store.s.groups).toHaveLength(50);
+    expect(t.store.s.groups.some((g) => g.id === 'C51')).toBe(false);
+  });
+});
