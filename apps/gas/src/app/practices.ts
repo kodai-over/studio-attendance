@@ -114,22 +114,25 @@ const LINE_SYNC_TTL = 5 * 60;
 const lineSyncKey = (userId: string) => `linesync:${userId}`;
 
 /**
- * 所属が空の一般メンバーについて、Bot が参加している LINE グループ（C 始まり）での実在籍を LINE API で確認して補完する。
- * 既存の一般メンバーが未記録のまま締め出されるのを防ぎつつ、未在籍の外部ユーザーからの連続問い合わせは 5 分キャッシュで抑える。
+ * 所属が空の非管理者メンバー（一般・予約者）について、Bot が参加している LINE グループ（C 始まり）での実在籍を LINE API で確認して補完する。
+ * 既存のメンバーが未記録のまま締め出されるのを防ぎつつ、未在籍の外部ユーザーからの連続問い合わせは 5 分キャッシュで抑える。
+ * LINE API の一時的な例外時はキャッシュを置かず、次回すぐ再試行できるようにする。
  */
 export function syncMemberGroupsFromLine(ctx: Ctx, m: Member): Member {
-  if (m.role !== '一般' || m.groups.length > 0) return m;
+  if (isAdmin(m) || m.userId === TEST_MEMBER_ID || m.groups.length > 0) return m;
   if (ctx.kv.get(lineSyncKey(m.userId))) return m;
   const matched: string[] = [];
+  let hadError = false;
   for (const g of ctx.store.settings().groups) {
     if (!g.id.startsWith('C')) continue;
     try {
       if (ctx.line.groupMemberProfile(g.id, m.userId)) matched.push(g.id);
     } catch (e) {
+      hadError = true;
       ctx.log('syncMemberGroupsFromLine failed', g.id, m.userId, e);
     }
   }
-  ctx.kv.put(lineSyncKey(m.userId), '1', LINE_SYNC_TTL);
+  if (!hadError) ctx.kv.put(lineSyncKey(m.userId), '1', LINE_SYNC_TTL);
   if (matched.length === 0) return m;
   for (const gid of matched) noteGroupMember(ctx, gid, m.userId);
   return ctx.store.getMember(m.userId) ?? { ...m, groups: matched };

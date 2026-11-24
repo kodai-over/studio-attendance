@@ -1730,6 +1730,51 @@ describe('グループ所属と外部ユーザーのアクセス制限', () => {
     const home = handleApi(t.ctx, { userId: 'Uexisting2' }, 'home', {}) as any;
     expect(home.me.member.groups).toEqual([G1]);
     expect(home.me.groups.map((g: any) => g.id)).toEqual([G1]);
+
+    // 所属・ふだんの送り先が空の予約者も自動補完され、そのまま募集を送信できる
+    t.store.m.push({ userId: 'UbookerEmpty', name: '未記録予約者', role: '予約者', defaultGroups: [], groups: [] });
+    t.line.groupMembers[G1].push('UbookerEmpty');
+    const bHome = handleApi(t.ctx, { userId: 'UbookerEmpty' }, 'home', {}) as any;
+    expect(bHome.me.member.groups).toEqual([G1]);
+    const res = handleApi(t.ctx, { userId: 'UbookerEmpty' }, 'createPractices', { items: [item], groups: [G1] }) as any;
+    expect(res.recruited).toEqual([G1]);
+  });
+
+  it('syncMemberGroupsFromLine は LINE API 一時障害時にキャッシュを残さず、復旧後の再試行で補完できる', () => {
+    const t = setup();
+    t.store.m.push({ userId: 'Uretry', name: '再試行', role: '一般', defaultGroups: [], groups: [] });
+    t.line.groupMembers[G1] = ['Uretry'];
+    const orig = t.line.groupMemberProfile.bind(t.line);
+    t.line.groupMemberProfile = () => {
+      throw new Error('LINE API 503');
+    };
+    try {
+      const first = handleApi(t.ctx, { userId: 'Uretry' }, 'me', {}) as any;
+      expect(first.member.groups).toEqual([]);
+      expect(t.kv.get('linesync:Uretry')).toBeNull();
+    } finally {
+      t.line.groupMemberProfile = orig;
+    }
+    const second = handleApi(t.ctx, { userId: 'Uretry' }, 'me', {}) as any;
+    expect(second.member.groups).toEqual([G1]);
+  });
+
+  it('複数人トーク（R始まり）のみの一般メンバーは、トークでの発言やカード起動で所属が付いたあとに登録・募集できる', () => {
+    const t = setup();
+    const R = 'Ronly1';
+    t.store.s.groups.push({ id: R, name: '複数人', key: 'rk1' });
+    t.store.m.push({ userId: 'UroomOnly', name: 'ルーム一般', role: '一般', defaultGroups: [], groups: [] });
+
+    // 未記録時は R トークの自動補完対象外のため登録不可
+    expect(() => handleApi(t.ctx, { userId: 'UroomOnly' }, 'createPractices', { items: [item], groups: [R] })).toThrow(
+      'グループに所属すると予約情報を登録できます',
+    );
+    // カード起動（またはトークでの発言）で所属が付いたあとは登録・募集できる
+    const home = handleApi(t.ctx, { userId: 'UroomOnly' }, 'home', { group: R, key: 'rk1' }) as any;
+    expect(home.me.member.groups).toEqual([R]);
+    expect(home.me.groups.map((g: any) => g.id)).toEqual([R]);
+    const res = handleApi(t.ctx, { userId: 'UroomOnly' }, 'createPractices', { items: [item], groups: [R] }) as any;
+    expect(res.recruited).toEqual([R]);
   });
 
   it('非管理者には所属グループのみ返し、管理者は全グループを取得できる', () => {
