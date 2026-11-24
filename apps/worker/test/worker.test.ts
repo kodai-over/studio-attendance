@@ -39,6 +39,11 @@ describe('中継', () => {
       await Promise.all(waits);
       expect(sent).toHaveLength(1);
       expect(JSON.parse(String(sent[0].body)).kind).toBe('line');
+
+      const huge = 'a'.repeat(256 * 1024 + 1);
+      const tooLarge = await worker.fetch(new Request('https://w', { method: 'POST', body: huge, headers: { 'x-line-signature': sign(huge) } }), env, ctx);
+      expect(tooLarge.status).toBe(413);
+      expect(sent).toHaveLength(1);
     } finally {
       globalThis.fetch = orig;
     }

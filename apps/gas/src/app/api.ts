@@ -341,10 +341,11 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
     if (imgs.length > MAX_SCREENSHOTS) throw new UserError(`スクショは${MAX_SCREENSHOTS}枚までにしてください`);
     let raws: RawReservation[];
     try {
-      raws = readReservations(ctx, { images: imgs, text: t || undefined });
+      raws = readReservations(ctx, { images: imgs, text: t || undefined }, me.userId);
     } catch (e) {
+      if (e instanceof UserError) throw e;
       ctx.log('read error', e);
-      throw new UserError(`予約内容を読み取れませんでした（${e instanceof Error ? e.message : String(e)}）。手で入力してください。`);
+      throw new UserError('予約内容を読み取れませんでした。時間をおいてもう一度お試しいただくか、手で入力してください。');
     }
     const d = buildDraft(ctx, me, raws);
     return { items: d.items, incomplete: d.incomplete, pastCount: d.pastCount, duplicateCount: d.duplicateCount ?? 0 };

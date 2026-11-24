@@ -1,5 +1,5 @@
-import type { ReaderHints, ReaderInput, ScreenshotReader } from '../app/ports';
-import { READER_SCHEMA, parseReaderResponse, readerPrompt } from '../app/prompt';
+import { UserError, type ReaderHints, type ReaderInput, type ScreenshotReader } from '../app/ports';
+import { READER_SCHEMA, parseReaderResponse, readerSystemPrompt, readerUserPrompt } from '../app/prompt';
 
 /** 常に最新の Flash モデルを指す別名。個別のモデルは提供終了で使えなくなるため、既定はこれにする */
 export const DEFAULT_GEMINI_MODEL = 'gemini-flash-latest';
@@ -58,11 +58,10 @@ export class GeminiReader implements ScreenshotReader {
       (msg) => console.log(msg),
     );
     if (res.code !== 200) {
-      throw new Error(
-        isTransient(res.code)
-          ? `Geminiが混み合っています（${res.code}）。少し時間をおいてもう一度お試しください`
-          : `Gemini ${res.code}: ${geminiErrorMessage(res.body)}`,
-      );
+      if (isTransient(res.code)) {
+        throw new UserError('ただいま混み合っています。少し時間をおいてもう一度お試しください');
+      }
+      throw new Error(`Gemini ${res.code}: ${geminiErrorMessage(res.body)}`);
     }
     return parseReaderResponse(JSON.parse(res.body));
   }
@@ -73,11 +72,14 @@ export class GeminiReader implements ScreenshotReader {
       contentType: 'application/json',
       headers: { 'x-goog-api-key': this.#apiKey },
       payload: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: readerSystemPrompt(hints.today, hints.studios) }],
+        },
         contents: [
           {
             role: 'user',
             parts: [
-              { text: readerPrompt(hints.today, hints.studios, input.text) },
+              { text: readerUserPrompt(input.text) },
               ...input.images.map((i) => ({ inline_data: { mime_type: i.mimeType, data: i.data } })),
             ],
           },
