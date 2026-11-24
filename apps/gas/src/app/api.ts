@@ -218,16 +218,20 @@ const publicSettings = (s: Settings, me?: Member): Settings => {
   return { ...s, groups: visible.map(({ id, name }) => ({ id, name })) };
 };
 
+const buildMe = (ctx: Ctx, me: Member, acting: Acting) => {
+  const pub = publicSettings(ctx.store.settings(), me);
+  return { member: me, groups: pub.groups, settings: pub, actAs: acting.actAs, canSwitch: acting.canSwitch };
+};
+
 // ---------------------------------------------------------------- 各操作
 
 const handlers: { [A in ApiAction]: Handler<A> } = {
   me(ctx, me, _params, acting = { actAs: 'self', canSwitch: isAdmin(me), realUserId: me.userId }) {
     if (acting.actAs === 'self') me = syncMemberGroupsFromLine(ctx, me);
-    const pub = publicSettings(ctx.store.settings(), me);
-    return { member: me, groups: pub.groups, settings: pub, actAs: acting.actAs, canSwitch: acting.canSwitch };
+    return buildMe(ctx, me, acting);
   },
 
-  home(ctx, me, params, acting) {
+  home(ctx, me, params, acting = { actAs: 'self', canSwitch: isAdmin(me), realUserId: me.userId }) {
     // 起動時の問い合わせを1回で済ませるため、グループのカードから開いたときの記録もここでする
     if (params?.group && params.key) {
       // 覚えられなくても一覧は返す（大勢が同時に開いてロックを待ちきれなかったときなど）
@@ -240,8 +244,8 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
       const saved = ctx.store.getMember(me.userId);
       if (saved && me.userId === (acting?.realUserId ?? me.userId)) me = { ...me, groups: saved.groups };
     }
-    if (!acting || acting.actAs === 'self') me = syncMemberGroupsFromLine(ctx, me);
-    return { me: handlers.me(ctx, me, {}, acting), practices: handlers.listPractices(ctx, me, {}, acting) };
+    if (acting.actAs === 'self') me = syncMemberGroupsFromLine(ctx, me);
+    return { me: buildMe(ctx, me, acting), practices: handlers.listPractices(ctx, me, {}, acting) };
   },
 
   listPractices(ctx, me) {

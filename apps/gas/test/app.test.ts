@@ -1745,18 +1745,41 @@ describe('グループ所属と外部ユーザーのアクセス制限', () => {
     t.store.m.push({ userId: 'Uretry', name: '再試行', role: '一般', defaultGroups: [], groups: [] });
     t.line.groupMembers[G1] = ['Uretry'];
     const orig = t.line.groupMemberProfile.bind(t.line);
+    let calls = 0;
     t.line.groupMemberProfile = () => {
+      calls++;
       throw new Error('LINE API 503');
     };
     try {
-      const first = handleApi(t.ctx, { userId: 'Uretry' }, 'me', {}) as any;
-      expect(first.member.groups).toEqual([]);
+      // home 内で例外が起きても、同じリクエスト内で 2 回呼ばれず 1 回だけ試行される
+      const first = handleApi(t.ctx, { userId: 'Uretry' }, 'home', {}) as any;
+      expect(first.me.member.groups).toEqual([]);
+      expect(calls).toBe(1);
       expect(t.kv.get('linesync:Uretry')).toBeNull();
     } finally {
       t.line.groupMemberProfile = orig;
     }
     const second = handleApi(t.ctx, { userId: 'Uretry' }, 'me', {}) as any;
     expect(second.member.groups).toEqual([G1]);
+  });
+
+  it('確認カードの onConfirm で所属外グループ送信エラーになった場合、下書きは消えず保持される', () => {
+    const t = setup();
+    t.store.s.groups.push({ id: G2, name: 'チームB' });
+    t.reader.result = [reservation];
+    handleWebhook(t.ctx, { events: [imageEvent(BOOKER)] });
+    const draftKey = [...t.kv.data.keys()].find((k) => k.startsWith('draft:'))!;
+    const draftId = draftKey.replace('draft:', '');
+    // 下書きの送り先に所属外グループ G2 が入っていた場合を模擬
+    const saved = JSON.parse(t.kv.data.get(draftKey)!);
+    saved.groups = [G2];
+    t.kv.data.set(draftKey, JSON.stringify(saved));
+
+    handleWebhook(t.ctx, { events: [postback(BOOKER, `a=confirm&d=${draftId}&r=1`)] });
+    expect(t.line.lastReplyText()).toContain('所属しているグループにだけ送れます');
+    expect(t.kv.data.has(draftKey)).toBe(true);
+    expect(t.store.p).toHaveLength(0);
+    expect(t.line.pushes).toHaveLength(0);
   });
 
   it('複数人トーク（R始まり）のみの一般メンバーは、トークでの発言やカード起動で所属が付いたあとに登録・募集できる', () => {
