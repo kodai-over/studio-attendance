@@ -2075,6 +2075,10 @@ describe('Webhookリプレイ対策とGemini読み取り防御', () => {
     // 別の webhookEventId なら処理される
     handleWebhook(t.ctx, { events: [baseText({ webhookEventId: 'ev-2', timestamp: nowMs })] });
     expect(t.line.replies).toHaveLength(2);
+
+    // timestamp・webhookEventId が付いていない従来のイベント形式もそのまま処理される
+    handleWebhook(t.ctx, { events: [baseText()] });
+    expect(t.line.replies).toHaveLength(3);
   });
 
   it('readReservations は他ユーザーが入力した過去予約の studio 名をプロンプトヒントに混ぜない', () => {
@@ -2105,9 +2109,14 @@ describe('Webhookリプレイ対策とGemini読み取り防御', () => {
       handleApi(t.ctx, { userId: BOOKER }, 'parseReservations', { images: [{ mimeType: 'application/pdf', data: 'abc' }] }),
     ).toThrow('対応していない形式のスクショです');
 
-    // 7MB 超の base64 データ
+    // 大文字・パラメータ付きの画像 MIME や上限ちょうど（14MB）の画像は許可される
     expect(() =>
-      handleApi(t.ctx, { userId: BOOKER }, 'parseReservations', { images: [{ mimeType: 'image/jpeg', data: 'a'.repeat(7 * 1024 * 1024 + 1) }] }),
+      handleApi(t.ctx, { userId: 'Uother' }, 'parseReservations', { images: [{ mimeType: 'IMAGE/JPEG; charset=binary', data: 'a'.repeat(14 * 1024 * 1024) }] }),
+    ).not.toThrow();
+
+    // 14MB 超の base64 データは拒否される
+    expect(() =>
+      handleApi(t.ctx, { userId: BOOKER }, 'parseReservations', { images: [{ mimeType: 'image/jpeg', data: 'a'.repeat(14 * 1024 * 1024 + 1) }] }),
     ).toThrow('スクショの容量が大きすぎます');
 
     // 1分間に10回まで成功し、11回目はレート制限

@@ -41,8 +41,15 @@ describe('中継', () => {
       expect(JSON.parse(String(sent[0].body)).kind).toBe('line');
 
       const huge = 'a'.repeat(256 * 1024 + 1);
+      // content-length ヘッダーがない場合でも本文実サイズで 413 になる
       const tooLarge = await worker.fetch(new Request('https://w', { method: 'POST', body: huge, headers: { 'x-line-signature': sign(huge) } }), env, ctx);
       expect(tooLarge.status).toBe(413);
+      const tooLargeWithHeader = await worker.fetch(
+        new Request('https://w', { method: 'POST', body: 'x', headers: { 'content-length': String(256 * 1024 + 1), 'x-line-signature': sign('x') } }),
+        env,
+        ctx,
+      );
+      expect(tooLargeWithHeader.status).toBe(413);
       expect(sent).toHaveLength(1);
     } finally {
       globalThis.fetch = orig;

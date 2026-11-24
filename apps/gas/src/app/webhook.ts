@@ -72,6 +72,7 @@ export function handleWebhook(ctx: Ctx, body: { events?: LineEvent[] }): void {
       continue;
     }
     // 同じ webhookEventId の再送・リプレイは二重処理しない
+    // （Gemini 読み取り等の長時間処理中に再送が並列到着しても二重実行されないよう、処理開始前に記録する）
     if (typeof ev.webhookEventId === 'string' && ev.webhookEventId) {
       const evKey = `whev:${ev.webhookEventId}`;
       if (ctx.kv.get(evKey)) {
