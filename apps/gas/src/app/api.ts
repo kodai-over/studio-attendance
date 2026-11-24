@@ -6,10 +6,12 @@ import {
   canRegister,
   canRemoveAttendance,
   canSeePractice,
+  deriveIcsKey,
   googleCalendarUrl,
   isActive,
   isAdmin,
   isAnswer,
+  maskJoinGuestId,
   minutes,
   normalizeTime,
   perPersonFee,
@@ -117,16 +119,20 @@ export function practiceView(ctx: Ctx, p: Practice, me: Member | null, att?: Att
   settings ??= ctx.store.settings();
   const byId = membersById(members);
   const mine = attendanceOf(att, p.id);
-  const toView = (a: Attendance): AttendeeView => ({
-    participant: a.participant,
-    name: a.kind === 'メンバー' ? (byId.get(a.participant)?.name ?? a.name) : a.name,
-    kind: a.kind,
-    via: a.via,
-    answer: a.answer,
-    addedByName: a.kind === 'ゲスト' && a.addedBy ? (byId.get(a.addedBy)?.name ?? null) : null,
-    canRemove: canRemoveAttendance(me, p, a),
-    updatedAt: a.updatedAt,
-  });
+  const toView = (a: Attendance): AttendeeView => {
+    const canRemove = canRemoveAttendance(me, p, a);
+    return {
+      // 参加リンクゲストの内部ID（guest:<uuid>）は更新キーを兼ねるため、削除権限のない閲覧者にはマスクして返す
+      participant: a.via === '参加リンク' && !canRemove ? maskJoinGuestId(p.id, a.participant) : a.participant,
+      name: a.kind === 'メンバー' ? (byId.get(a.participant)?.name ?? a.name) : a.name,
+      kind: a.kind,
+      via: a.via,
+      answer: a.answer,
+      addedByName: a.kind === 'ゲスト' && a.addedBy ? (byId.get(a.addedBy)?.name ?? null) : null,
+      canRemove,
+      updatedAt: a.updatedAt,
+    };
+  };
   const going = mine.filter((a) => a.answer === '行く').map(toView);
   const maybe = mine.filter((a) => a.answer === '保留').map(toView);
   const notGoing = mine.filter((a) => a.answer === '行かない').map(toView);
@@ -146,7 +152,7 @@ export function practiceView(ctx: Ctx, p: Practice, me: Member | null, att?: Att
     involved: me ? involved(mine, p, me) : false,
     canEdit,
     joinUrl: me && isActive(p) ? appLink(ctx.config.joinPageUrl, { p: p.id, k: joinKey }) : null,
-    icsUrl: appLink(ctx.config.gasUrl, { action: 'ics', id: p.id, k: joinKey }),
+    icsUrl: appLink(ctx.config.gasUrl, { action: 'ics', id: p.id, k: joinKey ? deriveIcsKey(p.id, joinKey) : '' }),
     googleCalendarUrl: googleCalendarUrl(p, detailUrl),
   };
 }
@@ -292,6 +298,8 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
 
   addGuest(ctx, me, { id, name }) {
     getVisibleOrThrow(ctx, me, id);
+    const guestCount = ctx.store.attendance(id).filter((a) => a.kind === 'ゲスト').length;
+    if (guestCount >= 30) throw new UserError('ゲストの登録上限に達しました');
     const res = recordAnswer(
       ctx,
       id,
