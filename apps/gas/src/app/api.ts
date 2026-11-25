@@ -329,7 +329,9 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
     ctx.withLock(() => {
       const p = getVisibleOrThrow(ctx, me, id);
       requireEditable(me, p);
-      ctx.store.savePractice({ ...p, memo: [p.memo, `${t}（${me.name}）`].filter(Boolean).join('\n').slice(0, 1000) });
+      const nextMemo = [p.memo, `${t}（${me.name}）`].filter(Boolean).join('\n');
+      if (nextMemo.length > 1000) throw new UserError('メモは1000文字までです');
+      ctx.store.savePractice({ ...p, memo: nextMemo });
     });
     return view(ctx, id, me);
   },

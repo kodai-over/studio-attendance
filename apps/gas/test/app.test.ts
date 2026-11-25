@@ -2179,17 +2179,39 @@ describe('Medium セキュリティ対策（閲覧絞り込み・権限・入力
       reservations: [{ date: item.date, start: item.start, end: item.end, studio: item.studio, room: item.room, fee: item.fee }],
     }) as any[];
     expect(g2Res[0].kind).toBe('duplicate');
+    const adminRes = handleApi(t.ctx, { userId: ADMIN }, 'classify', {
+      reservations: [{ date: item.date, start: item.start, end: item.end, studio: item.studio, room: item.room, fee: item.fee }],
+    }) as any[];
+    expect(adminRes[0].kind).toBe('duplicate');
   });
 
-  it('appendMemo は予約者・管理者のみ実行でき、一般閲覧者は拒否され、メモは1000文字に制限される', () => {
+  it('appendMemo は予約者・管理者のみ実行でき、1000文字を超える追記はエラーで拒否される', () => {
     const t = setup();
     inG1(t, 'Uviewer', '閲覧者');
     const { created } = handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [{ ...item, memo: 'あ'.repeat(995) }], groups: [G1] }) as any;
     const pid = created[0];
 
     expect(() => handleApi(t.ctx, { userId: 'Uviewer' }, 'appendMemo', { id: pid, text: '勝手な追記' })).toThrow('予約者か管理者だけが操作できます');
-    const updated = handleApi(t.ctx, { userId: BOOKER }, 'appendMemo', { id: pid, text: '予約者の追記' }) as any;
-    expect(updated.practice.memo.length).toBeLessThanOrEqual(1000);
+    expect(() => handleApi(t.ctx, { userId: BOOKER }, 'appendMemo', { id: pid, text: '予約者の追記' })).toThrow('メモは1000文字までです');
+
+    const { created: created2 } = handleApi(t.ctx, { userId: BOOKER }, 'createPractices', { items: [{ ...item, date: '2026-10-26', memo: '初期メモ' }], groups: [G1] }) as any;
+    const updated = handleApi(t.ctx, { userId: BOOKER }, 'appendMemo', { id: created2[0], text: '予約者の追記' }) as any;
+    expect(updated.practice.memo).toContain('予約者の追記');
+  });
+
+  it('createPractices は長い studio/room でもID不整合で落ちずに切り詰めて登録できる', () => {
+    const t = setup();
+    const longStudio = 'S'.repeat(120);
+    const longRoom = 'R'.repeat(80);
+    const res = handleApi(t.ctx, { userId: BOOKER }, 'createPractices', {
+      items: [{ ...item, studio: longStudio, room: longRoom, memo: 'M'.repeat(1200) }],
+      groups: [G1],
+    }) as any;
+    expect(res.created).toHaveLength(1);
+    const saved = t.store.getPractice(res.created[0])!;
+    expect(saved.studio).toHaveLength(100);
+    expect(saved.room).toHaveLength(50);
+    expect(saved.memo).toHaveLength(1000);
   });
 
   it('createPractices / classify は31件以上を拒否し、room長は50文字に制限され、postFeedback は1分5件で制限され翌分には回復する', () => {

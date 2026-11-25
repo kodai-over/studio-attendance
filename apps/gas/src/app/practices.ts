@@ -342,8 +342,9 @@ export function createPractices(ctx: Ctx, booker: Member, inputs: NewPracticeInp
   const created: Practice[] = [];
 
   const normalized = inputs.map((input) => {
-    const r = normalizeReservation(input);
-    if (!r) throw new UserError(`入力が足りない予約情報があります（${input.date || '日付なし'}）`);
+    const raw = normalizeReservation(input);
+    if (!raw) throw new UserError(`入力が足りない予約情報があります（${input.date || '日付なし'}）`);
+    const r = { ...raw, studio: raw.studio.slice(0, 100), room: raw.room.slice(0, 50) };
     return { input, r: { ...r, fee: r.fee ?? defaultFee(settings, r) } };
   });
   // 確認画面の分類（classifyReservations は日時順に見る）と同じ結果になるよう、日時順に並べてから1件ずつ分類する
@@ -550,15 +551,13 @@ export function sendPracticeCancellation(ctx: Ctx, practice: Practice, groups: s
 }
 
 function draftPractice(ctx: Ctx, booker: Member, r: Reservation & { fee: number }, input: NewPracticeInput, groups: string[]): Practice {
-  const studio = r.studio.slice(0, 100);
-  const room = r.room.slice(0, 50);
   return {
-    id: makePracticeId({ ...r, studio, room }),
+    id: makePracticeId(r),
     date: r.date,
     start: r.start,
     end: r.end,
-    studio,
-    room,
+    studio: r.studio,
+    room: r.room,
     fee: r.fee,
     booker: booker.userId,
     max: positiveOrNull(input.max),

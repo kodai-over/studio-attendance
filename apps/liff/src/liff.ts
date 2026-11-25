@@ -173,12 +173,13 @@ export function closeApp() {
   if (!MOCK && liff.isInClient()) liff.closeWindow();
 }
 
-/** ログアウト時に消すべきログイン本人のキャッシュを消す（テーマ設定・参加リンクの回答記録は残す） */
+/** ログアウト時に消すべきログイン本人のデータキャッシュだけを消す（テーマ・表示設定・既読・参加リンク記録は残す） */
 export function clearAuthStorage(local: Storage, session: Storage) {
-  const keepLocal = new Set(['pb:theme', LOGGED_OUT_KEY, 'pb:name']);
+  const clearExact = new Set(['pb:home', 'pb:rsvpDrafts']);
+  const clearPrefixes = ['pb:practiceSnapshots:', 'pb:detectedNotices:'];
   for (let i = local.length - 1; i >= 0; i--) {
     const k = local.key(i);
-    if (k && k.startsWith('pb:') && !keepLocal.has(k) && !k.startsWith('pb:join:')) {
+    if (k && (clearExact.has(k) || clearPrefixes.some((p) => k.startsWith(p)))) {
       local.removeItem(k);
     }
   }

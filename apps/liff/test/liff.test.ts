@@ -304,12 +304,16 @@ describe('LIFF 初期化 & 画面遷移ロジック', () => {
       };
     };
 
-    it('ログイン本人のキャッシュを消去し、テーマ設定・参加リンク記録・他アプリキーは残す', () => {
+    it('ログイン本人のデータキャッシュのみ消去し、テーマ・既読・表示設定・参加リンク記録は残す', () => {
       const local = makeStorage({
         'pb:home': '{"me":{}}',
         'pb:practiceSnapshots:U1': '[]',
+        'pb:detectedNotices:U1': '[]',
         'pb:rsvpDrafts': '{}',
         'pb:theme': 'dark',
+        'pb:seenRelease:U1': 'v1.11.4',
+        'pb:noticeReadAt:U1': '2026-11-24',
+        'pb:scheduleViewMode': 'week',
         'pb:name': 'ゲスト太郎',
         'pb:join:p1': 'guest:abc',
         otherKey: 'keep',
@@ -324,8 +328,12 @@ describe('LIFF 初期化 & 画面遷移ロジック', () => {
 
       expect(local.getItem('pb:home')).toBeNull();
       expect(local.getItem('pb:practiceSnapshots:U1')).toBeNull();
+      expect(local.getItem('pb:detectedNotices:U1')).toBeNull();
       expect(local.getItem('pb:rsvpDrafts')).toBeNull();
       expect(local.getItem('pb:theme')).toBe('dark');
+      expect(local.getItem('pb:seenRelease:U1')).toBe('v1.11.4');
+      expect(local.getItem('pb:noticeReadAt:U1')).toBe('2026-11-24');
+      expect(local.getItem('pb:scheduleViewMode')).toBe('week');
       expect(local.getItem('pb:name')).toBe('ゲスト太郎');
       expect(local.getItem('pb:join:p1')).toBe('guest:abc');
       expect(local.getItem('pb:loggedOut')).toBe('1');
