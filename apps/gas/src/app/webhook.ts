@@ -374,6 +374,9 @@ function onConfirm(ctx: Ctx, ev: LineEvent, userId: string, draftId: string, rec
 
 // ---------------------------------------------------------------- グループ
 
+/** 自動登録できるグループ数の上限（無制限な招待による設定肥大化を防ぐ） */
+const MAX_REGISTERED_GROUPS = 50;
+
 function onJoin(ctx: Ctx, ev: LineEvent): void {
   const id = chatId(ev.source);
   if (!id || ev.source.type === 'user') return;
@@ -386,7 +389,7 @@ function onJoin(ctx: Ctx, ev: LineEvent): void {
         ctx.log('joined but group not found', id);
         return;
       }
-      name = summary.groupName ?? '';
+      name = (summary.groupName ?? '').trim().slice(0, 50);
     } catch (e) {
       ctx.log('group summary error', e);
     }
@@ -395,10 +398,13 @@ function onJoin(ctx: Ctx, ev: LineEvent): void {
   ctx.kv.remove(goneKey(id));
   ctx.withLock(() => {
     const s = ctx.store.settings();
-    if (!s.groups.some((g) => g.id === id)) {
-      s.groups.push({ id, name: name || `グループ${s.groups.length + 1}`, key: ctx.uuid() });
-      ctx.store.saveSettings(s);
+    if (s.groups.some((g) => g.id === id)) return;
+    if (s.groups.length >= MAX_REGISTERED_GROUPS) {
+      ctx.log('group registration limit reached', id);
+      return;
     }
+    s.groups.push({ id, name: name || `グループ${s.groups.length + 1}`, key: ctx.uuid() });
+    ctx.store.saveSettings(s);
   });
   // 招待されたときの案内は送らない（グループの会話を邪魔しないため）
 }

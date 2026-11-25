@@ -173,13 +173,27 @@ export function closeApp() {
   if (!MOCK && liff.isInClient()) liff.closeWindow();
 }
 
-/** ブラウザ・ホーム画面のアプリでログアウトする。この端末に残した前回の表示も消す */
+/** ログアウト時に消すべきログイン本人のデータキャッシュだけを消す（テーマ・表示設定・既読・参加リンク記録は残す） */
+export function clearAuthStorage(local: Storage, session: Storage) {
+  const clearExact = new Set(['pb:home', 'pb:rsvpDrafts']);
+  const clearPrefixes = ['pb:practiceSnapshots:', 'pb:detectedNotices:'];
+  for (let i = local.length - 1; i >= 0; i--) {
+    const k = local.key(i);
+    if (k && (clearExact.has(k) || clearPrefixes.some((p) => k.startsWith(p)))) {
+      local.removeItem(k);
+    }
+  }
+  for (let i = session.length - 1; i >= 0; i--) {
+    const k = session.key(i);
+    if (k && k.startsWith('pb:')) session.removeItem(k);
+  }
+  local.setItem(LOGGED_OUT_KEY, '1');
+}
+
+/** ブラウザ・ホーム画面のアプリでログアウトする。この端末に残したアプリ用キャッシュ（テーマ・参加リンク記録除く）も消す */
 export function logoutApp() {
   try {
-    localStorage.setItem(LOGGED_OUT_KEY, '1');
-    localStorage.removeItem('pb:home');
-    sessionStorage.removeItem('pb:relogin');
-    sessionStorage.removeItem('pb:actAs');
+    clearAuthStorage(localStorage, sessionStorage);
     if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   } catch {
     /* 消せなくてもログアウトは続ける */

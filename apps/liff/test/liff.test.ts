@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { checkLiffRedirect, decideLiffInitAction } from '../src/liff';
+import { checkLiffRedirect, clearAuthStorage, decideLiffInitAction } from '../src/liff';
 import { readTab } from '../src/pages/List';
 import { resolveInitialHash } from '../src/route';
 import { RsvpButtons, shouldNotifyInitially } from '../src/ui';
@@ -282,6 +282,66 @@ describe('LIFF 初期化 & 画面遷移ロジック', () => {
       buttons[0].props.onClick();
       expect(onBlocked).toHaveBeenCalledWith('full');
       expect(onAnswer).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('clearAuthStorage（ログアウト時のキャッシュ消去）', () => {
+    const makeStorage = (init: Record<string, string>): Storage => {
+      const m = new Map(Object.entries(init));
+      return {
+        get length() {
+          return m.size;
+        },
+        key: (i: number) => [...m.keys()][i] ?? null,
+        getItem: (k: string) => m.get(k) ?? null,
+        setItem: (k: string, v: string) => {
+          m.set(k, v);
+        },
+        removeItem: (k: string) => {
+          m.delete(k);
+        },
+        clear: () => m.clear(),
+      };
+    };
+
+    it('ログイン本人のデータキャッシュのみ消去し、テーマ・既読・表示設定・参加リンク記録は残す', () => {
+      const local = makeStorage({
+        'pb:home': '{"me":{}}',
+        'pb:practiceSnapshots:U1': '[]',
+        'pb:detectedNotices:U1': '[]',
+        'pb:rsvpDrafts': '{}',
+        'pb:theme': 'dark',
+        'pb:seenRelease:U1': 'v1.11.4',
+        'pb:noticeReadAt:U1': '2026-11-24',
+        'pb:scheduleViewMode': 'week',
+        'pb:name': 'ゲスト太郎',
+        'pb:join:p1': 'guest:abc',
+        otherKey: 'keep',
+      });
+      const session = makeStorage({
+        'pb:relogin': '1',
+        'pb:actAs': 'member',
+        otherSession: 'keep',
+      });
+
+      clearAuthStorage(local, session);
+
+      expect(local.getItem('pb:home')).toBeNull();
+      expect(local.getItem('pb:practiceSnapshots:U1')).toBeNull();
+      expect(local.getItem('pb:detectedNotices:U1')).toBeNull();
+      expect(local.getItem('pb:rsvpDrafts')).toBeNull();
+      expect(local.getItem('pb:theme')).toBe('dark');
+      expect(local.getItem('pb:seenRelease:U1')).toBe('v1.11.4');
+      expect(local.getItem('pb:noticeReadAt:U1')).toBe('2026-11-24');
+      expect(local.getItem('pb:scheduleViewMode')).toBe('week');
+      expect(local.getItem('pb:name')).toBe('ゲスト太郎');
+      expect(local.getItem('pb:join:p1')).toBe('guest:abc');
+      expect(local.getItem('pb:loggedOut')).toBe('1');
+      expect(local.getItem('otherKey')).toBe('keep');
+
+      expect(session.getItem('pb:relogin')).toBeNull();
+      expect(session.getItem('pb:actAs')).toBeNull();
+      expect(session.getItem('otherSession')).toBe('keep');
     });
   });
 });

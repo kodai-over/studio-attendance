@@ -38,7 +38,7 @@ import {
   type StudioDef,
 } from '@studio-attendance/shared';
 import { UserError, type Ctx, type RawReservation } from './ports';
-import { buildDraft, canRemindTo, classifyFor, createPractices, ensureMember, inGroupKey, loadDraft, noteGroupMember, readReservations, recordAnswer, refreshStatus, remindRecruitMany, removeDraft, sendPracticeCancellation, sendRecruit, syncMemberGroupsFromLine, withDefaultFee } from './practices';
+import { buildDraft, canRemindTo, classifyFor, createPractices, ensureMember, inGroupKey, loadDraft, noteGroupMember, readReservations, recordAnswer, refreshStatus, remindRecruitMany, removeDraft, sendPracticeCancellation, sendRecruit, syncMemberGroupsFromLine, visiblePractices, withDefaultFee } from './practices';
 
 /** 誰として操作しているか（管理者の見え方の切り替え） */
 interface Acting {
@@ -328,7 +328,10 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
     if (!t) throw new UserError('メモを入力してください');
     ctx.withLock(() => {
       const p = getVisibleOrThrow(ctx, me, id);
-      ctx.store.savePractice({ ...p, memo: [p.memo, `${t}（${me.name}）`].filter(Boolean).join('\n') });
+      requireEditable(me, p);
+      const nextMemo = [p.memo, `${t}（${me.name}）`].filter(Boolean).join('\n');
+      if (nextMemo.length > 1000) throw new UserError('メモは1000文字までです');
+      ctx.store.savePractice({ ...p, memo: nextMemo });
     });
     return view(ctx, id, me);
   },
@@ -354,15 +357,18 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
   getDraft(ctx, me, { id }) {
     const d = loadDraft(ctx, id);
     if (!d || d.booker !== me.userId) return null;
-    // 確認カードを出してから状態が変わっているかもしれないので分類し直す
+    // 確認カードを出してから状態が変わっているかもしれないので分類し直す（他グループの予約は混ぜない）
     // まとめる前の予約から分類し直し、アプリで分け直せるよう parts を残す
     const settings = ctx.store.settings();
-    return { ...d, items: classifyFor(ctx.store.practices(), me, d.items.flatMap((i) => i.parts ?? [i.reservation])).map((i) => withDefaultFee(settings, i)) };
+    const visible = visiblePractices(ctx, me);
+    return { ...d, items: classifyFor(visible, me, d.items.flatMap((i) => i.parts ?? [i.reservation])).map((i) => withDefaultFee(settings, i)) };
   },
 
   classify(ctx, me, { reservations }) {
     if (!canRegister(me)) throw new UserError('グループに所属すると予約情報を登録できます');
-    return classifyFor(ctx.store.practices(), me, reservations ?? []);
+    const list = reservations ?? [];
+    if (list.length > 30) throw new UserError('一度に登録できる予約情報は30件までです');
+    return classifyFor(visiblePractices(ctx, me), me, list);
   },
 
   createPractices(ctx, me, { items, groups, draftId }) {
@@ -379,7 +385,7 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
       if (patch.start !== undefined) next.start = normalizeTime(patch.start) ?? fail('開始時刻が不正です');
       if (patch.end !== undefined) next.end = normalizeTime(patch.end) ?? fail('終了時刻が不正です');
       if (minutes(next.end) <= minutes(next.start)) fail('終了時刻は開始時刻より後にしてください');
-      if (patch.room !== undefined) next.room = String(patch.room).trim();
+      if (patch.room !== undefined) next.room = String(patch.room).trim().slice(0, 50);
       if (patch.fee !== undefined) next.fee = nonNegative(patch.fee) ?? fail('スタジオ代が不正です');
       if (patch.max !== undefined) next.max = positiveOrNull(patch.max);
       if (patch.min !== undefined) next.min = positiveOrNull(patch.min);
@@ -492,6 +498,11 @@ const handlers: { [A in ApiAction]: Handler<A> } = {
     if (!canRegister(me)) throw new UserError('グループに所属すると要望を送れます');
     const t = typeof text === 'string' ? text.trim().slice(0, 1000) : '';
     if (!t) throw new UserError('要望を入力してください');
+    // 要望の連投によるシート肥大化を防ぐベストエフォート制限（1分間に5件まで）
+    const rateKey = `fbrate:${me.userId}:${Math.floor(ctx.now().getTime() / 60_000)}`;
+    const count = Number(ctx.kv.get(rateKey) ?? '0');
+    if (count >= 5) throw new UserError('短時間に送信が集中しています。少し時間をおいてお試しください');
+    ctx.kv.put(rateKey, String(count + 1), 60);
     ctx.withLock(() =>
       ctx.store.saveFeedback({ id: ctx.uuid(), userId: me.userId, name: me.name, text: t, status: '未対応', reply: '', createdAt: ctx.now().toISOString() }),
     );
