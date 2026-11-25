@@ -2243,4 +2243,34 @@ describe('Medium セキュリティ対策（閲覧絞り込み・権限・入力
     expect(t.store.s.groups).toHaveLength(50);
     expect(t.store.s.groups.some((g) => g.id === 'C51')).toBe(false);
   });
+
+  it('sendDayBefore の送信失敗時は withLock 内で reminded を false に戻す', () => {
+    const t = setup();
+    t.clock.now = new Date('2026-10-18T00:00:00Z');
+    const { created } = handleApi(t.ctx, { userId: BOOKER }, 'createPractices', {
+      items: [{ ...item, date: '2026-10-21', start: '19:00', end: '21:00' }],
+      groups: [G1],
+    }) as any;
+    const pid = created[0];
+    let lockCalls = 0;
+    const origLock = t.ctx.withLock;
+    t.ctx.withLock = (fn) => {
+      lockCalls++;
+      return origLock(fn);
+    };
+    const origPush = t.line.push.bind(t.line);
+    t.line.push = () => {
+      throw new Error('LINE temporary error');
+    };
+    try {
+      t.clock.now = new Date('2026-10-20T10:00:00Z');
+      hourlyJob(t.ctx);
+      expect(t.store.getPractice(pid)?.reminded).toBe(false);
+      // hourlyJob 本体 + sendDayBefore 内の reminded 戻し + syncGroupNames で少なくとも3回 withLock が呼ばれる
+      expect(lockCalls).toBeGreaterThanOrEqual(3);
+    } finally {
+      t.line.push = origPush;
+      t.ctx.withLock = origLock;
+    }
+  });
 });
