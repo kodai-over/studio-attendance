@@ -98,8 +98,10 @@ function sendDayBefore(ctx: Ctx, p: Practice): void {
     }
   }
   if (sent === 0) {
-    const cur = ctx.store.getPractice(p.id);
-    if (cur) ctx.store.savePractice({ ...cur, reminded: false });
+    ctx.withLock(() => {
+      const cur = ctx.store.getPractice(p.id);
+      if (cur) ctx.store.savePractice({ ...cur, reminded: false });
+    });
   }
 }
 
